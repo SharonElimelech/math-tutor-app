@@ -35,6 +35,7 @@ const App = (() => {
   let students = DB.load("students", []);
   let lessons  = DB.load("lessons", []);
   let viewMonth = new Date(); // החודש שמוצג בסיכום
+  let showPast = false;       // האם להציג שיעורים שעברו ביומן
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const save = () => { DB.save("students", students); DB.save("lessons", lessons); };
@@ -42,7 +43,9 @@ const App = (() => {
   // ----- עזרי תאריך -----
   const fmtDate = d => new Date(d).toLocaleDateString("he-IL", { weekday: "short", day: "numeric", month: "numeric" });
   const fmtTime = t => t || "";
-  const todayStr = () => new Date().toISOString().slice(0, 10);
+  // פורמט תאריך מקומי YYYY-MM-DD (לא UTC) — מונע הזזת יום באזור זמן ישראל
+  const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const todayStr = () => ymd(new Date());
   const monthKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -140,9 +143,15 @@ const App = (() => {
     openModal(`
       <h3>${id ? "עריכת שיעור" : "שיעור חדש"}</h3>
       <label>תלמיד</label>
-      <select id="f-student">
-        ${students.map(s => `<option value="${s.id}" ${s.id === l.studentId ? "selected" : ""}>${escapeHtml(s.name)}</option>`).join("")}
-      </select>
+      <input id="f-student-search" placeholder="חיפוש תלמיד..." autocomplete="off" oninput="App.renderStudentPicker()">
+      <input type="hidden" id="f-student" value="${l.studentId}">
+      <div id="studentPicker" class="student-picker"></div>
+      <label>בחירה מהירה</label>
+      <div class="quick-dates">
+        <button type="button" class="quick-date" onclick="App.setLessonDate(0,this)">היום</button>
+        <button type="button" class="quick-date" onclick="App.setLessonDate(1,this)">מחר</button>
+        <button type="button" class="quick-date" onclick="App.setLessonDate(7,this)">בעוד שבוע</button>
+      </div>
       <div class="row">
         <div><label>תאריך</label><input id="f-date" type="date" value="${l.date}"></div>
         <div><label>שעה</label><input id="f-time" type="time" value="${l.time}"></div>
@@ -162,6 +171,29 @@ const App = (() => {
       <button class="btn btn-green btn-block" onclick="App.saveLesson('${id || ""}')">שמירה</button>
       ${id ? `<button class="btn btn-danger btn-block" onclick="App.deleteLesson('${id}')">מחיקת שיעור</button>` : ""}
     `);
+    renderStudentPicker();
+  }
+
+  // בורר תלמיד עם חיפוש (בתוך טופס שיעור)
+  function renderStudentPicker() {
+    const pick = document.getElementById("studentPicker");
+    if (!pick) return;
+    const searchEl = document.getElementById("f-student-search");
+    const term = (searchEl ? searchEl.value : "").trim().toLowerCase();
+    const selId = document.getElementById("f-student").value;
+    const matches = students.filter(s => s.name.toLowerCase().includes(term));
+    if (!matches.length) { pick.innerHTML = `<div class="picker-empty">לא נמצא תלמיד</div>`; return; }
+    pick.innerHTML = matches.map(s => `
+      <div class="picker-row ${s.id === selId ? "sel" : ""}" onclick="App.pickStudent('${s.id}')">
+        <span>${escapeHtml(s.name)}</span>
+        ${s.id === selId ? icon("check") : ""}
+      </div>`).join("");
+  }
+
+  function pickStudent(id) {
+    const h = document.getElementById("f-student");
+    if (h) h.value = id;
+    renderStudentPicker();
   }
 
   function saveLesson(id) {
@@ -184,11 +216,20 @@ const App = (() => {
         d.setDate(d.getDate() + i * 7);
         lessons.push({
           id: uid(), paid: false, done: false, ...data,
-          date: d.toISOString().slice(0, 10)
+          date: ymd(d)
         });
       }
     }
     save(); closeModal(); render();
+  }
+
+  function setLessonDate(offset, btn) {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    const el = document.getElementById("f-date");
+    if (el) el.value = ymd(d);
+    document.querySelectorAll(".quick-date").forEach(b => b.classList.remove("sel"));
+    if (btn) btn.classList.add("sel");
   }
 
   function deleteLesson(id) {
@@ -212,27 +253,84 @@ const App = (() => {
   const dateTimeLine = l =>
     `${icon("calendar", "ic-sub")} ${fmtDate(l.date)} &nbsp;·&nbsp; ${icon("clock", "ic-sub")} ${fmtTime(l.time)}`;
 
+  // תווית יום יחסית ("היום", "מחר", שם היום)
+  function dayLabel(dateStr) {
+    const d = new Date(dateStr + "T00:00");
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const diff = Math.round((d - t) / 86400000);
+    const wd = d.toLocaleDateString("he-IL", { weekday: "long" });
+    const dm = d.toLocaleDateString("he-IL", { day: "numeric", month: "long" });
+    if (diff === 0) return `<span class="rel">היום</span> · ${dm}`;
+    if (diff === 1) return `<span class="rel">מחר</span> · ${dm}`;
+    if (diff === -1) return `אתמול · ${dm}`;
+    if (diff > 1 && diff < 7) return `${wd} · ${dm}`;
+    return `${wd}, ${dm}`;
+  }
+
+  // קיבוץ שיעורים לפי תאריך, שומר על סדר
+  function groupByDate(list) {
+    const map = new Map();
+    list.forEach(l => {
+      if (!map.has(l.date)) map.set(l.date, []);
+      map.get(l.date).push(l);
+    });
+    return map;
+  }
+
+  function lessonRow(l) {
+    const s = studentById(l.studentId) || { name: "תלמיד שנמחק" };
+    const isToday = l.date === todayStr();
+    return `
+      <div class="lesson-row ${l.done ? "is-done" : ""} ${isToday ? "is-today" : ""}">
+        <div class="time-chip" onclick="App.openLessonForm('${l.id}')">${fmtTime(l.time) || "—"}</div>
+        <div class="lesson-body" onclick="App.openLessonForm('${l.id}')">
+          <div class="lesson-name">${escapeHtml(s.name)}</div>
+          ${l.topic ? `<div class="lesson-topic">${icon("note", "ic-sub")} ${escapeHtml(l.topic)}</div>` : ""}
+        </div>
+        <button class="lesson-check ${l.done ? "done" : ""}" onclick="App.toggleDone('${l.id}')" title="${l.done ? "בוצע" : "סמן כבוצע"}">${icon("check")}</button>
+      </div>`;
+  }
+
+  function dayGroupHtml(date, dayLessons) {
+    const count = dayLessons.length;
+    return `
+      <div class="day-group">
+        <div class="day-head">
+          <span class="day-label">${dayLabel(date)}</span>
+          <span class="day-count">${count} ${count === 1 ? "שיעור" : "שיעורים"}</span>
+        </div>
+        <div class="day-lessons">${dayLessons.map(lessonRow).join("")}</div>
+      </div>`;
+  }
+
   function renderLessons() {
     const el = document.getElementById("lessonsList");
     const list = lessonSorted();
-    if (!list.length) { el.innerHTML = `<div class="empty">אין שיעורים ביומן.<br>קבעי שיעור עם הכפתור שלמעלה.</div>`; return; }
-    el.innerHTML = list.map(l => {
-      const s = studentById(l.studentId) || { name: "תלמיד שנמחק" };
-      return `
-        <div class="item">
-          <div class="item-main" onclick="App.openLessonForm('${l.id}')">
-            <div class="item-title">${escapeHtml(s.name)} ${doneMark(l.done)}</div>
-            <div class="item-sub">${dateTimeLine(l)}</div>
-            ${l.topic ? `<div class="item-note">${icon("note", "ic-sub")} ${escapeHtml(l.topic)}</div>` : ""}
-          </div>
-          <div class="item-actions">
-            <button class="btn ${l.done ? "btn-light" : "btn-green"}" onclick="App.toggleDone('${l.id}')">
-              ${l.done ? "בוטל סימון" : "בוצע"}
-            </button>
-          </div>
-        </div>`;
-    }).join("");
+    if (!list.length) {
+      el.innerHTML = `<div class="empty">אין שיעורים ביומן.<br>קבעי שיעור עם הכפתור שלמעלה.</div>`;
+      return;
+    }
+    const today = todayStr();
+    const upcoming = list.filter(l => l.date >= today);
+    const past = list.filter(l => l.date < today).reverse(); // האחרונים קודם
+
+    let html = "";
+    if (upcoming.length) {
+      groupByDate(upcoming).forEach((ls, date) => { html += dayGroupHtml(date, ls); });
+    } else {
+      html += `<div class="empty">אין שיעורים קרובים</div>`;
+    }
+
+    if (past.length) {
+      html += `<button class="past-toggle" onclick="App.togglePast()">${showPast ? "הסתר" : "הצג"} שיעורים שעברו (${past.length})</button>`;
+      if (showPast) {
+        groupByDate(past).forEach((ls, date) => { html += dayGroupHtml(date, ls); });
+      }
+    }
+    el.innerHTML = html;
   }
+
+  function togglePast() { showPast = !showPast; renderLessons(); }
 
   // ========== מסך בית ==========
   function renderHome() {
@@ -494,6 +592,7 @@ const App = (() => {
     go, closeModal, renderStudents,
     openStudentForm, saveStudent, deleteStudent,
     openLessonForm, saveLesson, deleteLesson, toggleDone,
+    setLessonDate, togglePast, renderStudentPicker, pickStudent,
     sendWhatsApp, markAllPaid,
     exportData, importData,
     changeMonth

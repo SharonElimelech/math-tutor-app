@@ -278,6 +278,130 @@ main { padding: 18px 16px; max-width: 620px; margin: 0 auto; }
   border-radius: var(--r-md);
 }
 
+/* ---------- יומן מקובץ לפי יום ---------- */
+.day-group { margin-bottom: 22px; }
+.day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 4px 10px;
+}
+.day-label { font-weight: 800; font-size: 1.02rem; letter-spacing: -.01em; }
+.day-label .rel { color: var(--brand-1); }
+.day-count { font-size: .76rem; color: var(--faint); font-weight: 700; }
+.day-lessons { display: flex; flex-direction: column; gap: 9px; }
+
+.lesson-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: var(--sh-sm);
+  transition: transform .12s ease, box-shadow .2s ease;
+}
+.lesson-row:active { transform: scale(.99); }
+.lesson-row.is-done { opacity: .55; }
+.time-chip {
+  background: var(--bg-soft);
+  color: var(--text);
+  font-weight: 800;
+  font-size: .98rem;
+  border-radius: 12px;
+  padding: 9px 8px;
+  min-width: 58px;
+  text-align: center;
+  line-height: 1.15;
+  flex: none;
+}
+.lesson-row.is-today .time-chip { background: var(--orange-bg); color: var(--orange); }
+.lesson-body { flex: 1; min-width: 0; cursor: pointer; }
+.lesson-name {
+  font-weight: 700;
+  font-size: 1.03rem;
+  letter-spacing: -.01em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lesson-topic { color: var(--muted); font-size: .83rem; margin-top: 3px; }
+.lesson-check {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.lesson-check svg { width: 18px; height: 18px; }
+.lesson-check:active { transform: scale(.9); }
+.lesson-check.done { background: var(--green); border-color: var(--green); color: #fff; }
+
+.past-toggle {
+  width: 100%;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 13px;
+  color: var(--muted);
+  font-weight: 700;
+  font-family: inherit;
+  font-size: .9rem;
+  cursor: pointer;
+  margin: 6px 0 18px;
+}
+.past-toggle:active { background: var(--bg-soft); }
+
+/* בורר תלמיד עם חיפוש */
+.student-picker {
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 16px;
+  background: var(--surface-2);
+}
+.picker-row {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.picker-row:last-child { border-bottom: none; }
+.picker-row:active { background: var(--bg-soft); }
+.picker-row.sel { background: var(--orange-bg); color: var(--orange); }
+.picker-row.sel svg { width: 16px; height: 16px; }
+.picker-empty { padding: 14px; text-align: center; color: var(--faint); }
+
+/* כפתורי תאריך מהירים בטופס */
+.quick-dates { display: flex; gap: 8px; margin-bottom: 14px; }
+.quick-date {
+  flex: 1;
+  background: var(--bg-soft);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 6px;
+  font-size: .88rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.quick-date:active { transform: scale(.96); }
+.quick-date.sel { background: var(--brand-1); border-color: var(--brand-1); color: #fff; }
+
 /* ---------- חיפוש ---------- */
 .search-wrap { position: relative; margin-bottom: 16px; }
 .search-wrap .ic {
