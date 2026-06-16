@@ -2,8 +2,8 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#1f2937">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1f2937" id="themeColorMeta">
   <title>המורה שלי - ניהול שיעורים פרטיים</title>
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,13 +18,18 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 2.7 3 6 3s6-2 6-3v-5"/><path d="M22 10v6"/></svg>
       המורה שלי
     </h1>
-    <div id="reminderBadge" class="reminder-badge hidden"></div>
+    <div class="header-right">
+      <div id="reminderBadge" class="reminder-badge hidden"></div>
+      <button class="header-icon-btn" aria-label="הגדרות" onclick="App.go('settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
   </header>
 
   <main id="app">
     <!-- מסך: בית / שיעורים קרובים -->
     <section id="view-home" class="view active">
-      <h2>שלום</h2>
+      <h2 id="homeGreeting">שלום</h2>
       <div id="todaySummary" class="card summary-card"></div>
       <h3>השיעורים הקרובים</h3>
       <div id="upcomingLessons" class="list"></div>
@@ -59,6 +64,11 @@
         <h2>יומן שיעורים</h2>
         <button class="btn-add" onclick="App.openLessonForm()">+ שיעור</button>
       </div>
+      <div class="seg-toggle">
+        <button class="seg-btn active" data-cal="list" onclick="App.setCalendarMode('list')">רשימה</button>
+        <button class="seg-btn" data-cal="month" onclick="App.setCalendarMode('month')">לוח חודשי</button>
+      </div>
+      <div id="calendarMonth" class="calendar-month hidden"></div>
       <div id="lessonsList" class="list"></div>
     </section>
 
@@ -79,6 +89,14 @@
       <div id="incomeSummary"></div>
       <canvas id="incomeChart" height="200"></canvas>
     </section>
+
+    <!-- מסך: הגדרות -->
+    <section id="view-settings" class="view">
+      <div class="view-head">
+        <h2>הגדרות</h2>
+      </div>
+      <div id="settingsBody"></div>
+    </section>
   </main>
 
   <nav class="bottom-nav">
@@ -97,6 +115,26 @@
       <div id="modalBody"></div>
     </div>
   </div>
+
+  <!-- באנר התקנה -->
+  <div id="installBanner" class="banner hidden">
+    <span>אפשר להתקין את האפליקציה על המסך הבית</span>
+    <div class="banner-actions">
+      <button class="btn btn-light banner-btn" onclick="App.dismissInstall()">לא עכשיו</button>
+      <button class="btn btn-green banner-btn" onclick="App.promptInstall()">התקנה</button>
+    </div>
+  </div>
+
+  <!-- באנר עדכון -->
+  <div id="updateBanner" class="banner hidden">
+    <span>גרסה חדשה זמינה</span>
+    <div class="banner-actions">
+      <button class="btn btn-green banner-btn" onclick="App.applyUpdate()">רענון</button>
+    </div>
+  </div>
+
+  <!-- הודעות צפות -->
+  <div id="toastWrap" class="toast-wrap"></div>
 
   <script src="app.js"></script>
 </body>

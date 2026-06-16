@@ -18,7 +18,9 @@ const App = (() => {
     whatsapp: '<path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.5L3 21l2-5.4A8.5 8.5 0 1 1 21 11.5z"/><path d="M8.6 9.6c0 3.8 2 5.8 5.8 6.3"/>',
     send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
     repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
-    bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9z"/><path d="M10.5 21a2 2 0 0 0 3 0"/>'
+    bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9z"/><path d="M10.5 21a2 2 0 0 0 3 0"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/>',
+    warn: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>'
   };
   const icon = (name, cls) =>
     `<svg class="${cls || "ic"}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${SVG[name]}</svg>`;
@@ -26,31 +28,88 @@ const App = (() => {
   // ----- שכבת נתונים -----
   const DB = {
     load(key, def) {
-      try { return JSON.parse(localStorage.getItem("mt_" + key)) ?? def; }
+      try { const v = JSON.parse(localStorage.getItem("mt_" + key)); return v ?? def; }
       catch { return def; }
     },
-    save(key, val) { localStorage.setItem("mt_" + key, JSON.stringify(val)); }
+    save(key, val) {
+      try { localStorage.setItem("mt_" + key, JSON.stringify(val)); }
+      catch (e) { toast("שמירה נכשלה — אחסון מלא?", "err"); }
+    }
+  };
+
+  const DATA_VERSION = 2;
+  const DEFAULT_SETTINGS = {
+    teacherName: "",
+    currency: "₪",
+    defaultPrice: 120,
+    defaultTime: "16:00",
+    defaultDuration: 60,
+    theme: "auto",        // auto | light | dark
+    remindMinutes: 30
   };
 
   let students = DB.load("students", []);
   let lessons  = DB.load("lessons", []);
-  let viewMonth = new Date(); // החודש שמוצג בסיכום
-  let showPast = false;       // האם להציג שיעורים שעברו ביומן
+  let settings = Object.assign({}, DEFAULT_SETTINGS, DB.load("settings", {}));
+
+  let viewMonth = new Date();      // החודש שמוצג בסיכום הכנסות
+  let calMonth  = new Date();      // החודש שמוצג בלוח החודשי
+  let selectedDay = null;          // יום נבחר בלוח החודשי
+  let calMode = "list";            // list | month
+  let showPast = false;
+
+  // ----- מיגרציית נתונים -----
+  function migrate() {
+    const stored = DB.load("version", 1);
+    let changed = false;
+    if (stored < 2) {
+      lessons.forEach(l => {
+        if (typeof l.paid !== "boolean") l.paid = false;
+        if (typeof l.done !== "boolean") l.done = false;
+        if (typeof l.duration !== "number") l.duration = DEFAULT_SETTINGS.defaultDuration;
+      });
+      changed = true;
+    }
+    if (changed) { DB.save("lessons", lessons); }
+    DB.save("version", DATA_VERSION);
+  }
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const save = () => { DB.save("students", students); DB.save("lessons", lessons); };
+  const saveSettings = () => DB.save("settings", settings);
 
-  // ----- עזרי תאריך -----
+  // ----- עזרי תאריך וכסף -----
   const fmtDate = d => new Date(d).toLocaleDateString("he-IL", { weekday: "short", day: "numeric", month: "numeric" });
   const fmtTime = t => t || "";
-  // פורמט תאריך מקומי YYYY-MM-DD (לא UTC) — מונע הזזת יום באזור זמן ישראל
   const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const todayStr = () => ymd(new Date());
   const monthKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const cur = n => `${settings.currency}${n}`;
   const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   const studentById = id => students.find(s => s.id === id);
+  // מחיר שיעור: עדיפות למחיר ששמור על השיעור, אחרת מחיר התלמיד
+  const lessonPrice = l => {
+    if (typeof l.price === "number") return l.price;
+    const s = studentById(l.studentId);
+    return s ? (s.price || 0) : 0;
+  };
+
+  // ----- הודעות צפות (toast) -----
+  function toast(msg, type = "") {
+    const wrap = document.getElementById("toastWrap");
+    if (!wrap) return alert(msg);
+    const el = document.createElement("div");
+    el.className = "toast" + (type ? " " + type : "");
+    const ico = type === "ok" ? "checkCircle" : type === "err" ? "warn" : "info";
+    el.innerHTML = icon(ico) + "<span>" + escapeHtml(msg) + "</span>";
+    wrap.appendChild(el);
+    setTimeout(() => {
+      el.classList.add("out");
+      setTimeout(() => el.remove(), 260);
+    }, 3000);
+  }
 
   // ----- ניווט -----
   function go(view) {
@@ -73,17 +132,18 @@ const App = (() => {
 
   // ========== תלמידים ==========
   function openStudentForm(id) {
-    const s = id ? studentById(id) : { name: "", parentName: "", phone: "", price: "" };
+    const s = id ? studentById(id) : { name: "", parentName: "", phone: "", price: settings.defaultPrice };
     openModal(`
       <h3>${id ? "עריכת תלמיד" : "תלמיד חדש"}</h3>
       <label>שם התלמיד</label>
       <input id="f-name" value="${escapeHtml(s.name)}" placeholder="לדוגמה: דנה כהן">
+      <div id="err-name" class="field-error" style="display:none">נא להזין שם תלמיד</div>
       <label>שם ההורה</label>
       <input id="f-parent" value="${escapeHtml(s.parentName)}" placeholder="לדוגמה: רונית">
       <label>טלפון ההורה (לוואטסאפ)</label>
-      <input id="f-phone" type="tel" value="${escapeHtml(s.phone)}" placeholder="05X-XXXXXXX">
-      <label>מחיר לשיעור (₪)</label>
-      <input id="f-price" type="number" value="${escapeHtml(s.price)}" placeholder="120">
+      <input id="f-phone" type="tel" inputmode="tel" value="${escapeHtml(s.phone)}" placeholder="05X-XXXXXXX">
+      <label>מחיר לשיעור (${escapeHtml(settings.currency)})</label>
+      <input id="f-price" type="number" inputmode="numeric" min="0" value="${escapeHtml(s.price)}" placeholder="120">
       <button class="btn btn-green btn-block" onclick="App.saveStudent('${id || ""}')">שמירה</button>
       ${id ? `<button class="btn btn-danger btn-block" onclick="App.deleteStudent('${id}')">מחיקת תלמיד</button>` : ""}
     `);
@@ -91,17 +151,26 @@ const App = (() => {
 
   function saveStudent(id) {
     const name = document.getElementById("f-name").value.trim();
-    if (!name) { alert("נא להזין שם תלמיד"); return; }
+    if (!name) {
+      document.getElementById("err-name").style.display = "block";
+      return;
+    }
+    const phone = document.getElementById("f-phone").value.trim();
+    if (phone && !/[0-9]{6,}/.test(phone.replace(/[^0-9]/g, ""))) {
+      toast("מספר טלפון לא תקין", "err"); return;
+    }
     const data = {
       name,
       parentName: document.getElementById("f-parent").value.trim(),
-      phone: document.getElementById("f-phone").value.trim(),
-      price: parseFloat(document.getElementById("f-price").value) || 0
+      phone,
+      price: Math.max(0, parseFloat(document.getElementById("f-price").value) || 0)
     };
     if (id) {
       Object.assign(studentById(id), data);
+      toast("התלמיד עודכן", "ok");
     } else {
       students.push({ id: uid(), ...data });
+      toast("תלמיד נוסף", "ok");
     }
     save(); closeModal(); render();
   }
@@ -111,6 +180,7 @@ const App = (() => {
     students = students.filter(s => s.id !== id);
     lessons = lessons.filter(l => l.studentId !== id);
     save(); closeModal(); render();
+    toast("התלמיד נמחק");
   }
 
   function renderStudents() {
@@ -128,7 +198,7 @@ const App = (() => {
           <div class="item-title">${escapeHtml(s.name)}</div>
           <div class="item-sub">
             הורה: ${escapeHtml(s.parentName) || "—"} ${s.phone ? "· " + escapeHtml(s.phone) : ""}<br>
-            ₪${s.price} לשיעור
+            ${cur(s.price)} לשיעור
           </div>
         </div>
         <div class="item-actions"><span class="btn btn-light">${icon("edit")}</span></div>
@@ -138,8 +208,11 @@ const App = (() => {
 
   // ========== שיעורים / יומן ==========
   function openLessonForm(id) {
-    if (!students.length) { alert("צריך קודם להוסיף לפחות תלמיד אחד"); return; }
-    const l = id ? lessons.find(x => x.id === id) : { studentId: students[0].id, date: todayStr(), time: "16:00", topic: "" };
+    if (!students.length) { toast("צריך קודם להוסיף לפחות תלמיד אחד", "err"); return; }
+    const l = id
+      ? lessons.find(x => x.id === id)
+      : { studentId: students[0].id, date: selectedDay || todayStr(), time: settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
+    const priceVal = (typeof l.price === "number") ? l.price : "";
     openModal(`
       <h3>${id ? "עריכת שיעור" : "שיעור חדש"}</h3>
       <label>תלמיד</label>
@@ -155,6 +228,10 @@ const App = (() => {
       <div class="row">
         <div><label>תאריך</label><input id="f-date" type="date" value="${l.date}"></div>
         <div><label>שעה</label><input id="f-time" type="time" value="${l.time}"></div>
+      </div>
+      <div class="row">
+        <div><label>משך (דקות)</label><input id="f-duration" type="number" inputmode="numeric" min="0" step="15" value="${l.duration ?? settings.defaultDuration}"></div>
+        <div><label>מחיר לשיעור זה (${escapeHtml(settings.currency)})</label><input id="f-price" type="number" inputmode="numeric" min="0" value="${priceVal}" placeholder="ברירת מחדל מהתלמיד"></div>
       </div>
       <label>נושא / הערות (לא חובה)</label>
       <input id="f-topic" value="${escapeHtml(l.topic || "")}" placeholder="לדוגמה: גיאומטריה - משפט פיתגורס">
@@ -197,15 +274,20 @@ const App = (() => {
   }
 
   function saveLesson(id) {
+    const priceRaw = document.getElementById("f-price").value.trim();
+    const durRaw = document.getElementById("f-duration").value.trim();
     const data = {
       studentId: document.getElementById("f-student").value,
       date: document.getElementById("f-date").value,
       time: document.getElementById("f-time").value,
-      topic: document.getElementById("f-topic").value.trim()
+      topic: document.getElementById("f-topic").value.trim(),
+      duration: durRaw === "" ? settings.defaultDuration : Math.max(0, parseInt(durRaw) || 0),
+      price: priceRaw === "" ? undefined : Math.max(0, parseFloat(priceRaw) || 0)
     };
-    if (!data.date) { alert("נא לבחור תאריך"); return; }
+    if (!data.date) { toast("נא לבחור תאריך", "err"); return; }
     if (id) {
       Object.assign(lessons.find(x => x.id === id), data);
+      toast("השיעור עודכן", "ok");
     } else {
       const repeat = document.getElementById("f-repeat");
       const weeks = (repeat && repeat.checked)
@@ -214,11 +296,9 @@ const App = (() => {
       for (let i = 0; i < weeks; i++) {
         const d = new Date(data.date + "T00:00");
         d.setDate(d.getDate() + i * 7);
-        lessons.push({
-          id: uid(), paid: false, done: false, ...data,
-          date: ymd(d)
-        });
+        lessons.push({ id: uid(), paid: false, done: false, ...data, date: ymd(d) });
       }
+      toast(weeks > 1 ? `נקבעו ${weeks} שיעורים` : "השיעור נקבע", "ok");
     }
     save(); closeModal(); render();
   }
@@ -236,6 +316,7 @@ const App = (() => {
     if (!confirm("למחוק את השיעור?")) return;
     lessons = lessons.filter(l => l.id !== id);
     save(); closeModal(); render();
+    toast("השיעור נמחק");
   }
 
   function toggleDone(id) {
@@ -249,7 +330,6 @@ const App = (() => {
       (a.date + a.time).localeCompare(b.date + b.time));
   }
 
-  const doneMark = done => done ? `<span style="color:var(--green)">${icon("check")}</span>` : "";
   const dateTimeLine = l =>
     `${icon("calendar", "ic-sub")} ${fmtDate(l.date)} &nbsp;·&nbsp; ${icon("clock", "ic-sub")} ${fmtTime(l.time)}`;
 
@@ -267,7 +347,6 @@ const App = (() => {
     return `${wd}, ${dm}`;
   }
 
-  // קיבוץ שיעורים לפי תאריך, שומר על סדר
   function groupByDate(list) {
     const map = new Map();
     list.forEach(l => {
@@ -282,7 +361,7 @@ const App = (() => {
     const isToday = l.date === todayStr();
     return `
       <div class="lesson-row ${l.done ? "is-done" : ""} ${isToday ? "is-today" : ""}">
-        <div class="time-chip" onclick="App.openLessonForm('${l.id}')">${fmtTime(l.time) || "—"}</div>
+        <div class="time-chip" onclick="App.openLessonForm('${l.id}')">${fmtTime(l.time) || "—"}${l.duration ? `<span class="dur">${l.duration}׳</span>` : ""}</div>
         <div class="lesson-body" onclick="App.openLessonForm('${l.id}')">
           <div class="lesson-name">${escapeHtml(s.name)}</div>
           ${l.topic ? `<div class="lesson-topic">${icon("note", "ic-sub")} ${escapeHtml(l.topic)}</div>` : ""}
@@ -303,8 +382,74 @@ const App = (() => {
       </div>`;
   }
 
-  function renderLessons() {
+  // ----- מתג רשימה / לוח חודשי -----
+  function setCalendarMode(mode) {
+    calMode = mode;
+    if (mode === "month" && !selectedDay) selectedDay = todayStr();
+    document.querySelectorAll(".seg-btn").forEach(b =>
+      b.classList.toggle("active", b.dataset.cal === mode));
+    document.getElementById("calendarMonth").classList.toggle("hidden", mode !== "month");
+    renderCalendar();
+  }
+
+  function calShift(delta) {
+    calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + delta, 1);
+    renderCalendar();
+  }
+
+  function selectCalDay(dateStr) {
+    selectedDay = dateStr;
+    renderCalendar();
+  }
+
+  function renderMonthGrid() {
+    const grid = document.getElementById("calendarMonth");
+    if (calMode !== "month") { grid.classList.add("hidden"); return; }
+    grid.classList.remove("hidden");
+
+    const year = calMonth.getFullYear(), month = calMonth.getMonth();
+    const first = new Date(year, month, 1);
+    const startDow = first.getDay(); // 0=ראשון
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const counts = {};
+    lessons.forEach(l => { if (l.date.startsWith(monthKey(calMonth))) counts[l.date] = (counts[l.date] || 0) + 1; });
+
+    const dows = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
+    let cells = dows.map(d => `<div class="cal-dow">${d}</div>`).join("");
+    for (let i = 0; i < startDow; i++) cells += `<div class="cal-cell empty"></div>`;
+    for (let day = 1; day <= daysInMonth; day++) {
+      const ds = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const has = counts[ds] > 0;
+      const cls = ["cal-cell",
+        ds === todayStr() ? "today" : "",
+        ds === selectedDay ? "sel" : "",
+        has ? "has-lessons" : ""].filter(Boolean).join(" ");
+      cells += `<div class="${cls}" onclick="App.selectCalDay('${ds}')">${day}${has ? '<span class="cal-dot"></span>' : ""}</div>`;
+    }
+
+    grid.innerHTML = `
+      <div class="cal-head">
+        <button class="cal-nav" onclick="App.calShift(-1)">‹</button>
+        <span>${calMonth.toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</span>
+        <button class="cal-nav" onclick="App.calShift(1)">›</button>
+      </div>
+      <div class="cal-grid">${cells}</div>`;
+  }
+
+  function renderCalendar() {
     const el = document.getElementById("lessonsList");
+    renderMonthGrid();
+
+    if (calMode === "month") {
+      const day = selectedDay || todayStr();
+      const dayLessons = lessonSorted().filter(l => l.date === day);
+      el.innerHTML = dayLessons.length
+        ? dayGroupHtml(day, dayLessons)
+        : `<div class="empty">אין שיעורים ב-${fmtDate(day)}</div>`;
+      return;
+    }
+
+    // מצב רשימה
     const list = lessonSorted();
     if (!list.length) {
       el.innerHTML = `<div class="empty">אין שיעורים ביומן.<br>קבעי שיעור עם הכפתור שלמעלה.</div>`;
@@ -312,7 +457,7 @@ const App = (() => {
     }
     const today = todayStr();
     const upcoming = list.filter(l => l.date >= today);
-    const past = list.filter(l => l.date < today).reverse(); // האחרונים קודם
+    const past = list.filter(l => l.date < today).reverse();
 
     let html = "";
     if (upcoming.length) {
@@ -320,7 +465,6 @@ const App = (() => {
     } else {
       html += `<div class="empty">אין שיעורים קרובים</div>`;
     }
-
     if (past.length) {
       html += `<button class="past-toggle" onclick="App.togglePast()">${showPast ? "הסתר" : "הצג"} שיעורים שעברו (${past.length})</button>`;
       if (showPast) {
@@ -330,10 +474,13 @@ const App = (() => {
     el.innerHTML = html;
   }
 
-  function togglePast() { showPast = !showPast; renderLessons(); }
+  function togglePast() { showPast = !showPast; renderCalendar(); }
 
   // ========== מסך בית ==========
   function renderHome() {
+    document.getElementById("homeGreeting").textContent =
+      settings.teacherName ? `שלום ${settings.teacherName}` : "שלום";
+
     const today = todayStr();
     const todayLessons = lessons.filter(l => l.date === today);
     document.getElementById("todaySummary").innerHTML = `
@@ -341,13 +488,12 @@ const App = (() => {
       <div>סה"כ תלמידים: <b>${students.length}</b></div>
     `;
 
-    // שיעורים קרובים (מהיום והלאה, עד 5)
     const upcoming = lessonSorted().filter(l => l.date >= today && !l.done).slice(0, 5);
     const up = document.getElementById("upcomingLessons");
     up.innerHTML = upcoming.length ? upcoming.map(l => {
       const s = studentById(l.studentId) || { name: "?" };
       const isToday = l.date === today;
-      return `<div class="item">
+      return `<div class="item" onclick="App.openLessonForm('${l.id}')">
         <div class="item-main">
           <div class="item-title">${escapeHtml(s.name)} ${isToday ? '<span class="tag tag-soon">היום</span>' : ""}</div>
           <div class="item-sub">${dateTimeLine(l)}</div>
@@ -356,14 +502,13 @@ const App = (() => {
       </div>`;
     }).join("") : `<div class="empty">אין שיעורים מתוכננים</div>`;
 
-    // תזכורות תשלום: שיעורים שבוצעו אך לא שולמו
     const dues = lessons.filter(l => l.done && !l.paid);
     const pa = document.getElementById("paymentAlerts");
     pa.innerHTML = dues.length ? dues.map(l => {
-      const s = studentById(l.studentId) || { name: "?", price: 0 };
+      const s = studentById(l.studentId) || { name: "?" };
       return `<div class="item">
         <div class="item-main">
-          <div class="item-title">${escapeHtml(s.name)} <span class="tag tag-due">₪${s.price}</span></div>
+          <div class="item-title">${escapeHtml(s.name)} <span class="tag tag-due">${cur(lessonPrice(l))}</span></div>
           <div class="item-sub">שיעור מ-${fmtDate(l.date)} · ממתין לתשלום</div>
         </div>
         <div class="item-actions">
@@ -372,7 +517,6 @@ const App = (() => {
       </div>`;
     }).join("") : `<div class="empty"><span style="color:var(--green)">${icon("checkCircle")}</span> הכול שולם</div>`;
 
-    // עדכון תגית בכותרת
     const badge = document.getElementById("reminderBadge");
     if (todayLessons.length) {
       badge.innerHTML = `${icon("bell")} ${todayLessons.length} שיעורים היום`;
@@ -387,7 +531,7 @@ const App = (() => {
     el.innerHTML = students.map(s => {
       const sl = lessons.filter(l => l.studentId === s.id && l.done);
       const unpaid = sl.filter(l => !l.paid);
-      const owed = unpaid.length * s.price;
+      const owed = unpaid.reduce((sum, l) => sum + lessonPrice(l), 0);
       return `
         <div class="card">
           <div class="item" style="box-shadow:none;padding:0;border:none;">
@@ -395,12 +539,12 @@ const App = (() => {
               <div class="item-title">${escapeHtml(s.name)}</div>
               <div class="item-sub">
                 ${sl.length} שיעורים בוצעו · ${unpaid.length} לא שולמו
-                ${owed > 0 ? `<br><span class="tag tag-due">חוב: ₪${owed}</span>` : `<br><span class="tag tag-paid">הכול שולם</span>`}
+                ${owed > 0 ? `<br><span class="tag tag-due">חוב: ${cur(owed)}</span>` : `<br><span class="tag tag-paid">הכול שולם</span>`}
               </div>
             </div>
           </div>
           ${unpaid.length ? `
-            <button class="btn btn-wa btn-block" onclick="App.sendWhatsApp('${s.id}')">${icon("whatsapp")} תזכורת תשלום בוואטסאפ (₪${owed})</button>
+            <button class="btn btn-wa btn-block" onclick="App.sendWhatsApp('${s.id}')">${icon("whatsapp")} תזכורת תשלום בוואטסאפ (${cur(owed)})</button>
             <button class="btn btn-green btn-block" onclick="App.markAllPaid('${s.id}')">${icon("check")} סימון הכול כשולם</button>
           ` : ""}
         </div>`;
@@ -411,34 +555,35 @@ const App = (() => {
     lessons.filter(l => l.studentId === studentId && l.done && !l.paid)
       .forEach(l => l.paid = true);
     save(); render();
+    toast("סומן כשולם", "ok");
   }
 
   // ----- וואטסאפ: הודעה מוכנה + קישור לשליחה בלחיצה -----
   function sendWhatsApp(studentId) {
     const s = studentById(studentId);
     if (!s) return;
-    if (!s.phone) { alert("לתלמיד הזה אין מספר טלפון. הוסיפי אותו במסך התלמידים."); return; }
+    if (!s.phone) { toast("לתלמיד אין מספר טלפון. הוסיפי אותו במסך התלמידים.", "err"); return; }
 
     const unpaid = lessons.filter(l => l.studentId === studentId && l.done && !l.paid);
-    const owed = unpaid.length * s.price;
+    const owed = unpaid.reduce((sum, l) => sum + lessonPrice(l), 0);
+    const greet = s.parentName ? `שלום ${s.parentName},` : "שלום,";
     const msg =
-      `שלום ${s.parentName || ""},\n` +
+      `${greet}\n` +
       `תזכורת ידידותית לגבי תשלום עבור השיעורים הפרטיים של ${s.name}.\n` +
-      `סה"כ ${unpaid.length} שיעורים שטרם שולמו, בסך ${owed} ₪.\n` +
+      `סה"כ ${unpaid.length} שיעורים שטרם שולמו, בסך ${owed} ${settings.currency}.\n` +
       `תודה רבה!`;
 
-    // ניקוי מספר טלפון לפורמט בינלאומי (ישראל +972)
     let phone = s.phone.replace(/[^0-9]/g, "");
+    if (phone.startsWith("00")) phone = phone.slice(2);
     if (phone.startsWith("0")) phone = "972" + phone.slice(1);
     else if (!phone.startsWith("972")) phone = "972" + phone;
 
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-    window.open(url, "_blank");
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
   // ========== גיבוי ושחזור ==========
   function exportData() {
-    const data = { students, lessons, exportedAt: new Date().toISOString(), version: 1 };
+    const data = { students, lessons, settings, exportedAt: new Date().toISOString(), version: DATA_VERSION };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -446,6 +591,7 @@ const App = (() => {
     a.download = `גיבוי-המורה-שלי-${todayStr()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    toast("הגיבוי הורד", "ok");
   }
 
   function importData(event) {
@@ -457,13 +603,14 @@ const App = (() => {
         const data = JSON.parse(e.target.result);
         if (!Array.isArray(data.students) || !Array.isArray(data.lessons))
           throw new Error("מבנה קובץ לא תקין");
-        if (!confirm("שחזור יחליף את כל הנתונים הקיימים. להמשיך?")) return;
+        if (!confirm("שחזור יחליף את כל הנתונים הקיימים. להמשיך?")) { event.target.value = ""; return; }
         students = data.students;
         lessons = data.lessons;
-        save(); render();
-        alert("השחזור הושלם בהצלחה");
+        if (data.settings) settings = Object.assign({}, DEFAULT_SETTINGS, data.settings);
+        save(); saveSettings(); applyTheme(); render();
+        toast("השחזור הושלם בהצלחה", "ok");
       } catch (err) {
-        alert("שגיאה בקריאת הקובץ: " + err.message);
+        toast("שגיאה בקריאת הקובץ: " + err.message, "err");
       }
       event.target.value = "";
     };
@@ -473,7 +620,7 @@ const App = (() => {
   // ========== סיכום הכנסות ==========
   function changeMonth(delta) {
     viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + delta, 1);
-    render();
+    renderIncome();
   }
 
   function renderIncome() {
@@ -484,17 +631,16 @@ const App = (() => {
     const monthLessons = lessons.filter(l => l.date.startsWith(key) && l.done);
     let earned = 0, pending = 0;
     monthLessons.forEach(l => {
-      const s = studentById(l.studentId);
-      const price = s ? s.price : 0;
+      const price = lessonPrice(l);
       if (l.paid) earned += price; else pending += price;
     });
 
     document.getElementById("incomeSummary").innerHTML = `
       <div class="card summary-card">
         <div>שיעורים שבוצעו: <b>${monthLessons.length}</b></div>
-        <div>התקבל בפועל: <b>₪${earned}</b></div>
-        <div>ממתין לתשלום: <b>₪${pending}</b></div>
-        <div style="font-size:1.2rem;margin-top:6px">סה"כ החודש: <b>₪${earned + pending}</b></div>
+        <div>התקבל בפועל: <b>${cur(earned)}</b></div>
+        <div>ממתין לתשלום: <b>${cur(pending)}</b></div>
+        <div style="font-size:1.2rem;margin-top:6px">סה"כ החודש: <b>${cur(earned + pending)}</b></div>
       </div>`;
 
     drawChart();
@@ -503,18 +649,26 @@ const App = (() => {
   // גרף עמודות של 6 החודשים האחרונים (ללא ספריות חיצוניות)
   function drawChart() {
     const canvas = document.getElementById("incomeChart");
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    const W = canvas.width = canvas.clientWidth;
-    const H = canvas.height;
+    const css = getComputedStyle(document.documentElement);
+    const textCol = css.getPropertyValue("--text").trim() || "#1f2937";
+    const faintCol = css.getPropertyValue("--faint").trim() || "#9aa1ab";
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.clientWidth, H = 200;
+    if (W < 60) return; // הקנבס מוסתר/צר מדי — אין מה לצייר
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
 
     const months = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(viewMonth.getFullYear(), viewMonth.getMonth() - i, 1);
-      const key = monthKey(d);
-      const total = lessons.filter(l => l.date.startsWith(key) && l.done)
-        .reduce((sum, l) => { const s = studentById(l.studentId); return sum + (s ? s.price : 0); }, 0);
-      months.push({ label: d.toLocaleDateString("he-IL", { month: "short" }), total });
+      const k = monthKey(d);
+      const total = lessons.filter(l => l.date.startsWith(k) && l.done)
+        .reduce((sum, l) => sum + lessonPrice(l), 0);
+      months.push({ label: d.toLocaleDateString("he-IL", { month: "short" }), total, current: k === monthKey(viewMonth) });
     }
 
     const max = Math.max(...months.map(m => m.total), 1);
@@ -527,14 +681,135 @@ const App = (() => {
       const x = pad + i * (bw + gap);
       const h = (m.total / max) * (H - 50);
       const y = H - 25 - h;
-      ctx.fillStyle = "#d97706";
-      ctx.fillRect(x, y, bw, h);
-      ctx.fillStyle = "#1f2937";
-      ctx.fillText("₪" + m.total, x + bw / 2, y - 6);
-      ctx.fillStyle = "#9aa1ab";
+      const grad = ctx.createLinearGradient(0, y, 0, H - 25);
+      grad.addColorStop(0, m.current ? "#f59e0b" : "#d97706");
+      grad.addColorStop(1, m.current ? "#d97706" : "#b45309");
+      ctx.fillStyle = grad;
+      const r = Math.min(6, bw / 2);
+      ctx.beginPath();
+      ctx.moveTo(x, H - 25);
+      ctx.lineTo(x, y + r);
+      ctx.arcTo(x, y, x + r, y, r);
+      ctx.lineTo(x + bw - r, y);
+      ctx.arcTo(x + bw, y, x + bw, y + r, r);
+      ctx.lineTo(x + bw, H - 25);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = textCol;
+      ctx.fillText(settings.currency + m.total, x + bw / 2, y - 6);
+      ctx.fillStyle = faintCol;
       ctx.fillText(m.label, x + bw / 2, H - 8);
     });
   }
+
+  // ========== הגדרות ==========
+  function renderSettings() {
+    const body = document.getElementById("settingsBody");
+    body.innerHTML = `
+      <div class="settings-group">
+        <div class="group-title">כללי</div>
+        <div class="setting-row">
+          <div><div class="setting-label">שם המורה</div><div class="setting-sub">יופיע בברכה במסך הבית</div></div>
+          <input type="text" id="set-name" value="${escapeHtml(settings.teacherName)}" placeholder="שמך" onchange="App.updateSetting('teacherName', this.value)">
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-label">מטבע</div></div>
+          <input type="text" id="set-cur" value="${escapeHtml(settings.currency)}" maxlength="3" onchange="App.updateSetting('currency', this.value)">
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="group-title">ברירות מחדל לשיעור</div>
+        <div class="setting-row">
+          <div><div class="setting-label">מחיר ברירת מחדל</div></div>
+          <input type="number" inputmode="numeric" min="0" value="${settings.defaultPrice}" onchange="App.updateSetting('defaultPrice', this.value)">
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-label">שעת התחלה</div></div>
+          <input type="time" value="${settings.defaultTime}" onchange="App.updateSetting('defaultTime', this.value)">
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-label">משך (דקות)</div></div>
+          <input type="number" inputmode="numeric" min="0" step="15" value="${settings.defaultDuration}" onchange="App.updateSetting('defaultDuration', this.value)">
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="group-title">תזכורות</div>
+        <div class="setting-row">
+          <div><div class="setting-label">התראה לפני שיעור</div><div class="setting-sub">דקות לפני (כשהאפליקציה פתוחה)</div></div>
+          <input type="number" inputmode="numeric" min="0" value="${settings.remindMinutes}" onchange="App.updateSetting('remindMinutes', this.value)">
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="group-title">מראה</div>
+        <div class="setting-row">
+          <div><div class="setting-label">ערכת נושא</div></div>
+          <div class="theme-seg">
+            <button class="${settings.theme === "auto" ? "active" : ""}" onclick="App.setTheme('auto')">אוטומטי</button>
+            <button class="${settings.theme === "light" ? "active" : ""}" onclick="App.setTheme('light')">בהיר</button>
+            <button class="${settings.theme === "dark" ? "active" : ""}" onclick="App.setTheme('dark')">כהה</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="group-title">נתונים</div>
+        <div class="card">
+          <button class="btn btn-light btn-block" onclick="App.exportData()">ייצוא גיבוי לקובץ</button>
+          <button class="btn btn-light btn-block" onclick="document.getElementById('importFile').click()">שחזור מקובץ גיבוי</button>
+          <button class="btn btn-danger btn-block" onclick="App.clearAll()">מחיקת כל הנתונים</button>
+        </div>
+        <div class="setting-sub" style="margin-top:8px;text-align:center">המורה שלי · גרסה ${DATA_VERSION}.0</div>
+      </div>
+    `;
+  }
+
+  function updateSetting(key, value) {
+    if (["defaultPrice", "defaultDuration", "remindMinutes"].includes(key)) {
+      value = Math.max(0, parseInt(value) || 0);
+    } else {
+      value = String(value).trim();
+    }
+    if (key === "currency" && !value) value = "₪";
+    settings[key] = value;
+    saveSettings();
+    render();
+    toast("נשמר", "ok");
+  }
+
+  function setTheme(theme) {
+    settings.theme = theme;
+    saveSettings();
+    applyTheme();
+    renderSettings();
+  }
+
+  function clearAll() {
+    if (!confirm("פעולה זו תמחק את כל התלמידים, השיעורים וההגדרות לצמיתות. להמשיך?")) return;
+    if (!confirm("בטוחה? אין דרך לשחזר ללא קובץ גיבוי.")) return;
+    students = []; lessons = [];
+    settings = Object.assign({}, DEFAULT_SETTINGS);
+    save(); saveSettings(); applyTheme(); render();
+    toast("כל הנתונים נמחקו");
+  }
+
+  // ----- מצב כהה -----
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  function resolveTheme() {
+    if (settings.theme === "auto") return mq.matches ? "dark" : "light";
+    return settings.theme;
+  }
+  function applyTheme() {
+    const t = resolveTheme();
+    document.documentElement.setAttribute("data-theme", t);
+    const meta = document.getElementById("themeColorMeta");
+    if (meta) meta.setAttribute("content", t === "dark" ? "#0f141b" : "#1f2937");
+    // ציור מחדש של הגרף כדי שצבעי הטקסט יתעדכנו
+    if (document.getElementById("view-income").classList.contains("active")) drawChart();
+  }
+  mq.addEventListener && mq.addEventListener("change", () => { if (settings.theme === "auto") applyTheme(); });
 
   // ========== תזכורות בדפדפן ==========
   function initReminders() {
@@ -552,11 +827,12 @@ const App = (() => {
   function checkReminders() {
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     const now = new Date();
+    const lead = settings.remindMinutes || 30;
     lessons.forEach(l => {
       if (l.done || notified.has(l.id)) return;
       const dt = new Date(`${l.date}T${l.time || "00:00"}`);
       const diffMin = (dt - now) / 60000;
-      if (diffMin > 0 && diffMin <= 30) {
+      if (diffMin > 0 && diffMin <= lead) {
         const s = studentById(l.studentId);
         new Notification("תזכורת שיעור", {
           body: `שיעור עם ${s ? s.name : "תלמיד"} בשעה ${l.time}`,
@@ -567,22 +843,85 @@ const App = (() => {
     });
   }
 
+  // ========== התקנה (PWA) ועדכון ==========
+  let deferredPrompt = null;
+  let waitingWorker = null;
+
+  function initInstall() {
+    window.addEventListener("beforeinstallprompt", e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (!localStorage.getItem("mt_installDismissed"))
+        document.getElementById("installBanner").classList.remove("hidden");
+    });
+    window.addEventListener("appinstalled", () => {
+      document.getElementById("installBanner").classList.add("hidden");
+      deferredPrompt = null;
+      toast("האפליקציה הותקנה", "ok");
+    });
+  }
+  async function promptInstall() {
+    document.getElementById("installBanner").classList.add("hidden");
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  }
+  function dismissInstall() {
+    document.getElementById("installBanner").classList.add("hidden");
+    localStorage.setItem("mt_installDismissed", "1");
+  }
+  function applyUpdate() {
+    if (waitingWorker) waitingWorker.postMessage({ type: "SKIP_WAITING" });
+    document.getElementById("updateBanner").classList.add("hidden");
+  }
+
   // ========== רנדור כללי ==========
   function render() {
     renderHome();
     renderStudents();
-    renderLessons();
+    renderCalendar();
     renderPayments();
     renderIncome();
+    renderSettings();
   }
 
   // ----- אתחול -----
+  function handleLaunchParams() {
+    const p = new URLSearchParams(location.search);
+    if (p.get("view")) go(p.get("view"));
+    if (p.get("action") === "new-lesson") openLessonForm();
+  }
+
   function init() {
+    migrate();
+    applyTheme();
     render();
+    handleLaunchParams();
     initReminders();
+    initInstall();
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("service-worker.js").catch(() => {});
+      navigator.serviceWorker.register("service-worker.js").then(reg => {
+        if (reg.waiting) { waitingWorker = reg.waiting; showUpdate(); }
+        reg.addEventListener("updatefound", () => {
+          const nw = reg.installing;
+          nw && nw.addEventListener("statechange", () => {
+            if (nw.state === "installed" && navigator.serviceWorker.controller) {
+              waitingWorker = nw; showUpdate();
+            }
+          });
+        });
+      }).catch(() => {});
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      });
     }
+  }
+  function showUpdate() {
+    document.getElementById("updateBanner").classList.remove("hidden");
   }
 
   document.addEventListener("DOMContentLoaded", init);
@@ -593,8 +932,11 @@ const App = (() => {
     openStudentForm, saveStudent, deleteStudent,
     openLessonForm, saveLesson, deleteLesson, toggleDone,
     setLessonDate, togglePast, renderStudentPicker, pickStudent,
+    setCalendarMode, calShift, selectCalDay,
     sendWhatsApp, markAllPaid,
     exportData, importData,
-    changeMonth
+    changeMonth,
+    updateSetting, setTheme, clearAll,
+    promptInstall, dismissInstall, applyUpdate
   };
 })();

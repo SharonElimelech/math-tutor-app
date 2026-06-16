@@ -1,5 +1,5 @@
 // Service Worker – מאפשר עבודה גם בלי אינטרנט (offline) והתקנה כאפליקציה
-const CACHE = "morti-v2";
+const CACHE = "morti-v3";
 const ASSETS = [
   "index.html",
   "styles.css",
@@ -10,7 +10,8 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // לא קוראים ל-skipWaiting אוטומטית — מחכים לאישור המשתמש דרך הבאנר
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
 });
 
 self.addEventListener("activate", e => {
@@ -19,6 +20,11 @@ self.addEventListener("activate", e => {
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
+});
+
+// הודעה מהדף: החל עדכון מיד
+self.addEventListener("message", e => {
+  if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 // רשת קודם: תמיד מנסה להביא גרסה עדכנית, ונופל למטמון רק כשאין אינטרנט
@@ -31,6 +37,6 @@ self.addEventListener("fetch", e => {
         caches.open(CACHE).then(c => c.put(e.request, copy));
         return res;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() => caches.match(e.request).then(r => r || caches.match("index.html")))
   );
 });
