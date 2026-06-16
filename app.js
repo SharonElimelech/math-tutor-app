@@ -961,9 +961,8 @@ const App = (() => {
     });
   }
 
-  // ========== התקנה (PWA) ועדכון ==========
+  // ========== התקנה (PWA) ==========
   let deferredPrompt = null;
-  let waitingWorker = null;
 
   function initInstall() {
     window.addEventListener("beforeinstallprompt", e => {
@@ -988,10 +987,6 @@ const App = (() => {
   function dismissInstall() {
     document.getElementById("installBanner").classList.add("hidden");
     localStorage.setItem("mt_installDismissed", "1");
-  }
-  function applyUpdate() {
-    if (waitingWorker) waitingWorker.postMessage({ type: "SKIP_WAITING" });
-    document.getElementById("updateBanner").classList.add("hidden");
   }
 
   // ========== רנדור כללי ==========
@@ -1019,17 +1014,8 @@ const App = (() => {
     initReminders();
     initInstall();
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("service-worker.js").then(reg => {
-        if (reg.waiting) { waitingWorker = reg.waiting; showUpdate(); }
-        reg.addEventListener("updatefound", () => {
-          const nw = reg.installing;
-          nw && nw.addEventListener("statechange", () => {
-            if (nw.state === "installed" && navigator.serviceWorker.controller) {
-              waitingWorker = nw; showUpdate();
-            }
-          });
-        });
-      }).catch(() => {});
+      navigator.serviceWorker.register("service-worker.js").catch(() => {});
+      // עדכון אוטומטי שקט: כש-SW חדש משתלט (skipWaiting), מרעננים פעם אחת
       let refreshing = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (refreshing) return;
@@ -1037,9 +1023,6 @@ const App = (() => {
         window.location.reload();
       });
     }
-  }
-  function showUpdate() {
-    document.getElementById("updateBanner").classList.remove("hidden");
   }
 
   document.addEventListener("DOMContentLoaded", init);
@@ -1055,6 +1038,6 @@ const App = (() => {
     exportData, importData,
     changeMonth,
     updateSetting, setTheme, clearAll,
-    promptInstall, dismissInstall, applyUpdate
+    promptInstall, dismissInstall
   };
 })();
