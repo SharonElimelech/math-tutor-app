@@ -1,5 +1,5 @@
 // Service Worker – מאפשר עבודה גם בלי אינטרנט (offline) והתקנה כאפליקציה
-const CACHE = "morti-v5";
+const CACHE = "morti-v6";
 const ASSETS = [
   "index.html",
   "styles.css",
@@ -25,6 +25,17 @@ self.addEventListener("activate", e => {
 // הודעה מהדף: החל עדכון מיד
 self.addEventListener("message", e => {
   if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
+});
+
+// לחיצה על התראה — מביאה את האפליקציה לקדמת המסך (או פותחת אותה)
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  e.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
+      for (const c of list) { if ("focus" in c) return c.focus(); }
+      if (clients.openWindow) return clients.openWindow("./");
+    })
+  );
 });
 
 // רשת קודם: תמיד מנסה להביא גרסה עדכנית, ונופל למטמון רק כשאין אינטרנט

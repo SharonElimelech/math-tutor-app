@@ -77,7 +77,7 @@ const App = (() => {
   }
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const save = () => { DB.save("students", students); DB.save("lessons", lessons); };
+  const save = () => { DB.save("students", students); DB.save("lessons", lessons); reschedule(); };
   const saveSettings = () => DB.save("settings", settings);
 
   // ----- עזרי תאריך וכסף -----
@@ -853,10 +853,16 @@ const App = (() => {
       </div>
 
       <div class="settings-group">
-        <div class="group-title">תזכורות</div>
+        <div class="group-title">התראות</div>
         <div class="setting-row">
-          <div><div class="setting-label">התראה לפני שיעור</div><div class="setting-sub">דקות לפני (כשהאפליקציה פתוחה)</div></div>
-          <input type="number" inputmode="numeric" min="0" value="${settings.remindMinutes}" onchange="App.updateSetting('remindMinutes', this.value)">
+          <div><div class="setting-label">תזכורת לפני שיעור</div><div class="setting-sub">${notifStatusText()}</div></div>
+          <input type="number" inputmode="numeric" min="0" value="${settings.remindMinutes}" onchange="App.updateSetting('remindMinutes', this.value)" aria-label="דקות לפני שיעור">
+        </div>
+        <div class="card" style="margin-top:10px">
+          ${notifSupported && Notification.permission === "granted"
+            ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה</button>`
+            : `<button class="btn btn-green btn-block" onclick="App.enableNotifications()">${icon("bell")} הפעלת התראות בטלפון</button>`}
+          <div class="setting-sub" style="margin-top:8px">${notifHelpText()}</div>
         </div>
       </div>
 
@@ -893,6 +899,7 @@ const App = (() => {
     if (key === "currency" && !value) value = "₪";
     settings[key] = value;
     saveSettings();
+    if (key === "remindMinutes") reschedule();
     render();
     toast("נשמר", "ok");
   }
@@ -929,21 +936,110 @@ const App = (() => {
   }
   mq.addEventListener && mq.addEventListener("change", () => { if (settings.theme === "auto") applyTheme(); });
 
-  // ========== תזכורות בדפדפן ==========
+  // ========== תזכורות / התראות ==========
+  const notifSupported = "Notification" in window;
+  // תזמון התראות דרך ה-SW שעובד גם כשהאפליקציה סגורה (Chrome/Android)
+  const triggerSupported = notifSupported && "serviceWorker" in navigator && "TimestampTrigger" in window;
+  let intervalStarted = false;
+
+  function notifStatusText() {
+    if (!notifSupported) return "הדפדפן לא תומך בהתראות";
+    if (Notification.permission === "granted")
+      return triggerSupported
+        ? "מופעל — תזכורת תישלח לטלפון לפני כל שיעור"
+        : "מופעל — תזכורת תופיע כשהאפליקציה פתוחה";
+    if (Notification.permission === "denied") return "חסום — יש לאפשר בהגדרות הדפדפן";
+    return "כבוי — לחצי 'הפעלת התראות'";
+  }
+  function notifHelpText() {
+    if (triggerSupported) return "מומלץ להתקין את האפליקציה (הוספה למסך הבית) כדי שההתראות יעבדו גם כשהיא סגורה.";
+    return "באייפון: הוסיפי קודם למסך הבית. תזכורות מתוזמנות אינן נתמכות שם — יופיעו רק כשהאפליקציה פתוחה.";
+  }
+
   function initReminders() {
-    if (!("Notification" in window)) return;
-    if (Notification.permission === "default") {
-      document.body.addEventListener("click", () => {
-        if (Notification.permission === "default") Notification.requestPermission();
-      }, { once: true });
+    if (!notifSupported) return;
+    if (Notification.permission === "granted") {
+      reschedule();
+      if (!triggerSupported) startInterval();
     }
+  }
+
+  function startInterval() {
+    if (intervalStarted || triggerSupported) return;
+    intervalStarted = true;
     setInterval(checkReminders, 60 * 1000);
     checkReminders();
   }
 
+  async function enableNotifications() {
+    if (!notifSupported) { toast("הדפדפן לא תומך בהתראות", "err"); return; }
+    if (Notification.permission === "denied") {
+      toast("ההתראות חסומות — יש לאפשר בהגדרות הדפדפן", "err");
+      return;
+    }
+    const p = await Notification.requestPermission();
+    if (p === "granted") {
+      toast("התראות הופעלו", "ok");
+      reschedule();
+      startInterval();
+    } else {
+      toast("ההרשאה לא ניתנה", "err");
+    }
+    renderSettings();
+  }
+
+  async function testNotification() {
+    if (Notification.permission !== "granted") return enableNotifications();
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification("בדיקת התראה ✓", {
+        body: "מצוין — ההתראות עובדות!", icon: "icon-192.png", badge: "icon-192.png"
+      });
+    } catch {
+      try { new Notification("בדיקת התראה ✓", { body: "ההתראות עובדות!", icon: "icon-192.png" }); }
+      catch { toast("לא ניתן להציג התראה", "err"); }
+    }
+  }
+
+  // תזמון מחדש של כל ההתראות המתוזמנות (debounced)
+  let rescheduleTimer = null;
+  function reschedule() {
+    if (!triggerSupported || Notification.permission !== "granted") return;
+    clearTimeout(rescheduleTimer);
+    rescheduleTimer = setTimeout(doSchedule, 500);
+  }
+  async function doSchedule() {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      // ניקוי התראות שיעור שתוזמנו קודם
+      const existing = await reg.getNotifications({ includeTriggered: true });
+      existing.forEach(n => { if (n.tag && n.tag.startsWith("lesson-")) n.close(); });
+
+      const now = Date.now();
+      const lead = (settings.remindMinutes || 30) * 60000;
+      const upcoming = lessonSorted()
+        .filter(l => !l.done)
+        .map(l => ({ l, fire: new Date(`${l.date}T${l.time || "00:00"}`).getTime() - lead }))
+        .filter(x => x.fire > now)
+        .slice(0, 30); // מגבלת מכסה
+
+      for (const { l, fire } of upcoming) {
+        const s = studentById(l.studentId);
+        await reg.showNotification("תזכורת שיעור 📚", {
+          tag: "lesson-" + l.id,
+          body: `שיעור עם ${s ? s.name : "תלמיד"} בשעה ${l.time}`,
+          icon: "icon-192.png",
+          badge: "icon-192.png",
+          showTrigger: new TimestampTrigger(fire),
+          data: { url: "./" }
+        });
+      }
+    } catch { /* התעלמות שקטה */ }
+  }
+
   const notified = new Set();
   function checkReminders() {
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    if (!notifSupported || Notification.permission !== "granted") return;
     const now = new Date();
     const lead = settings.remindMinutes || 30;
     lessons.forEach(l => {
@@ -1038,6 +1134,7 @@ const App = (() => {
     exportData, importData,
     changeMonth,
     updateSetting, setTheme, clearAll,
+    enableNotifications, testNotification,
     promptInstall, dismissInstall
   };
 })();
