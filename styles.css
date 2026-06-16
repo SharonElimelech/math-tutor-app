@@ -467,7 +467,7 @@ main { padding: 18px 16px; max-width: 620px; margin: 0 auto; }
   cursor: pointer;
 }
 .cal-nav:active { transform: scale(.92); }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .cal-dow {
   text-align: center;
   font-size: .68rem;
