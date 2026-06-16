@@ -842,6 +842,129 @@ html[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
 /* גלילה עדינה */
 ::-webkit-scrollbar { width: 0; height: 0; }
 
+/* ---------- פעולות מהירות במסך הבית ---------- */
+.home-actions { display: flex; gap: 12px; margin: 16px 0 6px; }
+.action-tile {
+  flex: 1;
+  min-height: 88px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: var(--sh-sm);
+  transition: transform .15s ease, box-shadow .2s ease;
+}
+.action-tile svg { width: 28px; height: 28px; stroke-width: 1.9; }
+.action-tile:active { transform: scale(.97); }
+.action-tile.primary {
+  background: var(--grad-brand);
+  color: #fff;
+  border: none;
+  box-shadow: var(--sh-brand);
+}
+
+/* ---------- כרטיס פתיחה / הכוונה ---------- */
+.onboard-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  box-shadow: var(--sh-md);
+  margin-bottom: 16px;
+}
+.onboard-card h4 { font-size: 1.15rem; font-weight: 800; margin-bottom: 6px; }
+.onboard-card p { color: var(--muted); font-size: .92rem; margin-bottom: 14px; line-height: 1.7; }
+.onboard-steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.onboard-step { display: flex; align-items: center; gap: 12px; font-size: .95rem; font-weight: 600; }
+.onboard-step .num {
+  width: 30px; height: 30px; flex: none;
+  border-radius: 50%;
+  background: var(--orange-bg);
+  color: var(--orange);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800;
+}
+.onboard-step.done .num { background: var(--green-bg); color: var(--green); }
+.onboard-step.done span { color: var(--faint); text-decoration: line-through; }
+
+/* ---------- מסך כספים (פאנלים) ---------- */
+.money-panel { animation: fadeUp .25s ease; }
+
+/* ---------- חגים בלוח ---------- */
+.cal-cell.holiday { background: rgba(124, 58, 237, .14); }
+html[data-theme="dark"] .cal-cell.holiday { background: rgba(167, 139, 250, .16); }
+.cal-cell.holiday:not(.sel) { color: #7c3aed; }
+html[data-theme="dark"] .cal-cell.holiday:not(.sel) { color: #c4b5fd; }
+.cal-cell .cal-dot.holiday-dot { background: #7c3aed; }
+.cal-cell.sel .cal-dot.holiday-dot { background: #fff; }
+.holiday-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(124, 58, 237, .12);
+  color: #7c3aed;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: .74rem;
+  font-weight: 700;
+}
+html[data-theme="dark"] .holiday-tag { background: rgba(167, 139, 250, .16); color: #c4b5fd; }
+.holiday-banner {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(124, 58, 237, .1);
+  color: #7c3aed;
+  border: 1px solid rgba(124, 58, 237, .2);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+html[data-theme="dark"] .holiday-banner { color: #c4b5fd; background: rgba(167, 139, 250, .1); border-color: rgba(167, 139, 250, .25); }
+.holiday-banner svg { width: 18px; height: 18px; flex: none; }
+
+/* ---------- כפתור "עוד אפשרויות" בטופס ---------- */
+.adv-toggle {
+  width: 100%;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 13px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: .92rem;
+  color: var(--muted);
+  cursor: pointer;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.adv-toggle svg { width: 16px; height: 16px; transition: transform .2s ease; }
+.adv-toggle.open svg { transform: rotate(180deg); }
+
+/* ---------- נגישות: מטרות מגע גדולות + פוקוס ברור ---------- */
+.nav-btn { min-height: 52px; font-size: .72rem; }
+.btn { min-height: 44px; }
+.btn-add { min-height: 44px; }
+.seg-btn { min-height: 42px; }
+input, select { min-height: 48px; }
+.item, .lesson-row { min-height: 56px; }
+
+:focus-visible {
+  outline: 3px solid var(--brand-3);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.nav-btn:focus-visible, .lesson-check:focus-visible { outline-offset: -2px; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }

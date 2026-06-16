@@ -1,5 +1,5 @@
 // Service Worker – מאפשר עבודה גם בלי אינטרנט (offline) והתקנה כאפליקציה
-const CACHE = "morti-v3";
+const CACHE = "morti-v4";
 const ASSETS = [
   "index.html",
   "styles.css",
@@ -10,8 +10,8 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", e => {
-  // לא קוראים ל-skipWaiting אוטומטית — מחכים לאישור המשתמש דרך הבאנר
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  // מתקינים מיד את הגרסה החדשה — רענון הדף יציג אותה ללא צורך באישור
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", e => {

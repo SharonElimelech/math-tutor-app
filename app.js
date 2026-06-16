@@ -19,6 +19,7 @@ const App = (() => {
     send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
     repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
     bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9z"/><path d="M10.5 21a2 2 0 0 0 3 0"/>',
+    chevron: '<path d="m6 9 6 6 6-6"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/>',
     warn: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>'
   };
@@ -56,6 +57,7 @@ const App = (() => {
   let calMonth  = new Date();      // החודש שמוצג בלוח החודשי
   let selectedDay = null;          // יום נבחר בלוח החודשי
   let calMode = "list";            // list | month
+  let moneyTab = "payments";       // payments | income
   let showPast = false;
 
   // ----- מיגרציית נתונים -----
@@ -96,6 +98,60 @@ const App = (() => {
     return s ? (s.price || 0) : 0;
   };
 
+  // ----- חגי ישראל (לוח עברי דרך Intl, ללא ספריות) -----
+  const HEB_FMT = new Intl.DateTimeFormat("en-u-ca-hebrew", { day: "numeric", month: "long" });
+  function hebParts(date) {
+    let month = "", day = 0;
+    for (const p of HEB_FMT.formatToParts(date)) {
+      if (p.type === "month") month = p.value;
+      if (p.type === "day") day = parseInt(p.value);
+    }
+    return { month, day };
+  }
+  const holidayCache = new Map();
+  function holidayFor(dateStr) {
+    if (holidayCache.has(dateStr)) return holidayCache.get(dateStr);
+    const { month: m, day } = hebParts(new Date(dateStr + "T00:00"));
+    let h = null;
+    if (m === "Tishri") {
+      if (day === 1 || day === 2) h = { name: "ראש השנה", chag: true };
+      else if (day === 3) h = { name: "צום גדליה" };
+      else if (day === 10) h = { name: "יום כיפור", chag: true };
+      else if (day === 15) h = { name: "סוכות", chag: true };
+      else if (day >= 16 && day <= 20) h = { name: "חול המועד סוכות" };
+      else if (day === 21) h = { name: "הושענא רבה" };
+      else if (day === 22) h = { name: "שמחת תורה", chag: true };
+    } else if ((m === "Kislev" && day >= 25) || (m === "Tevet" && day <= 2)) {
+      h = { name: "חנוכה" };
+    } else if (m === "Tevet" && day === 10) {
+      h = { name: "צום עשרה בטבת" };
+    } else if (m === "Shevat" && day === 15) {
+      h = { name: "ט״ו בשבט" };
+    } else if (m === "Adar" || m === "Adar II") {
+      if (day === 13) h = { name: "תענית אסתר" };
+      else if (day === 14) h = { name: "פורים", chag: true };
+      else if (day === 15) h = { name: "שושן פורים" };
+    } else if (m === "Nisan") {
+      if (day === 15) h = { name: "פסח", chag: true };
+      else if (day >= 16 && day <= 20) h = { name: "חול המועד פסח" };
+      else if (day === 21) h = { name: "שביעי של פסח", chag: true };
+      else if (day === 27) h = { name: "יום השואה" };
+    } else if (m === "Iyar") {
+      if (day === 4) h = { name: "יום הזיכרון" };
+      else if (day === 5) h = { name: "יום העצמאות", chag: true };
+      else if (day === 18) h = { name: "ל״ג בעומר" };
+      else if (day === 28) h = { name: "יום ירושלים" };
+    } else if (m === "Sivan" && day === 6) {
+      h = { name: "שבועות", chag: true };
+    } else if (m === "Tammuz" && day === 17) {
+      h = { name: "צום י״ז בתמוז" };
+    } else if (m === "Av" && day === 9) {
+      h = { name: "תשעה באב" };
+    }
+    holidayCache.set(dateStr, h);
+    return h;
+  }
+
   // ----- הודעות צפות (toast) -----
   function toast(msg, type = "") {
     const wrap = document.getElementById("toastWrap");
@@ -113,11 +169,14 @@ const App = (() => {
 
   // ----- ניווט -----
   function go(view) {
+    const target = document.getElementById("view-" + view);
+    if (!target) return;
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-    document.getElementById("view-" + view).classList.add("active");
+    target.classList.add("active");
     document.querySelectorAll(".nav-btn").forEach(b =>
       b.classList.toggle("active", b.dataset.view === view));
     render();
+    if (view === "money") applyMoneyTab();
     window.scrollTo(0, 0);
   }
 
@@ -229,22 +288,28 @@ const App = (() => {
         <div><label>תאריך</label><input id="f-date" type="date" value="${l.date}"></div>
         <div><label>שעה</label><input id="f-time" type="time" value="${l.time}"></div>
       </div>
-      <div class="row">
-        <div><label>משך (דקות)</label><input id="f-duration" type="number" inputmode="numeric" min="0" step="15" value="${l.duration ?? settings.defaultDuration}"></div>
-        <div><label>מחיר לשיעור זה (${escapeHtml(settings.currency)})</label><input id="f-price" type="number" inputmode="numeric" min="0" value="${priceVal}" placeholder="ברירת מחדל מהתלמיד"></div>
-      </div>
       <label>נושא / הערות (לא חובה)</label>
       <input id="f-topic" value="${escapeHtml(l.topic || "")}" placeholder="לדוגמה: גיאומטריה - משפט פיתגורס">
-      ${!id ? `
-        <div class="checkbox-row">
-          <input type="checkbox" id="f-repeat" onchange="document.getElementById('repeatWrap').style.display=this.checked?'block':'none'">
-          <label for="f-repeat">שיעור חוזר כל שבוע</label>
+
+      <button type="button" class="adv-toggle" onclick="App.toggleAdvanced(this)">
+        עוד אפשרויות (משך, מחיר${!id ? ", חזרה" : ""}) ${icon("chevron", "ic")}
+      </button>
+      <div id="advWrap" style="display:none">
+        <div class="row">
+          <div><label>משך (דקות)</label><input id="f-duration" type="number" inputmode="numeric" min="0" step="15" value="${l.duration ?? settings.defaultDuration}"></div>
+          <div><label>מחיר לשיעור זה (${escapeHtml(settings.currency)})</label><input id="f-price" type="number" inputmode="numeric" min="0" value="${priceVal}" placeholder="ברירת מחדל"></div>
         </div>
-        <div id="repeatWrap" style="display:none">
-          <label>למשך כמה שבועות?</label>
-          <input id="f-weeks" type="number" value="8" min="2" max="52">
-        </div>
-      ` : ""}
+        ${!id ? `
+          <div class="checkbox-row">
+            <input type="checkbox" id="f-repeat" onchange="document.getElementById('repeatWrap').style.display=this.checked?'block':'none'">
+            <label for="f-repeat">שיעור חוזר כל שבוע</label>
+          </div>
+          <div id="repeatWrap" style="display:none">
+            <label>למשך כמה שבועות?</label>
+            <input id="f-weeks" type="number" value="8" min="2" max="52">
+          </div>
+        ` : ""}
+      </div>
       <button class="btn btn-green btn-block" onclick="App.saveLesson('${id || ""}')">שמירה</button>
       ${id ? `<button class="btn btn-danger btn-block" onclick="App.deleteLesson('${id}')">מחיקת שיעור</button>` : ""}
     `);
@@ -271,6 +336,13 @@ const App = (() => {
     const h = document.getElementById("f-student");
     if (h) h.value = id;
     renderStudentPicker();
+  }
+
+  function toggleAdvanced(btn) {
+    const w = document.getElementById("advWrap");
+    const open = w.style.display === "block";
+    w.style.display = open ? "none" : "block";
+    btn.classList.toggle("open", !open);
   }
 
   function saveLesson(id) {
@@ -372,10 +444,11 @@ const App = (() => {
 
   function dayGroupHtml(date, dayLessons) {
     const count = dayLessons.length;
+    const h = holidayFor(date);
     return `
       <div class="day-group">
         <div class="day-head">
-          <span class="day-label">${dayLabel(date)}</span>
+          <span class="day-label">${dayLabel(date)} ${h ? `<span class="holiday-tag">${icon("info", "ic-sub")} ${escapeHtml(h.name)}</span>` : ""}</span>
           <span class="day-count">${count} ${count === 1 ? "שיעור" : "שיעורים"}</span>
         </div>
         <div class="day-lessons">${dayLessons.map(lessonRow).join("")}</div>
@@ -420,11 +493,15 @@ const App = (() => {
     for (let day = 1; day <= daysInMonth; day++) {
       const ds = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const has = counts[ds] > 0;
+      const h = holidayFor(ds);
       const cls = ["cal-cell",
         ds === todayStr() ? "today" : "",
         ds === selectedDay ? "sel" : "",
+        h ? "holiday" : "",
         has ? "has-lessons" : ""].filter(Boolean).join(" ");
-      cells += `<div class="${cls}" onclick="App.selectCalDay('${ds}')">${day}${has ? '<span class="cal-dot"></span>' : ""}</div>`;
+      const title = [h ? h.name : "", has ? counts[ds] + " שיעורים" : ""].filter(Boolean).join(" · ");
+      const dot = h ? '<span class="cal-dot holiday-dot"></span>' : (has ? '<span class="cal-dot"></span>' : "");
+      cells += `<div class="${cls}"${title ? ` title="${escapeHtml(title)}"` : ""} onclick="App.selectCalDay('${ds}')">${day}${dot}</div>`;
     }
 
     grid.innerHTML = `
@@ -442,10 +519,12 @@ const App = (() => {
 
     if (calMode === "month") {
       const day = selectedDay || todayStr();
+      const h = holidayFor(day);
       const dayLessons = lessonSorted().filter(l => l.date === day);
       el.innerHTML = dayLessons.length
         ? dayGroupHtml(day, dayLessons)
-        : `<div class="empty">אין שיעורים ב-${fmtDate(day)}</div>`;
+        : (h ? `<div class="holiday-banner">${icon("info")} ${escapeHtml(h.name)}</div>` : "") +
+          `<div class="empty">אין שיעורים ב-${fmtDate(day)}</div>`;
       return;
     }
 
@@ -477,10 +556,36 @@ const App = (() => {
   function togglePast() { showPast = !showPast; renderCalendar(); }
 
   // ========== מסך בית ==========
+  // כרטיס הכוונה — מראה למשתמש מה הצעד הבא
+  function renderOnboard() {
+    const onb = document.getElementById("onboard");
+    if (!onb) return;
+    const hasStudents = students.length > 0;
+    const hasLessons = lessons.length > 0;
+    if (hasStudents && hasLessons) { onb.innerHTML = ""; return; }
+    const step = (n, txt, done) =>
+      `<div class="onboard-step ${done ? "done" : ""}"><span class="num">${done ? "✓" : n}</span><span>${txt}</span></div>`;
+    const cta = !hasStudents
+      ? `<button class="btn btn-green btn-block" onclick="App.openStudentForm()">הוספת תלמיד ראשון</button>`
+      : `<button class="btn btn-green btn-block" onclick="App.openLessonForm()">קביעת שיעור ראשון</button>`;
+    onb.innerHTML = `
+      <div class="onboard-card">
+        <h4>${hasStudents ? "כמעט שם!" : "ברוכה הבאה! 👋"}</h4>
+        <p>שלושה צעדים קטנים כדי להתחיל לנהל את השיעורים:</p>
+        <div class="onboard-steps">
+          ${step(1, "הוספת תלמיד", hasStudents)}
+          ${step(2, "קביעת שיעור ביומן", hasLessons)}
+          ${step(3, "מעקב ותזכורת תשלום בוואטסאפ", false)}
+        </div>
+        ${cta}
+      </div>`;
+  }
+
   function renderHome() {
     document.getElementById("homeGreeting").textContent =
       settings.teacherName ? `שלום ${settings.teacherName}` : "שלום";
 
+    renderOnboard();
     const today = todayStr();
     const todayLessons = lessons.filter(l => l.date === today);
     document.getElementById("todaySummary").innerHTML = `
@@ -522,6 +627,19 @@ const App = (() => {
       badge.innerHTML = `${icon("bell")} ${todayLessons.length} שיעורים היום`;
       badge.classList.remove("hidden");
     } else { badge.classList.add("hidden"); }
+  }
+
+  // ========== כספים: מעבר בין תשלומים לסיכום ==========
+  function applyMoneyTab() {
+    document.querySelectorAll(".seg-btn[data-money]").forEach(b =>
+      b.classList.toggle("active", b.dataset.money === moneyTab));
+    document.getElementById("money-payments").classList.toggle("hidden", moneyTab !== "payments");
+    document.getElementById("money-income").classList.toggle("hidden", moneyTab !== "income");
+    if (moneyTab === "income") drawChart();
+  }
+  function setMoneyTab(tab) {
+    moneyTab = tab;
+    applyMoneyTab();
   }
 
   // ========== תשלומים ==========
@@ -931,9 +1049,9 @@ const App = (() => {
     go, closeModal, renderStudents,
     openStudentForm, saveStudent, deleteStudent,
     openLessonForm, saveLesson, deleteLesson, toggleDone,
-    setLessonDate, togglePast, renderStudentPicker, pickStudent,
+    setLessonDate, togglePast, renderStudentPicker, pickStudent, toggleAdvanced,
     setCalendarMode, calShift, selectCalDay,
-    sendWhatsApp, markAllPaid,
+    setMoneyTab, sendWhatsApp, markAllPaid,
     exportData, importData,
     changeMonth,
     updateSetting, setTheme, clearAll,
