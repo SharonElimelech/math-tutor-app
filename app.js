@@ -39,6 +39,7 @@ const App = (() => {
   };
 
   const DATA_VERSION = 2;
+  const HORIZON_WEEKS = 52; // כמה שבועות קדימה לממש לשיעור חוזר קבוע
   const DEFAULT_SETTINGS = {
     teacherName: "",
     currency: "₪",
@@ -339,17 +340,30 @@ const App = (() => {
         </div>
         ${!id ? `
           <div class="checkbox-row">
-            <input type="checkbox" id="f-repeat" onchange="document.getElementById('repeatWrap').style.display=this.checked?'block':'none'">
+            <input type="checkbox" id="f-repeat" onchange="App.toggleRepeat(this.checked)">
             <label for="f-repeat">שיעור חוזר כל שבוע</label>
           </div>
           <div id="repeatWrap" style="display:none">
-            <label>למשך כמה שבועות?</label>
-            <input id="f-weeks" type="number" value="8" min="2" max="52">
+            <input type="hidden" id="f-recur-mode" value="open">
+            <div class="seg-toggle">
+              <button type="button" class="seg-btn active" data-recur="open" onclick="App.setRecurMode('open')">כל שבוע, קבוע</button>
+              <button type="button" class="seg-btn" data-recur="count" onclick="App.setRecurMode('count')">מספר שבועות</button>
+            </div>
+            <div id="weeksWrap" style="display:none">
+              <label>למשך כמה שבועות?</label>
+              <input id="f-weeks" type="number" value="8" min="2" max="52">
+            </div>
           </div>
         ` : ""}
       </div>
       <button class="btn btn-green btn-block" onclick="App.saveLesson('${id || ""}')">שמירה</button>
-      ${id ? `<button class="btn btn-danger btn-block" onclick="App.deleteLesson('${id}')">מחיקת שיעור</button>` : ""}
+      ${id ? (l.seriesId ? `
+        <div class="setting-sub" style="text-align:center;margin:10px 0">${icon("repeat", "ic-sub")} שיעור חוזר שבועי</div>
+        <button class="btn btn-danger btn-block" onclick="App.deleteLesson('${id}')">מחיקת שיעור זה בלבד</button>
+        <button class="btn btn-danger btn-block" onclick="App.deleteSeriesFuture('${id}')">מחיקת השיעור וכל ההמשך</button>
+      ` : `
+        <button class="btn btn-danger btn-block" onclick="App.deleteLesson('${id}')">מחיקת שיעור</button>
+      `) : ""}
     `);
     renderStudentPicker();
   }
@@ -383,6 +397,16 @@ const App = (() => {
     btn.classList.toggle("open", !open);
   }
 
+  function toggleRepeat(checked) {
+    document.getElementById("repeatWrap").style.display = checked ? "block" : "none";
+  }
+  function setRecurMode(mode) {
+    document.getElementById("f-recur-mode").value = mode;
+    document.querySelectorAll("[data-recur]").forEach(b =>
+      b.classList.toggle("active", b.dataset.recur === mode));
+    document.getElementById("weeksWrap").style.display = mode === "count" ? "block" : "none";
+  }
+
   function saveLesson(id) {
     const priceRaw = document.getElementById("f-price").value.trim();
     const durRaw = document.getElementById("f-duration").value.trim();
@@ -400,15 +424,23 @@ const App = (() => {
       toast("השיעור עודכן", "ok");
     } else {
       const repeat = document.getElementById("f-repeat");
-      const weeks = (repeat && repeat.checked)
-        ? Math.max(1, parseInt(document.getElementById("f-weeks").value) || 1)
-        : 1;
-      for (let i = 0; i < weeks; i++) {
-        const d = new Date(data.date + "T00:00");
-        d.setDate(d.getDate() + i * 7);
-        lessons.push({ id: uid(), paid: false, done: false, ...data, date: ymd(d) });
+      if (repeat && repeat.checked) {
+        const mode = document.getElementById("f-recur-mode").value;
+        const openEnded = mode === "open";
+        const weeks = openEnded
+          ? HORIZON_WEEKS
+          : Math.max(1, parseInt(document.getElementById("f-weeks").value) || 1);
+        const seriesId = uid();
+        for (let i = 0; i < weeks; i++) {
+          const d = new Date(data.date + "T00:00");
+          d.setDate(d.getDate() + i * 7);
+          lessons.push({ id: uid(), paid: false, done: false, seriesId, recur: "weekly", openEnded, ...data, date: ymd(d) });
+        }
+        toast(openEnded ? "נקבע שיעור שבועי קבוע" : `נקבעו ${weeks} שיעורים`, "ok");
+      } else {
+        lessons.push({ id: uid(), paid: false, done: false, ...data });
+        toast("השיעור נקבע", "ok");
       }
-      toast(weeks > 1 ? `נקבעו ${weeks} שיעורים` : "השיעור נקבע", "ok");
     }
     save(); closeModal(); render();
   }
@@ -427,6 +459,45 @@ const App = (() => {
     lessons = lessons.filter(l => l.id !== id);
     save(); closeModal(); render();
     toast("השיעור נמחק");
+  }
+
+  // מחיקת השיעור הנוכחי וכל החזרות שאחריו (כמו "אירוע זה ואילך" ביומן גוגל)
+  function deleteSeriesFuture(id) {
+    const l = lessons.find(x => x.id === id);
+    if (!l) return;
+    if (!confirm("למחוק את השיעור הזה ואת כל החזרות הבאות שלו קדימה?")) return;
+    const removed = lessons.filter(x => x.seriesId === l.seriesId && x.date >= l.date).length;
+    lessons = lessons.filter(x => !(x.seriesId === l.seriesId && x.date >= l.date));
+    // עצירת הסדרה — שלא תורחב שוב אוטומטית
+    lessons.forEach(x => { if (x.seriesId === l.seriesId) x.openEnded = false; });
+    save(); closeModal(); render();
+    toast(`נמחקו ${removed} שיעורים`);
+  }
+
+  // הארכה אוטומטית של סדרות "כל שבוע" כדי שתמיד יהיו שיעורים עתידיים (תחושת אינסוף)
+  function maintainSeries() {
+    const horizon = ymd((() => { const d = new Date(); d.setDate(d.getDate() + HORIZON_WEEKS * 7); return d; })());
+    const groups = {};
+    lessons.forEach(l => { if (l.seriesId && l.openEnded) (groups[l.seriesId] = groups[l.seriesId] || []).push(l); });
+    let added = false;
+    Object.values(groups).forEach(arr => {
+      arr.sort((a, b) => a.date.localeCompare(b.date));
+      const last = arr[arr.length - 1];
+      const d = new Date(last.date + "T00:00");
+      while (true) {
+        d.setDate(d.getDate() + 7);
+        const ds = ymd(d);
+        if (ds > horizon) break;
+        lessons.push({
+          id: uid(), paid: false, done: false,
+          seriesId: last.seriesId, recur: "weekly", openEnded: true,
+          studentId: last.studentId, time: last.time, topic: last.topic,
+          duration: last.duration, price: last.price, date: ds
+        });
+        added = true;
+      }
+    });
+    if (added) DB.save("lessons", lessons);
   }
 
   function toggleDone(id) {
@@ -1183,6 +1254,7 @@ const App = (() => {
   function init() {
     // קודם מחברים בקרות קריטיות שלא תלויות ברינדור — כך שגיאת רינדור לא תשבית אותן
     try { migrate(); } catch (e) { console.error(e); }
+    try { maintainSeries(); } catch (e) { console.error(e); }
     initModalControls();
     initInstall();
     registerSW();
@@ -1199,9 +1271,9 @@ const App = (() => {
   return {
     go, closeModal, renderStudents,
     openStudentForm, saveStudent, deleteStudent,
-    openLessonForm, saveLesson, deleteLesson, toggleDone,
+    openLessonForm, saveLesson, deleteLesson, deleteSeriesFuture, toggleDone,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, toggleAdvanced,
-    scheduleForStudent, togglePaid,
+    toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
     setCalendarMode, calShift, selectCalDay,
     setMoneyTab, sendWhatsApp, markAllPaid,
     exportData, importData,
