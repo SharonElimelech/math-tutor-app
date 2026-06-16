@@ -879,6 +879,17 @@ const App = (() => {
       </div>
 
       <div class="settings-group">
+        <div class="group-title">התקנה</div>
+        <div class="card">
+          ${isStandalone()
+            ? `<div class="setting-sub" style="text-align:center"><span style="color:var(--green)">${icon("checkCircle")}</span> האפליקציה מותקנת</div>`
+            : canInstall()
+              ? `<button class="btn btn-green btn-block" onclick="App.promptInstall()">התקנת האפליקציה למסך הבית</button>`
+              : `<div class="setting-sub" style="text-align:center">להתקנה: פתחי את תפריט הדפדפן ובחרי <b>"הוספה למסך הבית"</b></div>`}
+        </div>
+      </div>
+
+      <div class="settings-group">
         <div class="group-title">נתונים</div>
         <div class="card">
           <button class="btn btn-light btn-block" onclick="App.exportData()">ייצוא גיבוי לקובץ</button>
@@ -1057,32 +1068,31 @@ const App = (() => {
     });
   }
 
-  // ========== התקנה (PWA) ==========
+  // ========== התקנה (PWA) — כפתור בהגדרות, ללא באנר צף ==========
   let deferredPrompt = null;
+  const isStandalone = () =>
+    window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
 
   function initInstall() {
     window.addEventListener("beforeinstallprompt", e => {
       e.preventDefault();
       deferredPrompt = e;
-      if (!localStorage.getItem("mt_installDismissed"))
-        document.getElementById("installBanner").classList.remove("hidden");
+      // מציגים את כפתור ההתקנה במסך ההגדרות אם הוא פתוח
+      if (document.getElementById("view-settings").classList.contains("active")) renderSettings();
     });
     window.addEventListener("appinstalled", () => {
-      document.getElementById("installBanner").classList.add("hidden");
       deferredPrompt = null;
       toast("האפליקציה הותקנה", "ok");
+      renderSettings();
     });
   }
+  function canInstall() { return !!deferredPrompt && !isStandalone(); }
   async function promptInstall() {
-    document.getElementById("installBanner").classList.add("hidden");
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) { toast("להתקנה: תפריט הדפדפן → הוספה למסך הבית", "info"); return; }
     deferredPrompt.prompt();
     await deferredPrompt.userChoice;
     deferredPrompt = null;
-  }
-  function dismissInstall() {
-    document.getElementById("installBanner").classList.add("hidden");
-    localStorage.setItem("mt_installDismissed", "1");
+    renderSettings();
   }
 
   // ========== רנדור כללי ==========
@@ -1135,6 +1145,6 @@ const App = (() => {
     changeMonth,
     updateSetting, setTheme, clearAll,
     enableNotifications, testNotification,
-    promptInstall, dismissInstall
+    promptInstall
   };
 })();
