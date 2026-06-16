@@ -184,9 +184,27 @@ const App = (() => {
   function openModal(html) {
     document.getElementById("modalBody").innerHTML = html;
     document.getElementById("modal").classList.remove("hidden");
+    // פוקוס אוטומטי על שם התלמיד (לא על שדה החיפוש בטופס שיעור — מציק במובייל)
+    setTimeout(() => { const f = document.getElementById("f-name"); if (f) f.focus(); }, 60);
   }
   function closeModal() {
     document.getElementById("modal").classList.add("hidden");
+  }
+  function modalOpen() {
+    return !document.getElementById("modal").classList.contains("hidden");
+  }
+  // סגירה בלחיצה על הרקע, ב-Esc, ושמירה ב-Enter
+  function initModalControls() {
+    const modal = document.getElementById("modal");
+    modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+    document.addEventListener("keydown", e => {
+      if (!modalOpen()) return;
+      if (e.key === "Escape") { closeModal(); return; }
+      if (e.key === "Enter" && e.target.tagName === "INPUT" && e.target.type !== "checkbox") {
+        const primary = document.querySelector("#modalBody .btn-green");
+        if (primary) { e.preventDefault(); primary.click(); }
+      }
+    });
   }
 
   // ========== תלמידים ==========
@@ -204,8 +222,28 @@ const App = (() => {
       <label>מחיר לשיעור (${escapeHtml(settings.currency)})</label>
       <input id="f-price" type="number" inputmode="numeric" min="0" value="${escapeHtml(s.price)}" placeholder="120">
       <button class="btn btn-green btn-block" onclick="App.saveStudent('${id || ""}')">שמירה</button>
-      ${id ? `<button class="btn btn-danger btn-block" onclick="App.deleteStudent('${id}')">מחיקת תלמיד</button>` : ""}
+      ${id ? `
+        <button class="btn btn-light btn-block" onclick="App.scheduleForStudent('${id}')">${icon("calendar")} קביעת שיעור לתלמיד זה</button>
+        ${studentSummaryLine(id)}
+        <button class="btn btn-danger btn-block" onclick="App.deleteStudent('${id}')">מחיקת תלמיד</button>
+      ` : ""}
     `);
+  }
+
+  // שורת סיכום מהירה בכרטיס תלמיד: שיעורים קרובים + חוב פתוח
+  function studentSummaryLine(id) {
+    const today = todayStr();
+    const upcoming = lessons.filter(l => l.studentId === id && l.date >= today && !l.done).length;
+    const owed = lessons.filter(l => l.studentId === id && l.done && !l.paid)
+      .reduce((sum, l) => sum + lessonPrice(l), 0);
+    return `<div class="setting-sub" style="text-align:center;margin:10px 0">
+      ${upcoming} שיעורים קרובים${owed > 0 ? ` · חוב פתוח: ${cur(owed)}` : ""}
+    </div>`;
+  }
+
+  function scheduleForStudent(id) {
+    closeModal();
+    openLessonForm(null, id);
   }
 
   function saveStudent(id) {
@@ -266,11 +304,11 @@ const App = (() => {
   }
 
   // ========== שיעורים / יומן ==========
-  function openLessonForm(id) {
+  function openLessonForm(id, presetStudentId) {
     if (!students.length) { toast("צריך קודם להוסיף לפחות תלמיד אחד", "err"); return; }
     const l = id
       ? lessons.find(x => x.id === id)
-      : { studentId: students[0].id, date: selectedDay || todayStr(), time: settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
+      : { studentId: presetStudentId || students[0].id, date: selectedDay || todayStr(), time: settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
     const priceVal = (typeof l.price === "number") ? l.price : "";
     openModal(`
       <h3>${id ? "עריכת שיעור" : "שיעור חדש"}</h3>
@@ -598,12 +636,13 @@ const App = (() => {
     up.innerHTML = upcoming.length ? upcoming.map(l => {
       const s = studentById(l.studentId) || { name: "?" };
       const isToday = l.date === today;
-      return `<div class="item" onclick="App.openLessonForm('${l.id}')">
-        <div class="item-main">
+      return `<div class="item">
+        <div class="item-main" onclick="App.openLessonForm('${l.id}')">
           <div class="item-title">${escapeHtml(s.name)} ${isToday ? '<span class="tag tag-soon">היום</span>' : ""}</div>
           <div class="item-sub">${dateTimeLine(l)}</div>
           ${l.topic ? `<div class="item-note">${icon("note", "ic-sub")} ${escapeHtml(l.topic)}</div>` : ""}
         </div>
+        <button class="lesson-check" onclick="App.toggleDone('${l.id}')" aria-label="סימון כבוצע" title="סמן כבוצע">${icon("check")}</button>
       </div>`;
     }).join("") : `<div class="empty">אין שיעורים מתוכננים</div>`;
 
@@ -662,11 +701,26 @@ const App = (() => {
             </div>
           </div>
           ${unpaid.length ? `
+            <div class="paid-list">
+              ${unpaid.map(l => `
+                <div class="paid-row">
+                  <span class="paid-date">${icon("calendar", "ic-sub")} ${fmtDate(l.date)} · ${cur(lessonPrice(l))}</span>
+                  <button class="btn btn-light paid-mark" onclick="App.togglePaid('${l.id}')">${icon("check")} שולם</button>
+                </div>`).join("")}
+            </div>
             <button class="btn btn-wa btn-block" onclick="App.sendWhatsApp('${s.id}')">${icon("whatsapp")} תזכורת תשלום בוואטסאפ (${cur(owed)})</button>
             <button class="btn btn-green btn-block" onclick="App.markAllPaid('${s.id}')">${icon("check")} סימון הכול כשולם</button>
           ` : ""}
         </div>`;
     }).join("");
+  }
+
+  function togglePaid(id) {
+    const l = lessons.find(x => x.id === id);
+    if (!l) return;
+    l.paid = !l.paid;
+    save(); render();
+    toast(l.paid ? "סומן כשולם" : "בוטל סימון התשלום", "ok");
   }
 
   function markAllPaid(studentId) {
@@ -943,7 +997,9 @@ const App = (() => {
     const meta = document.getElementById("themeColorMeta");
     if (meta) meta.setAttribute("content", t === "dark" ? "#0f141b" : "#1f2937");
     // ציור מחדש של הגרף כדי שצבעי הטקסט יתעדכנו
-    if (document.getElementById("view-income").classList.contains("active")) drawChart();
+    // ציור מחדש של הגרף רק אם מסך הכספים פעיל ולשונית הסיכום פתוחה
+    const moneyView = document.getElementById("view-money");
+    if (moneyView && moneyView.classList.contains("active") && moneyTab === "income") drawChart();
   }
   mq.addEventListener && mq.addEventListener("change", () => { if (settings.theme === "auto") applyTheme(); });
 
@@ -1112,26 +1168,32 @@ const App = (() => {
     if (p.get("action") === "new-lesson") openLessonForm();
   }
 
-  function init() {
-    migrate();
-    applyTheme();
-    render();
-    handleLaunchParams();
-    initReminders();
-    initInstall();
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("service-worker.js").catch(() => {});
-      // עדכון אוטומטי שקט: כש-SW חדש משתלט (skipWaiting), מרעננים פעם אחת
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        if (refreshing) return;
-        refreshing = true;
-        window.location.reload();
-      });
-    }
+  function registerSW() {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("service-worker.js").catch(() => {});
+    // עדכון אוטומטי שקט: כש-SW חדש משתלט (skipWaiting), מרעננים פעם אחת
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
   }
 
-  document.addEventListener("DOMContentLoaded", init);
+  function init() {
+    // קודם מחברים בקרות קריטיות שלא תלויות ברינדור — כך שגיאת רינדור לא תשבית אותן
+    try { migrate(); } catch (e) { console.error(e); }
+    initModalControls();
+    initInstall();
+    registerSW();
+    applyTheme();
+    try { render(); } catch (e) { console.error(e); }
+    initReminders();
+    handleLaunchParams();
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 
   // ----- חשיפת פונקציות לממשק -----
   return {
@@ -1139,6 +1201,7 @@ const App = (() => {
     openStudentForm, saveStudent, deleteStudent,
     openLessonForm, saveLesson, deleteLesson, toggleDone,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, toggleAdvanced,
+    scheduleForStudent, togglePaid,
     setCalendarMode, calShift, selectCalDay,
     setMoneyTab, sendWhatsApp, markAllPaid,
     exportData, importData,
