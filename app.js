@@ -357,6 +357,8 @@ const App = (() => {
         ` : ""}
       </div>
       <button class="btn btn-green btn-block" onclick="App.saveLesson('${id || ""}')">שמירה</button>
+      ${id && studentById(l.studentId) && studentById(l.studentId).phone
+        ? `<button class="btn btn-wa btn-block" onclick="App.sendLessonReminder('${id}')">${icon("whatsapp")} שליחת תזכורת לתלמיד</button>` : ""}
       ${id ? (l.seriesId ? `
         <div class="setting-sub" style="text-align:center;margin:10px 0">${icon("repeat", "ic-sub")} שיעור חוזר שבועי</div>
         <button class="btn btn-danger btn-block" onclick="App.deleteLesson('${id}')">מחיקת שיעור זה בלבד</button>
@@ -528,6 +530,18 @@ const App = (() => {
     return `${wd}, ${dm}`;
   }
 
+  // גרסת טקסט נקי (להודעות וואטסאפ)
+  function dayLabelPlain(dateStr) {
+    const d = new Date(dateStr + "T00:00");
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const diff = Math.round((d - t) / 86400000);
+    const wd = d.toLocaleDateString("he-IL", { weekday: "long" });
+    const dm = d.toLocaleDateString("he-IL", { day: "numeric", month: "long" });
+    if (diff === 0) return `היום (${dm})`;
+    if (diff === 1) return `מחר (${dm})`;
+    return `ב${wd} (${dm})`;
+  }
+
   function groupByDate(list) {
     const map = new Map();
     list.forEach(l => {
@@ -584,6 +598,12 @@ const App = (() => {
     renderCalendar();
   }
 
+  function calToday() {
+    calMonth = new Date();
+    selectedDay = todayStr();
+    renderCalendar();
+  }
+
   function renderMonthGrid() {
     const grid = document.getElementById("calendarMonth");
     if (calMode !== "month") { grid.classList.add("hidden"); return; }
@@ -609,16 +629,19 @@ const App = (() => {
         h ? "holiday" : "",
         has ? "has-lessons" : ""].filter(Boolean).join(" ");
       const title = [h ? h.name : "", has ? counts[ds] + " שיעורים" : ""].filter(Boolean).join(" · ");
-      const dot = h ? '<span class="cal-dot holiday-dot"></span>' : (has ? '<span class="cal-dot"></span>' : "");
-      cells += `<div class="${cls}"${title ? ` title="${escapeHtml(title)}"` : ""} onclick="App.selectCalDay('${ds}')">${day}${dot}</div>`;
+      const marker = has
+        ? `<span class="cal-count">${counts[ds]}</span>`
+        : (h ? '<span class="cal-dot holiday-dot"></span>' : "");
+      cells += `<div class="${cls}"${title ? ` title="${escapeHtml(title)}"` : ""} onclick="App.selectCalDay('${ds}')">${day}${marker}</div>`;
     }
 
     grid.innerHTML = `
       <div class="cal-head">
-        <button class="cal-nav" onclick="App.calShift(-1)">‹</button>
+        <button class="cal-nav" aria-label="חודש קודם" onclick="App.calShift(-1)">‹</button>
         <span>${calMonth.toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</span>
-        <button class="cal-nav" onclick="App.calShift(1)">›</button>
+        <button class="cal-nav" aria-label="חודש הבא" onclick="App.calShift(1)">›</button>
       </div>
+      <button class="btn btn-light btn-block cal-today" onclick="App.calToday()">היום</button>
       <div class="cal-grid">${cells}</div>`;
   }
 
@@ -630,10 +653,12 @@ const App = (() => {
       const day = selectedDay || todayStr();
       const h = holidayFor(day);
       const dayLessons = lessonSorted().filter(l => l.date === day);
-      el.innerHTML = dayLessons.length
-        ? dayGroupHtml(day, dayLessons)
-        : (h ? `<div class="holiday-banner">${icon("info")} ${escapeHtml(h.name)}</div>` : "") +
-          `<div class="empty">אין שיעורים ב-${fmtDate(day)}</div>`;
+      const addBtn = `<button class="btn btn-light btn-block" onclick="App.openLessonForm()">${icon("plus")} קביעת שיעור ב-${fmtDate(day)}</button>`;
+      el.innerHTML = (h ? `<div class="holiday-banner">${icon("info")} ${escapeHtml(h.name)}</div>` : "") +
+        (dayLessons.length
+          ? dayGroupHtml(day, dayLessons)
+          : `<div class="empty">אין שיעורים ב-${fmtDate(day)}</div>`) +
+        addBtn;
       return;
     }
 
@@ -713,7 +738,10 @@ const App = (() => {
           <div class="item-sub">${dateTimeLine(l)}</div>
           ${l.topic ? `<div class="item-note">${icon("note", "ic-sub")} ${escapeHtml(l.topic)}</div>` : ""}
         </div>
-        <button class="lesson-check" onclick="App.toggleDone('${l.id}')" aria-label="סימון כבוצע" title="סמן כבוצע">${icon("check")}</button>
+        <div class="item-actions">
+          ${s.phone ? `<button class="btn btn-wa" onclick="App.sendLessonReminder('${l.id}')" aria-label="שליחת תזכורת">${icon("whatsapp")} תזכורת</button>` : ""}
+          <button class="lesson-check" onclick="App.toggleDone('${l.id}')" aria-label="סימון כבוצע" title="סמן כבוצע">${icon("check")}</button>
+        </div>
       </div>`;
     }).join("") : `<div class="empty">אין שיעורים מתוכננים</div>`;
 
@@ -802,11 +830,20 @@ const App = (() => {
   }
 
   // ----- וואטסאפ: הודעה מוכנה + קישור לשליחה בלחיצה -----
+  // פתיחת וואטסאפ עם הודעה מוכנה. מנרמל מספר ישראלי לפורמט בינלאומי.
+  function waOpen(student, msg) {
+    if (!student.phone) { toast("לתלמיד אין מספר טלפון. הוסיפי אותו במסך התלמידים.", "err"); return; }
+    let phone = student.phone.replace(/[^0-9]/g, "");
+    if (phone.startsWith("00")) phone = phone.slice(2);
+    if (phone.startsWith("0")) phone = "972" + phone.slice(1);
+    else if (!phone.startsWith("972")) phone = "972" + phone;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank");
+  }
+
+  // תזכורת תשלום מוכנה לשליחה
   function sendWhatsApp(studentId) {
     const s = studentById(studentId);
     if (!s) return;
-    if (!s.phone) { toast("לתלמיד אין מספר טלפון. הוסיפי אותו במסך התלמידים.", "err"); return; }
-
     const unpaid = lessons.filter(l => l.studentId === studentId && l.done && !l.paid);
     const owed = unpaid.reduce((sum, l) => sum + lessonPrice(l), 0);
     const greet = s.parentName ? `שלום ${s.parentName},` : "שלום,";
@@ -815,13 +852,23 @@ const App = (() => {
       `תזכורת ידידותית לגבי תשלום עבור השיעורים הפרטיים של ${s.name}.\n` +
       `סה"כ ${unpaid.length} שיעורים שטרם שולמו, בסך ${owed} ${settings.currency}.\n` +
       `תודה רבה!`;
+    waOpen(s, msg);
+  }
 
-    let phone = s.phone.replace(/[^0-9]/g, "");
-    if (phone.startsWith("00")) phone = phone.slice(2);
-    if (phone.startsWith("0")) phone = "972" + phone.slice(1);
-    else if (!phone.startsWith("972")) phone = "972" + phone;
-
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank");
+  // תזכורת שיעור מוכנה לשליחה לתלמיד/הורה
+  function sendLessonReminder(lessonId) {
+    const l = lessons.find(x => x.id === lessonId);
+    if (!l) return;
+    const s = studentById(l.studentId);
+    if (!s) return;
+    const greet = s.parentName ? `שלום ${s.parentName},` : "שלום,";
+    const when = dayLabelPlain(l.date);
+    const msg =
+      `${greet}\n` +
+      `תזכורת לשיעור של ${s.name} ${when} בשעה ${l.time}.` +
+      (l.topic ? `\nנושא: ${l.topic}.` : "") +
+      `\nנתראה!`;
+    waOpen(s, msg);
   }
 
   // ========== גיבוי ושחזור ==========
@@ -878,13 +925,35 @@ const App = (() => {
       if (l.paid) earned += price; else pending += price;
     });
 
+    // פירוט לפי תלמיד
+    const perStudent = students.map(s => {
+      const sl = monthLessons.filter(l => l.studentId === s.id);
+      let e = 0, p = 0;
+      sl.forEach(l => { const pr = lessonPrice(l); if (l.paid) e += pr; else p += pr; });
+      return { s, count: sl.length, earned: e, pending: p };
+    }).filter(x => x.count > 0).sort((a, b) => (b.earned + b.pending) - (a.earned + a.pending));
+
+    const breakdown = perStudent.length ? `
+      <h3>פירוט לפי תלמיד</h3>
+      <div class="list">
+        ${perStudent.map(x => `
+          <div class="item">
+            <div class="item-main">
+              <div class="item-title">${escapeHtml(x.s.name)}</div>
+              <div class="item-sub">${x.count} שיעורים · התקבל ${cur(x.earned)}${x.pending > 0 ? ` · <span style="color:var(--red)">חוב ${cur(x.pending)}</span>` : ""}</div>
+            </div>
+            <div class="item-actions"><b style="font-size:1.05rem">${cur(x.earned + x.pending)}</b></div>
+          </div>`).join("")}
+      </div>` : "";
+
     document.getElementById("incomeSummary").innerHTML = `
       <div class="card summary-card">
         <div>שיעורים שבוצעו: <b>${monthLessons.length}</b></div>
         <div>התקבל בפועל: <b>${cur(earned)}</b></div>
         <div>ממתין לתשלום: <b>${cur(pending)}</b></div>
         <div style="font-size:1.2rem;margin-top:6px">סה"כ החודש: <b>${cur(earned + pending)}</b></div>
-      </div>`;
+      </div>
+      ${breakdown}`;
 
     drawChart();
   }
@@ -1084,26 +1153,25 @@ const App = (() => {
     if (!notifSupported) return "הדפדפן לא תומך בהתראות";
     if (Notification.permission === "granted")
       return triggerSupported
-        ? "מופעל — תזכורת תישלח לטלפון לפני כל שיעור"
-        : "מופעל — תזכורת תופיע כשהאפליקציה פתוחה";
+        ? "מופעל — גם כשהאפליקציה ברקע/סגורה"
+        : "מופעל — בזמן שהאפליקציה פתוחה או ברקע";
     if (Notification.permission === "denied") return "חסום — יש לאפשר בהגדרות הדפדפן";
     return "כבוי — לחצי 'הפעלת התראות'";
   }
   function notifHelpText() {
-    if (triggerSupported) return "מומלץ להתקין את האפליקציה (הוספה למסך הבית) כדי שההתראות יעבדו גם כשהיא סגורה.";
-    return "באייפון: הוסיפי קודם למסך הבית. תזכורות מתוזמנות אינן נתמכות שם — יופיעו רק כשהאפליקציה פתוחה.";
+    return "התראה מתוזמנת ברקע אינה נתמכת בכל המכשירים (בעיקר אייפון). הדרך הבטוחה לוודא שהתלמיד מקבל תזכורת היא כפתור \"תזכורת\" שמכין הודעת וואטסאפ מוכנה לשליחה. מומלץ להתקין את האפליקציה למסך הבית.";
   }
 
   function initReminders() {
     if (!notifSupported) return;
     if (Notification.permission === "granted") {
-      reschedule();
-      if (!triggerSupported) startInterval();
+      reschedule();      // תזמון ברקע — בונוס היכן שנתמך
+      startInterval();   // גיבוי: תמיד פעיל בזמן שהאפליקציה פתוחה
     }
   }
 
   function startInterval() {
-    if (intervalStarted || triggerSupported) return;
+    if (intervalStarted) return;
     intervalStarted = true;
     setInterval(checkReminders, 60 * 1000);
     checkReminders();
@@ -1274,8 +1342,8 @@ const App = (() => {
     openLessonForm, saveLesson, deleteLesson, deleteSeriesFuture, toggleDone,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
-    setCalendarMode, calShift, selectCalDay,
-    setMoneyTab, sendWhatsApp, markAllPaid,
+    setCalendarMode, calShift, selectCalDay, calToday,
+    setMoneyTab, sendWhatsApp, sendLessonReminder, markAllPaid,
     exportData, importData,
     changeMonth,
     updateSetting, setTheme, clearAll,

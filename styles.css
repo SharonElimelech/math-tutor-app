@@ -496,6 +496,19 @@ main { padding: 18px 16px; max-width: 620px; margin: 0 auto; }
 .cal-cell.today { background: var(--orange-bg); color: var(--orange); }
 .cal-cell.sel { background: var(--brand-1); color: #fff; }
 .cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--brand-1); }
+.cal-count {
+  min-width: 16px; height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--brand-1);
+  color: #fff;
+  font-size: .62rem;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+.cal-cell.sel .cal-count { background: #fff; color: var(--brand-1); }
+.cal-today { margin: 0 0 12px; }
 .cal-cell.sel .cal-dot { background: #fff; }
 .cal-cell.has-lessons:not(.sel):not(.today) { background: var(--surface-2); }
 
