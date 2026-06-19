@@ -5,6 +5,7 @@ import {
   parseBackup,
   reminderLeadMinutes
 } from "./src/data.js";
+import { buildLessonIndex, summarizeMonth } from "./src/selectors.js";
 
 /* =========================================================
    "המורה שלי" – אפליקציה לניהול שיעורים פרטיים
@@ -69,6 +70,7 @@ const App = (() => {
   let settings = loaded.state.settings;
   let lastSavedState = clone(loaded.state);
   let startupDataError = loaded.error;
+  let lessonIndex = buildLessonIndex(students, lessons);
 
   let viewMonth = new Date();      // החודש שמוצג בסיכום הכנסות
   let calMonth  = new Date();      // החודש שמוצג בלוח החודשי
@@ -88,12 +90,15 @@ const App = (() => {
     students = restored.students;
     lessons = restored.lessons;
     settings = restored.settings;
+    refreshIndex();
   }
+  const refreshIndex = () => { lessonIndex = buildLessonIndex(students, lessons); };
   function persistSnapshot() {
     try {
       const snapshot = createSnapshot(students, lessons, settings);
       DB.save(snapshot);
       lastSavedState = clone(snapshot);
+      refreshIndex();
       return true;
     } catch (error) {
       restoreLastSavedState();
@@ -118,7 +123,7 @@ const App = (() => {
   const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  const studentById = id => students.find(s => s.id === id);
+  const studentById = id => lessonIndex.studentsById.get(id);
   // מחיר שיעור: עדיפות למחיר ששמור על השיעור, אחרת מחיר התלמיד
   const lessonPrice = l => {
     if (typeof l.price === "number") return l.price;
@@ -203,8 +208,7 @@ const App = (() => {
     target.classList.add("active");
     document.querySelectorAll(".nav-btn").forEach(b =>
       b.classList.toggle("active", b.dataset.view === view));
-    render();
-    if (view === "money") applyMoneyTab();
+    render(view);
     window.scrollTo(0, 0);
   }
 
@@ -261,8 +265,8 @@ const App = (() => {
   // שורת סיכום מהירה בכרטיס תלמיד: שיעורים קרובים + חוב פתוח
   function studentSummaryLine(id) {
     const today = todayStr();
-    const upcoming = lessons.filter(l => l.studentId === id && l.date >= today && !l.done).length;
-    const owed = lessons.filter(l => l.studentId === id && l.done && !l.paid)
+    const upcoming = lessonIndex.forStudent(id).filter(l => l.date >= today && !l.done).length;
+    const owed = lessonIndex.unpaidForStudent(id)
       .reduce((sum, l) => sum + lessonPrice(l), 0);
     return `<div class="setting-sub" style="text-align:center;margin:10px 0">
       ${upcoming} שיעורים קרובים${owed > 0 ? ` · חוב פתוח: ${cur(owed)}` : ""}
@@ -543,8 +547,7 @@ const App = (() => {
   }
 
   function lessonSorted() {
-    return [...lessons].sort((a, b) =>
-      (a.date + a.time).localeCompare(b.date + b.time));
+    return lessonIndex.sortedLessons;
   }
 
   const dateTimeLine = l =>
@@ -794,11 +797,6 @@ const App = (() => {
       </div>`;
     }).join("") : `<div class="empty"><span style="color:var(--green)">${icon("checkCircle")}</span> הכול שולם</div>`;
 
-    const badge = document.getElementById("reminderBadge");
-    if (todayLessons.length) {
-      badge.innerHTML = `${icon("bell")} ${todayLessons.length} שיעורים היום`;
-      badge.classList.remove("hidden");
-    } else { badge.classList.add("hidden"); }
   }
 
   // ========== כספים: מעבר בין תשלומים לסיכום ==========
@@ -809,9 +807,14 @@ const App = (() => {
     document.getElementById("money-income").classList.toggle("hidden", moneyTab !== "income");
     if (moneyTab === "income") drawChart();
   }
+  function renderMoney() {
+    if (moneyTab === "payments") renderPayments();
+    else renderIncome();
+    applyMoneyTab();
+  }
   function setMoneyTab(tab) {
     moneyTab = tab;
-    applyMoneyTab();
+    renderMoney();
   }
 
   // ========== תשלומים ==========
@@ -819,8 +822,8 @@ const App = (() => {
     const el = document.getElementById("paymentsList");
     if (!students.length) { el.innerHTML = `<div class="empty">אין נתונים</div>`; return; }
     el.innerHTML = students.map(s => {
-      const sl = lessons.filter(l => l.studentId === s.id && l.done);
-      const unpaid = sl.filter(l => !l.paid);
+      const sl = lessonIndex.doneForStudent(s.id);
+      const unpaid = lessonIndex.unpaidForStudent(s.id);
       const owed = unpaid.reduce((sum, l) => sum + lessonPrice(l), 0);
       return `
         <div class="card">
@@ -858,8 +861,7 @@ const App = (() => {
   }
 
   function markAllPaid(studentId) {
-    lessons.filter(l => l.studentId === studentId && l.done && !l.paid)
-      .forEach(l => l.paid = true);
+    lessonIndex.unpaidForStudent(studentId).forEach(l => l.paid = true);
     if (!save()) { render(); return; }
     render();
     toast("סומן כשולם", "ok");
@@ -880,7 +882,7 @@ const App = (() => {
   function sendWhatsApp(studentId) {
     const s = studentById(studentId);
     if (!s) return;
-    const unpaid = lessons.filter(l => l.studentId === studentId && l.done && !l.paid);
+    const unpaid = lessonIndex.unpaidForStudent(studentId);
     const owed = unpaid.reduce((sum, l) => sum + lessonPrice(l), 0);
     const greet = s.parentName ? `שלום ${s.parentName},` : "שלום,";
     const msg =
@@ -953,20 +955,9 @@ const App = (() => {
     document.getElementById("currentMonthLabel").textContent =
       viewMonth.toLocaleDateString("he-IL", { month: "long", year: "numeric" });
 
-    const monthLessons = lessons.filter(l => l.date.startsWith(key) && l.done);
-    let earned = 0, pending = 0;
-    monthLessons.forEach(l => {
-      const price = lessonPrice(l);
-      if (l.paid) earned += price; else pending += price;
-    });
-
-    // פירוט לפי תלמיד
-    const perStudent = students.map(s => {
-      const sl = monthLessons.filter(l => l.studentId === s.id);
-      let e = 0, p = 0;
-      sl.forEach(l => { const pr = lessonPrice(l); if (l.paid) e += pr; else p += pr; });
-      return { s, count: sl.length, earned: e, pending: p };
-    }).filter(x => x.count > 0).sort((a, b) => (b.earned + b.pending) - (a.earned + a.pending));
+    const monthLessons = lessonIndex.sortedLessons.filter(l => l.date.startsWith(key) && l.done);
+    const summary = summarizeMonth(monthLessons, lessonIndex.studentsById, lessonPrice);
+    const { earned, pending, students: perStudent } = summary;
 
     const breakdown = perStudent.length ? `
       <h3>פירוט לפי תלמיד</h3>
@@ -974,7 +965,7 @@ const App = (() => {
         ${perStudent.map(x => `
           <div class="item">
             <div class="item-main">
-              <div class="item-title">${escapeHtml(x.s.name)}</div>
+              <div class="item-title">${escapeHtml(x.student.name)}</div>
               <div class="item-sub">${x.count} שיעורים · התקבל ${cur(x.earned)}${x.pending > 0 ? ` · <span style="color:var(--red)">חוב ${cur(x.pending)}</span>` : ""}</div>
             </div>
             <div class="item-actions"><b style="font-size:1.05rem">${cur(x.earned + x.pending)}</b></div>
@@ -1327,13 +1318,27 @@ const App = (() => {
   }
 
   // ========== רנדור כללי ==========
-  function render() {
-    renderHome();
-    renderStudents();
-    renderCalendar();
-    renderPayments();
-    renderIncome();
-    renderSettings();
+  function activeViewName() {
+    const active = document.querySelector(".view.active");
+    return active ? active.id.replace("view-", "") : "home";
+  }
+  function renderHeader() {
+    const todayLessons = lessonIndex.onDate(todayStr());
+    const badge = document.getElementById("reminderBadge");
+    if (todayLessons.length) {
+      badge.innerHTML = `${icon("bell")} ${todayLessons.length} שיעורים היום`;
+      badge.classList.remove("hidden");
+    } else {
+      badge.classList.add("hidden");
+    }
+  }
+  function render(view = activeViewName()) {
+    renderHeader();
+    if (view === "home") renderHome();
+    else if (view === "students") renderStudents();
+    else if (view === "calendar") renderCalendar();
+    else if (view === "money") renderMoney();
+    else if (view === "settings") renderSettings();
   }
 
   // ----- אתחול -----
