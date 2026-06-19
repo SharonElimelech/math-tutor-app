@@ -830,43 +830,73 @@ const App = (() => {
   // ========== תשלומים ==========
   function renderPayments() {
     const el = document.getElementById("paymentsList");
-    if (!students.length) { el.innerHTML = `<div class="empty">אין נתונים</div>`; return; }
+    if (!students.length) {
+      el.innerHTML = `<div class="empty">כדי לעקוב אחר תשלומים, צריך קודם להוסיף תלמיד ושיעור.</div>`;
+      return;
+    }
     const totalUnpaid = lessons.filter(lesson => lesson.done && !lesson.paid);
     const totalOwed = totalUnpaid.reduce((sum, lesson) => sum + lessonPrice(lesson), 0);
-    const cards = students.map(s => {
-      const sl = lessonIndex.doneForStudent(s.id);
+    const debtors = students.map(s => {
       const unpaid = lessonIndex.unpaidForStudent(s.id);
       const owed = unpaid.reduce((sum, l) => sum + lessonPrice(l), 0);
-      return `
-        <div class="card">
-          <div class="item" style="box-shadow:none;padding:0;border:none;">
-            <div class="item-main">
-              <div class="item-title">${escapeHtml(s.name)}</div>
-              <div class="item-sub">
-                ${sl.length} ${sl.length === 1 ? "שיעור בוצע" : "שיעורים בוצעו"} · ${unpaid.length === 1 ? "אחד טרם שולם" : `${unpaid.length} טרם שולמו`}
-                ${owed > 0 ? `<br><span class="tag tag-due">חוב: ${cur(owed)}</span>` : `<br><span class="tag tag-paid">הכול שולם</span>`}
-              </div>
-            </div>
+      return { student: s, unpaid, owed };
+    }).filter(item => item.unpaid.length).sort((a, b) => b.owed - a.owed);
+
+    const queue = debtors.length ? debtors.map(({ student, unpaid, owed }) => `
+      <article class="payment-account" aria-labelledby="payment-student-${student.id}">
+        <header class="payment-account-head">
+          <div>
+            <h3 id="payment-student-${student.id}">${escapeHtml(student.name)}</h3>
+            <p>${unpaid.length === 1 ? "שיעור אחד ממתין לתשלום" : `${unpaid.length} שיעורים ממתינים לתשלום`}</p>
           </div>
-          ${unpaid.length ? `
-            <div class="paid-list">
-              ${unpaid.map(l => `
-                <div class="paid-row">
-                  <span class="paid-date">${icon("calendar", "ic-sub")} ${fmtDate(l.date)} · ${cur(lessonPrice(l))}</span>
-                  <button class="btn btn-light paid-mark" onclick="App.togglePaid('${l.id}')">${icon("check")} שולם</button>
-                </div>`).join("")}
-            </div>
-            <button class="btn btn-wa btn-block" onclick="App.sendWhatsApp('${s.id}')">${icon("whatsapp")} תזכורת תשלום בוואטסאפ (${cur(owed)})</button>
-            <button class="btn btn-green btn-block" onclick="App.markAllPaid('${s.id}')">${icon("check")} סימון הכול כשולם</button>
-          ` : ""}
-        </div>`;
-    }).join("");
+          <div class="payment-account-total" aria-label="יתרת חוב ${cur(owed)}">
+            <span>לתשלום</span>
+            <strong>${cur(owed)}</strong>
+          </div>
+        </header>
+        <ul class="payment-lessons" aria-label="שיעורים שטרם שולמו">
+          ${unpaid.map(l => `
+            <li class="payment-lesson">
+              <div class="payment-lesson-info">
+                <span class="payment-lesson-date">${icon("calendar", "ic-sub")} ${fmtDate(l.date)}</span>
+                ${l.topic ? `<span class="payment-lesson-topic">${escapeHtml(l.topic)}</span>` : ""}
+              </div>
+              <strong class="payment-lesson-price">${cur(lessonPrice(l))}</strong>
+              <button class="payment-mark" onclick="App.togglePaid('${l.id}')" aria-label="סימון השיעור של ${escapeHtml(student.name)} מ-${fmtDate(l.date)} בסך ${cur(lessonPrice(l))} כשולם">
+                ${icon("check")} <span>סימון כשולם</span>
+              </button>
+            </li>`).join("")}
+        </ul>
+        <footer class="payment-actions">
+          ${student.phone
+            ? `<button class="btn btn-wa" onclick="App.sendWhatsApp('${student.id}')">${icon("whatsapp")} שליחת תזכורת</button>`
+            : `<button class="btn btn-light" onclick="App.openStudentForm('${student.id}')">הוספת מספר טלפון</button>`}
+          <button class="btn btn-green" onclick="App.markAllPaid('${student.id}')">${icon("check")} סימון ${unpaid.length === 1 ? "השיעור" : "הכול"} כשולם</button>
+        </footer>
+      </article>
+    `).join("") : `
+      <div class="payment-empty">
+        <span class="payment-empty-icon">${icon("checkCircle")}</span>
+        <div><h3>אין תשלומים פתוחים</h3><p>כל השיעורים שבוצעו מסומנים כשולמו.</p></div>
+      </div>`;
+
+    const settledStudents = students.length - debtors.length;
     el.innerHTML = `
-      <div class="finance-overview">
-        <div><span>יתרה פתוחה</span><strong>${cur(totalOwed)}</strong></div>
-        <div><span>שיעורים ממתינים</span><strong>${totalUnpaid.length}</strong></div>
+      <section class="payment-summary" aria-label="סיכום תשלומים פתוחים">
+        <div class="payment-summary-main">
+          <span>יתרה לגבייה</span>
+          <strong>${cur(totalOwed)}</strong>
+        </div>
+        <div class="payment-summary-meta">
+          <span>${icon("note")} <b>${totalUnpaid.length}</b> ${totalUnpaid.length === 1 ? "שיעור פתוח" : "שיעורים פתוחים"}</span>
+          <span>${icon("checkCircle")} <b>${settledStudents}</b> ללא חוב</span>
+        </div>
+      </section>
+      <div class="payment-queue-head">
+        <h3>ממתינים לטיפול</h3>
+        <span>${debtors.length === 0 ? "הכול מעודכן" : debtors.length === 1 ? "תלמיד אחד" : `${debtors.length} תלמידים`}</span>
       </div>
-      ${cards}`;
+      <div class="payment-queue">${queue}</div>`;
   }
 
   function togglePaid(id, showUndo = true) {

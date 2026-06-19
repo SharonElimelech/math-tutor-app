@@ -38,3 +38,14 @@ test("lesson reminders use supported service-worker notifications", () => {
   assert.match(source, /visibilitychange/);
   assert.match(source, /exportCalendar/);
 });
+
+test("payment queue is semantic, touch friendly, and responsive", () => {
+  const source = read("app.js");
+  const styles = read("styles.css");
+  assert.match(source, /<article class="payment-account" aria-labelledby=/);
+  assert.match(source, /<ul class="payment-lessons" aria-label=/);
+  assert.match(source, /class="payment-mark"[^>]+aria-label=/);
+  assert.doesNotMatch(source, /class="finance-overview"|class="paid-list"/);
+  assert.match(styles, /\.payment-mark\s*\{[^}]*min-height:\s*44px/s);
+  assert.match(styles, /@media \(max-width: 520px\)[\s\S]*\.payment-actions\s*\{[^}]*flex-direction:\s*column/);
+});
