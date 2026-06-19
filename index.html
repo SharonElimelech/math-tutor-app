@@ -2,14 +2,14 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#1f2937" id="themeColorMeta">
   <title>המורה שלי - ניהול שיעורים פרטיים</title>
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=13">
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Heebo:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=14">
   <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
@@ -29,32 +29,42 @@
   <main id="app">
     <!-- מסך: בית / שיעורים קרובים -->
     <section id="view-home" class="view active">
-      <h2 id="homeGreeting">שלום</h2>
-      <div id="onboard"></div>
-      <div id="todaySummary" class="card summary-card"></div>
-
-      <div class="home-actions">
-        <button class="action-tile primary" onclick="App.openLessonForm()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-          קביעת שיעור
-        </button>
-        <button class="action-tile" onclick="App.openStudentForm()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20"/><circle cx="9.5" cy="8" r="3.5"/><path d="M20 8v6M23 11h-6"/></svg>
-          תלמיד חדש
-        </button>
+      <div class="page-intro">
+        <div>
+          <span class="eyebrow">שולחן העבודה</span>
+          <h2 id="homeGreeting">שלום</h2>
+        </div>
+        <p>השיעורים, התשלומים והפעולות החשובות — במקום אחד.</p>
       </div>
-
-      <h3>השיעורים הקרובים</h3>
-      <div id="upcomingLessons" class="list"></div>
-      <h3>תזכורות תשלום ממתינות</h3>
-      <div id="paymentAlerts" class="list"></div>
+      <div id="onboard"></div>
+      <div class="home-dashboard">
+        <div class="home-primary">
+          <div id="todaySummary" class="card summary-card"></div>
+          <div class="home-actions">
+            <button class="action-tile primary" onclick="App.openLessonForm()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              קביעת שיעור
+            </button>
+            <button class="action-tile" onclick="App.openStudentForm()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20"/><circle cx="9.5" cy="8" r="3.5"/><path d="M20 8v6M23 11h-6"/></svg>
+              תלמיד חדש
+            </button>
+          </div>
+          <div class="section-heading"><h3>השיעורים הקרובים</h3><span>5 הקרובים</span></div>
+          <div id="upcomingLessons" class="list timeline-list"></div>
+        </div>
+        <aside class="home-secondary">
+          <div class="section-heading"><h3>מעקב תשלומים</h3><span>דורש טיפול</span></div>
+          <div id="paymentAlerts" class="list"></div>
+        </aside>
+      </div>
       <input id="importFile" type="file" accept="application/json" style="display:none" onchange="App.importData(event)">
     </section>
 
     <!-- מסך: תלמידים -->
     <section id="view-students" class="view">
       <div class="view-head">
-        <h2>התלמידים שלי</h2>
+        <div><span class="eyebrow">קשר והתקדמות</span><h2>התלמידים שלי</h2></div>
         <button class="btn-add" onclick="App.openStudentForm()">+ תלמיד</button>
       </div>
       <div class="search-wrap">
@@ -67,7 +77,7 @@
     <!-- מסך: יומן -->
     <section id="view-calendar" class="view">
       <div class="view-head">
-        <h2>יומן שיעורים</h2>
+        <div><span class="eyebrow">תכנון שבועי</span><h2>יומן שיעורים</h2></div>
         <button class="btn-add" onclick="App.openLessonForm()">+ שיעור</button>
       </div>
       <div class="seg-toggle">
@@ -80,7 +90,7 @@
 
     <!-- מסך: כספים (תשלומים + סיכום) -->
     <section id="view-money" class="view">
-      <h2>כספים</h2>
+      <div class="page-intro compact"><div><span class="eyebrow">תמונה עסקית</span><h2>כספים</h2></div><p>חובות פתוחים והכנסות בפועל.</p></div>
       <div class="seg-toggle">
         <button class="seg-btn active" data-money="payments" onclick="App.setMoneyTab('payments')">תשלומים</button>
         <button class="seg-btn" data-money="income" onclick="App.setMoneyTab('income')">סיכום הכנסות</button>
@@ -104,7 +114,7 @@
     <!-- מסך: הגדרות -->
     <section id="view-settings" class="view">
       <div class="view-head">
-        <h2>הגדרות</h2>
+        <div><span class="eyebrow">התאמה אישית</span><h2>הגדרות</h2></div>
       </div>
       <div id="settingsBody"></div>
     </section>

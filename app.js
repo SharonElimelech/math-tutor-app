@@ -327,8 +327,12 @@ const App = (() => {
         <div class="item-main">
           <div class="item-title">${escapeHtml(s.name)}</div>
           <div class="item-sub">
-            הורה: ${escapeHtml(s.parentName) || "—"} ${s.phone ? "· " + escapeHtml(s.phone) : ""}<br>
-            ${cur(s.price)} לשיעור
+            ${escapeHtml(s.parentName) || "ללא איש קשר"} ${s.phone ? "· " + escapeHtml(s.phone) : ""}
+          </div>
+          <div class="item-meta">
+            <span>${lessonIndex.forStudent(s.id).filter(l => l.date >= todayStr() && !l.done).length} שיעורים קרובים</span>
+            <span>${cur(s.price)} לשיעור</span>
+            ${lessonIndex.unpaidForStudent(s.id).length ? `<span class="meta-due">${lessonIndex.unpaidForStudent(s.id).length} ממתינים לתשלום</span>` : ""}
           </div>
         </div>
         <div class="item-actions"><span class="btn btn-light">${icon("edit")}</span></div>
@@ -345,8 +349,8 @@ const App = (() => {
     const priceVal = (typeof l.price === "number") ? l.price : "";
     openModal(`
       <h3>${id ? "עריכת שיעור" : "שיעור חדש"}</h3>
-      <label>תלמיד</label>
-      <input id="f-student-search" placeholder="חיפוש תלמיד..." autocomplete="off" oninput="App.renderStudentPicker()">
+      <label>תלמיד <span class="required-note">בחירה נדרשת</span></label>
+      <input id="f-student-search" placeholder="הקלידי שם ובחרי תלמיד" autocomplete="off" oninput="App.renderStudentPicker()">
       <input type="hidden" id="f-student" value="${l.studentId}">
       <div id="studentPicker" class="student-picker"></div>
       <label>בחירה מהירה</label>
@@ -758,10 +762,17 @@ const App = (() => {
 
     renderOnboard();
     const today = todayStr();
-    const todayLessons = lessons.filter(l => l.date === today);
+    const todayLessons = lessonIndex.onDate(today);
+    const nextLesson = lessonSorted().find(l => l.date >= today && !l.done);
     document.getElementById("todaySummary").innerHTML = `
-      <div>היום: <b>${todayLessons.length}</b> שיעורים</div>
-      <div>סה"כ תלמידים: <b>${students.length}</b></div>
+      <div class="summary-kicker">${new Date().toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" })}</div>
+      <div class="summary-number"><b>${todayLessons.length}</b><span>${todayLessons.length === 1 ? "שיעור היום" : "שיעורים היום"}</span></div>
+      <div class="summary-next">
+        ${nextLesson
+          ? `${icon("clock")} הבא: <strong>${escapeHtml(studentById(nextLesson.studentId)?.name || "תלמיד")}</strong> · ${dayLabelPlain(nextLesson.date)} · ${fmtTime(nextLesson.time)}`
+          : `${icon("checkCircle")} היומן פנוי — אפשר לקבוע שיעור חדש`}
+      </div>
+      <div class="summary-foot"><span>${students.length} תלמידים פעילים</span><span>${lessons.filter(l => l.done && !l.paid).length} תשלומים פתוחים</span></div>
     `;
 
     const upcoming = lessonSorted().filter(l => l.date >= today && !l.done).slice(0, 5);
@@ -782,17 +793,23 @@ const App = (() => {
       </div>`;
     }).join("") : `<div class="empty">אין שיעורים מתוכננים</div>`;
 
-    const dues = lessons.filter(l => l.done && !l.paid);
+    const dues = students.map(student => {
+      const unpaid = lessonIndex.unpaidForStudent(student.id);
+      return {
+        student,
+        count: unpaid.length,
+        owed: unpaid.reduce((sum, lesson) => sum + lessonPrice(lesson), 0)
+      };
+    }).filter(item => item.count > 0).sort((a, b) => b.owed - a.owed);
     const pa = document.getElementById("paymentAlerts");
-    pa.innerHTML = dues.length ? dues.map(l => {
-      const s = studentById(l.studentId) || { name: "?" };
+    pa.innerHTML = dues.length ? dues.map(({ student, count, owed }) => {
       return `<div class="item">
         <div class="item-main">
-          <div class="item-title">${escapeHtml(s.name)} <span class="tag tag-due">${cur(lessonPrice(l))}</span></div>
-          <div class="item-sub">שיעור מ-${fmtDate(l.date)} · ממתין לתשלום</div>
+          <div class="item-title">${escapeHtml(student.name)} <span class="tag tag-due">${cur(owed)}</span></div>
+          <div class="item-sub">${count} ${count === 1 ? "שיעור ממתין" : "שיעורים ממתינים"} לתשלום</div>
         </div>
         <div class="item-actions">
-          <button class="btn btn-wa" onclick="App.sendWhatsApp('${l.studentId}')">${icon("whatsapp")} שליחה</button>
+          <button class="btn btn-wa" onclick="App.sendWhatsApp('${student.id}')">${icon("whatsapp")} תזכורת</button>
         </div>
       </div>`;
     }).join("") : `<div class="empty"><span style="color:var(--green)">${icon("checkCircle")}</span> הכול שולם</div>`;
@@ -821,7 +838,9 @@ const App = (() => {
   function renderPayments() {
     const el = document.getElementById("paymentsList");
     if (!students.length) { el.innerHTML = `<div class="empty">אין נתונים</div>`; return; }
-    el.innerHTML = students.map(s => {
+    const totalUnpaid = lessons.filter(lesson => lesson.done && !lesson.paid);
+    const totalOwed = totalUnpaid.reduce((sum, lesson) => sum + lessonPrice(lesson), 0);
+    const cards = students.map(s => {
       const sl = lessonIndex.doneForStudent(s.id);
       const unpaid = lessonIndex.unpaidForStudent(s.id);
       const owed = unpaid.reduce((sum, l) => sum + lessonPrice(l), 0);
@@ -849,6 +868,12 @@ const App = (() => {
           ` : ""}
         </div>`;
     }).join("");
+    el.innerHTML = `
+      <div class="finance-overview">
+        <div><span>יתרה פתוחה</span><strong>${cur(totalOwed)}</strong></div>
+        <div><span>שיעורים ממתינים</span><strong>${totalUnpaid.length}</strong></div>
+      </div>
+      ${cards}`;
   }
 
   function togglePaid(id) {
