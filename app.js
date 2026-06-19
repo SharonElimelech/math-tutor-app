@@ -1,4 +1,5 @@
 import {
+  APP_VERSION,
   DATA_VERSION,
   DEFAULT_SETTINGS,
   createSnapshot,
@@ -1141,7 +1142,7 @@ const App = (() => {
           <button class="btn btn-light btn-block" onclick="document.getElementById('importFile').click()">שחזור מקובץ גיבוי</button>
           <button class="btn btn-danger btn-block" onclick="App.clearAll()">מחיקת כל הנתונים</button>
         </div>
-        <div class="setting-sub" style="margin-top:8px;text-align:center">המורה שלי · גרסה ${DATA_VERSION}.0</div>
+        <div class="setting-sub" style="margin-top:8px;text-align:center">המורה שלי · גרסה ${APP_VERSION}</div>
       </div>
     `;
   }

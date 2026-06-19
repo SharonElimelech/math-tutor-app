@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  APP_VERSION,
   DEFAULT_SETTINGS,
   createSnapshot,
   normalizeSettings,
@@ -20,6 +21,10 @@ const lesson = {
   done: false,
   paid: false
 };
+
+test("release exposes the expected app version", () => {
+  assert.equal(APP_VERSION, "3.1.0");
+});
 
 test("backup parser normalizes a valid snapshot", () => {
   const result = parseBackup({ students: [student], lessons: [lesson], settings: {} });

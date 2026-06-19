@@ -28,7 +28,8 @@ test("manifest and service worker reference existing assets", () => {
   assert.ok(cachedAssets.length >= 6, "expected core PWA assets in cache list");
 
   for (const asset of cachedAssets) {
-    assert.ok(existsSync(join(root, asset)), `missing cached asset: ${asset}`);
+    const filePath = asset.split("?", 1)[0];
+    assert.ok(existsSync(join(root, filePath)), `missing cached asset: ${asset}`);
   }
 
   for (const icon of manifest.icons) {
