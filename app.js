@@ -756,7 +756,7 @@ const App = (() => {
           ? `${icon("clock")} הבא: <strong>${escapeHtml(studentById(nextLesson.studentId)?.name || "תלמיד")}</strong> · ${dayLabelPlain(nextLesson.date)} · ${fmtTime(nextLesson.time)}`
           : `${icon("checkCircle")} היומן פנוי — אפשר לקבוע שיעור חדש`}
       </div>
-      <div class="summary-foot"><span>${students.length} תלמידים פעילים</span><span>${lessons.filter(l => l.done && !l.paid).length} תשלומים פתוחים</span></div>
+      <div class="summary-foot"><span>${students.length} ${students.length === 1 ? "תלמיד פעיל" : "תלמידים פעילים"}</span><span>${lessons.filter(l => l.done && !l.paid).length} ${lessons.filter(l => l.done && !l.paid).length === 1 ? "תשלום פתוח" : "תשלומים פתוחים"}</span></div>
     `;
 
     const upcoming = lessonSorted().filter(l => l.date >= today && !l.done).slice(0, 5);
@@ -837,7 +837,7 @@ const App = (() => {
             <div class="item-main">
               <div class="item-title">${escapeHtml(s.name)}</div>
               <div class="item-sub">
-                ${sl.length} שיעורים בוצעו · ${unpaid.length} לא שולמו
+                ${sl.length} ${sl.length === 1 ? "שיעור בוצע" : "שיעורים בוצעו"} · ${unpaid.length === 1 ? "אחד טרם שולם" : `${unpaid.length} טרם שולמו`}
                 ${owed > 0 ? `<br><span class="tag tag-due">חוב: ${cur(owed)}</span>` : `<br><span class="tag tag-paid">הכול שולם</span>`}
               </div>
             </div>
@@ -1072,11 +1072,11 @@ const App = (() => {
       <div class="settings-group">
         <div class="group-title">כללי</div>
         <div class="setting-row">
-          <div><div class="setting-label">שם המורה</div><div class="setting-sub">יופיע בברכה במסך הבית</div></div>
+          <div><label class="setting-label" for="set-name">שם המורה</label><div class="setting-sub">יופיע בברכה במסך הבית</div></div>
           <input type="text" id="set-name" value="${escapeHtml(settings.teacherName)}" placeholder="שמך" onchange="App.updateSetting('teacherName', this.value)">
         </div>
         <div class="setting-row">
-          <div><div class="setting-label">מטבע</div></div>
+          <div><label class="setting-label" for="set-cur">מטבע</label></div>
           <input type="text" id="set-cur" value="${escapeHtml(settings.currency)}" maxlength="3" onchange="App.updateSetting('currency', this.value)">
         </div>
       </div>
@@ -1084,16 +1084,16 @@ const App = (() => {
       <div class="settings-group">
         <div class="group-title">ברירות מחדל לשיעור</div>
         <div class="setting-row">
-          <div><div class="setting-label">מחיר ברירת מחדל</div></div>
-          <input type="number" inputmode="numeric" min="0" value="${settings.defaultPrice}" onchange="App.updateSetting('defaultPrice', this.value)">
+          <div><label class="setting-label" for="set-price">מחיר ברירת מחדל</label></div>
+          <input id="set-price" type="number" inputmode="numeric" min="0" value="${settings.defaultPrice}" onchange="App.updateSetting('defaultPrice', this.value)">
         </div>
         <div class="setting-row">
-          <div><div class="setting-label">שעת התחלה</div></div>
-          <input type="time" value="${settings.defaultTime}" onchange="App.updateSetting('defaultTime', this.value)">
+          <div><label class="setting-label" for="set-time">שעת התחלה</label></div>
+          <input id="set-time" type="time" value="${settings.defaultTime}" onchange="App.updateSetting('defaultTime', this.value)">
         </div>
         <div class="setting-row">
-          <div><div class="setting-label">משך (דקות)</div></div>
-          <input type="number" inputmode="numeric" min="0" step="15" value="${settings.defaultDuration}" onchange="App.updateSetting('defaultDuration', this.value)">
+          <div><label class="setting-label" for="set-duration">משך (דקות)</label></div>
+          <input id="set-duration" type="number" inputmode="numeric" min="0" step="15" value="${settings.defaultDuration}" onchange="App.updateSetting('defaultDuration', this.value)">
         </div>
       </div>
 
@@ -1376,7 +1376,7 @@ const App = (() => {
     const todayLessons = lessonIndex.onDate(todayStr());
     const badge = document.getElementById("reminderBadge");
     if (todayLessons.length) {
-      badge.innerHTML = `${icon("bell")} ${todayLessons.length} שיעורים היום`;
+      badge.innerHTML = `${icon("bell")} ${todayLessons.length} ${todayLessons.length === 1 ? "שיעור היום" : "שיעורים היום"}`;
       badge.classList.remove("hidden");
     } else {
       badge.classList.add("hidden");

@@ -144,7 +144,7 @@ body {
   background: rgba(255,255,255,.16);
   border: 1px solid rgba(255,255,255,.22);
   color: #fff;
-  width: 38px; height: 38px;
+  width: 44px; height: 44px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
@@ -450,7 +450,7 @@ main { padding: 22px 16px; max-width: 760px; margin: 0 auto; }
 }
 .lesson-topic { color: var(--muted); font-size: .83rem; margin-top: 3px; }
 .lesson-check {
-  width: 36px; height: 36px;
+  width: 44px; height: 44px;
   border-radius: 50%;
   border: 2px solid var(--border);
   background: transparent;
@@ -502,7 +502,7 @@ main { padding: 22px 16px; max-width: 760px; margin: 0 auto; }
   background: var(--bg-soft);
   border: none;
   border-radius: 10px;
-  width: 34px; height: 34px;
+  width: 44px; height: 44px;
   font-size: 1.1rem;
   color: var(--text);
   cursor: pointer;
@@ -645,7 +645,7 @@ main { padding: 22px 16px; max-width: 760px; margin: 0 auto; }
 .setting-row:first-child { border-radius: var(--r-md) var(--r-md) 0 0; }
 .setting-row:last-child { border-radius: 0 0 var(--r-md) var(--r-md); border-bottom: 1px solid var(--border); }
 .setting-row:only-child { border-radius: var(--r-md); }
-.setting-label { font-weight: 600; font-size: .95rem; }
+.setting-label { font-weight: 600; font-size: .95rem; color: var(--text); margin: 0; }
 .setting-sub { font-size: .78rem; color: var(--faint); margin-top: 2px; }
 .setting-row input { margin: 0; max-width: 130px; text-align: center; }
 .setting-row input[type="text"] { max-width: 170px; text-align: right; }
@@ -655,6 +655,7 @@ main { padding: 22px 16px; max-width: 760px; margin: 0 auto; }
 .theme-seg button {
   border: none; background: none; padding: 8px 12px; border-radius: 9px;
   font-family: inherit; font-weight: 700; font-size: .82rem; color: var(--muted); cursor: pointer;
+  min-height: 44px;
 }
 .theme-seg button.active { background: var(--surface); color: var(--text); box-shadow: var(--sh-sm); }
 
@@ -784,7 +785,7 @@ body.modal-open { overflow: hidden; }
   background: var(--bg-soft);
   border: none;
   border-radius: 50%;
-  width: 34px; height: 34px;
+  width: 44px; height: 44px;
   font-size: 1rem;
   color: var(--muted);
   cursor: pointer;
