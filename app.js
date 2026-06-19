@@ -186,15 +186,27 @@ const App = (() => {
   }
 
   // ----- הודעות צפות (toast) -----
-  function toast(msg, type = "") {
+  function toast(msg, type = "", action = null) {
     const wrap = document.getElementById("toastWrap");
     if (!wrap) return alert(msg);
     const el = document.createElement("div");
     el.className = "toast" + (type ? " " + type : "");
     const ico = type === "ok" ? "checkCircle" : type === "err" ? "warn" : "info";
     el.innerHTML = icon(ico) + "<span>" + escapeHtml(msg) + "</span>";
+    if (action) {
+      el.classList.add("has-action");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = action.label;
+      button.addEventListener("click", () => {
+        clearTimeout(timer);
+        action.run();
+        el.remove();
+      }, { once: true });
+      el.appendChild(button);
+    }
     wrap.appendChild(el);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       el.classList.add("out");
       setTimeout(() => el.remove(), 260);
     }, 3000);
@@ -206,24 +218,50 @@ const App = (() => {
     if (!target) return;
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     target.classList.add("active");
-    document.querySelectorAll(".nav-btn").forEach(b =>
-      b.classList.toggle("active", b.dataset.view === view));
+    document.querySelectorAll(".nav-btn").forEach(b => {
+      const active = b.dataset.view === view;
+      b.classList.toggle("active", active);
+      if (active) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
     render(view);
     window.scrollTo(0, 0);
   }
 
   // ----- מודאל -----
+  let modalReturnFocus = null;
+  const modalSiblings = () => document.querySelectorAll("body > header, body > main, body > nav");
   function openModal(html) {
+    modalReturnFocus = document.activeElement;
     document.getElementById("modalBody").innerHTML = html;
     document.getElementById("modal").classList.remove("hidden");
-    // פוקוס אוטומטי על שם התלמיד (לא על שדה החיפוש בטופס שיעור — מציק במובייל)
-    setTimeout(() => { const f = document.getElementById("f-name"); if (f) f.focus(); }, 60);
+    document.body.classList.add("modal-open");
+    modalSiblings().forEach(element => { element.inert = true; });
+    setTimeout(() => {
+      const preferred = document.getElementById("f-name");
+      const fallback = document.querySelector("#modalBody input, #modalBody button, .modal-close");
+      (preferred || fallback)?.focus({ preventScroll: true });
+    }, 60);
   }
   function closeModal() {
     document.getElementById("modal").classList.add("hidden");
+    document.body.classList.remove("modal-open");
+    modalSiblings().forEach(element => { element.inert = false; });
+    if (modalReturnFocus && document.contains(modalReturnFocus)) modalReturnFocus.focus({ preventScroll: true });
+    modalReturnFocus = null;
   }
   function modalOpen() {
     return !document.getElementById("modal").classList.contains("hidden");
+  }
+  function askConfirmation(message, confirmLabel = "אישור") {
+    const dialog = document.getElementById("confirmDialog");
+    document.getElementById("confirmMessage").textContent = message;
+    dialog.querySelector(".confirm-submit").textContent = confirmLabel;
+    dialog.returnValue = "cancel";
+    dialog.showModal();
+    return new Promise(resolve => {
+      dialog.addEventListener("close", () => resolve(dialog.returnValue === "confirm"), { once: true });
+    });
   }
   // סגירה בלחיצה על הרקע, ב-Esc, ושמירה ב-Enter
   function initModalControls() {
@@ -232,6 +270,14 @@ const App = (() => {
     document.addEventListener("keydown", e => {
       if (!modalOpen()) return;
       if (e.key === "Escape") { closeModal(); return; }
+      if (e.key === "Tab") {
+        const focusable = [...modal.querySelectorAll("button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])")]
+          .filter(element => element.offsetParent !== null);
+        if (!focusable.length) return;
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
       if (e.key === "Enter" && e.target.tagName === "INPUT" && e.target.type !== "checkbox") {
         const primary = document.querySelector("#modalBody .btn-green");
         if (primary) { e.preventDefault(); primary.click(); }
@@ -243,15 +289,15 @@ const App = (() => {
   function openStudentForm(id) {
     const s = id ? studentById(id) : { name: "", parentName: "", phone: "", price: settings.defaultPrice };
     openModal(`
-      <h3>${id ? "עריכת תלמיד" : "תלמיד חדש"}</h3>
-      <label>שם התלמיד</label>
+      <h3 id="modalTitle">${id ? "עריכת תלמיד" : "תלמיד חדש"}</h3>
+      <label for="f-name">שם התלמיד</label>
       <input id="f-name" value="${escapeHtml(s.name)}" placeholder="לדוגמה: דנה כהן">
       <div id="err-name" class="field-error" style="display:none">נא להזין שם תלמיד</div>
-      <label>שם ההורה</label>
+      <label for="f-parent">שם ההורה</label>
       <input id="f-parent" value="${escapeHtml(s.parentName)}" placeholder="לדוגמה: רונית">
-      <label>טלפון ההורה (לוואטסאפ)</label>
+      <label for="f-phone">טלפון ההורה (לוואטסאפ)</label>
       <input id="f-phone" type="tel" inputmode="tel" value="${escapeHtml(s.phone)}" placeholder="05X-XXXXXXX">
-      <label>מחיר לשיעור (${escapeHtml(settings.currency)})</label>
+      <label for="f-price">מחיר לשיעור (${escapeHtml(settings.currency)})</label>
       <input id="f-price" type="number" inputmode="numeric" min="0" value="${escapeHtml(s.price)}" placeholder="120">
       <button class="btn btn-green btn-block" onclick="App.saveStudent('${id || ""}')">שמירה</button>
       ${id ? `
@@ -304,8 +350,8 @@ const App = (() => {
     closeModal(); render(); toast(successMessage, "ok");
   }
 
-  function deleteStudent(id) {
-    if (!confirm("למחוק את התלמיד וכל השיעורים שלו?")) return;
+  async function deleteStudent(id) {
+    if (!await askConfirmation("מחיקת התלמיד תמחק גם את כל השיעורים והיסטוריית התשלומים שלו. אין אפשרות לבטל פעולה זו.", "מחיקת תלמיד")) return;
     students = students.filter(s => s.id !== id);
     lessons = lessons.filter(l => l.studentId !== id);
     if (!save()) { render(); return; }
@@ -323,20 +369,20 @@ const App = (() => {
       : students;
     if (!filtered.length) { el.innerHTML = `<div class="empty">לא נמצאו תלמידים בחיפוש</div>`; return; }
     el.innerHTML = filtered.map(s => `
-      <div class="item" onclick="App.openStudentForm('${s.id}')">
-        <div class="item-main">
-          <div class="item-title">${escapeHtml(s.name)}</div>
-          <div class="item-sub">
+      <button type="button" class="item item-button" onclick="App.openStudentForm('${s.id}')" aria-label="פתיחת הפרופיל של ${escapeHtml(s.name)}">
+        <span class="item-main">
+          <span class="item-title">${escapeHtml(s.name)}</span>
+          <span class="item-sub">
             ${escapeHtml(s.parentName) || "ללא איש קשר"} ${s.phone ? "· " + escapeHtml(s.phone) : ""}
-          </div>
-          <div class="item-meta">
+          </span>
+          <span class="item-meta">
             <span>${lessonIndex.forStudent(s.id).filter(l => l.date >= todayStr() && !l.done).length} שיעורים קרובים</span>
             <span>${cur(s.price)} לשיעור</span>
             ${lessonIndex.unpaidForStudent(s.id).length ? `<span class="meta-due">${lessonIndex.unpaidForStudent(s.id).length} ממתינים לתשלום</span>` : ""}
-          </div>
-        </div>
-        <div class="item-actions"><span class="btn btn-light">${icon("edit")}</span></div>
-      </div>
+          </span>
+        </span>
+        <span class="item-actions"><span class="btn btn-light" aria-hidden="true">${icon("edit")}</span></span>
+      </button>
     `).join("");
   }
 
@@ -348,8 +394,8 @@ const App = (() => {
       : { studentId: presetStudentId || "", date: selectedDay || todayStr(), time: settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
     const priceVal = (typeof l.price === "number") ? l.price : "";
     openModal(`
-      <h3>${id ? "עריכת שיעור" : "שיעור חדש"}</h3>
-      <label>תלמיד <span class="required-note">בחירה נדרשת</span></label>
+      <h3 id="modalTitle">${id ? "עריכת שיעור" : "שיעור חדש"}</h3>
+      <label for="f-student-search">תלמיד <span class="required-note">בחירה נדרשת</span></label>
       <input id="f-student-search" placeholder="הקלידי שם ובחרי תלמיד" autocomplete="off" oninput="App.renderStudentPicker()">
       <input type="hidden" id="f-student" value="${l.studentId}">
       <div id="studentPicker" class="student-picker"></div>
@@ -360,10 +406,10 @@ const App = (() => {
         <button type="button" class="quick-date" onclick="App.setLessonDate(7,this)">בעוד שבוע</button>
       </div>
       <div class="row">
-        <div><label>תאריך</label><input id="f-date" type="date" value="${l.date}"></div>
-        <div><label>שעה</label><input id="f-time" type="time" value="${l.time}"></div>
+        <div><label for="f-date">תאריך</label><input id="f-date" type="date" value="${l.date}"></div>
+        <div><label for="f-time">שעה</label><input id="f-time" type="time" value="${l.time}"></div>
       </div>
-      <label>נושא / הערות (לא חובה)</label>
+      <label for="f-topic">נושא / הערות (לא חובה)</label>
       <input id="f-topic" value="${escapeHtml(l.topic || "")}" placeholder="לדוגמה: גיאומטריה - משפט פיתגורס">
 
       <button type="button" class="adv-toggle" onclick="App.toggleAdvanced(this)">
@@ -371,8 +417,8 @@ const App = (() => {
       </button>
       <div id="advWrap" style="display:none">
         <div class="row">
-          <div><label>משך (דקות)</label><input id="f-duration" type="number" inputmode="numeric" min="0" step="15" value="${l.duration ?? settings.defaultDuration}"></div>
-          <div><label>מחיר לשיעור זה (${escapeHtml(settings.currency)})</label><input id="f-price" type="number" inputmode="numeric" min="0" value="${priceVal}" placeholder="ברירת מחדל"></div>
+          <div><label for="f-duration">משך (דקות)</label><input id="f-duration" type="number" inputmode="numeric" min="0" step="15" value="${l.duration ?? settings.defaultDuration}"></div>
+          <div><label for="f-price">מחיר לשיעור זה (${escapeHtml(settings.currency)})</label><input id="f-price" type="number" inputmode="numeric" min="0" value="${priceVal}" placeholder="ברירת מחדל"></div>
         </div>
         ${!id ? `
           <div class="checkbox-row">
@@ -382,11 +428,11 @@ const App = (() => {
           <div id="repeatWrap" style="display:none">
             <input type="hidden" id="f-recur-mode" value="open">
             <div class="seg-toggle">
-              <button type="button" class="seg-btn active" data-recur="open" onclick="App.setRecurMode('open')">כל שבוע, קבוע</button>
-              <button type="button" class="seg-btn" data-recur="count" onclick="App.setRecurMode('count')">מספר שבועות</button>
+              <button type="button" class="seg-btn active" data-recur="open" aria-pressed="true" onclick="App.setRecurMode('open')">כל שבוע, קבוע</button>
+              <button type="button" class="seg-btn" data-recur="count" aria-pressed="false" onclick="App.setRecurMode('count')">מספר שבועות</button>
             </div>
             <div id="weeksWrap" style="display:none">
-              <label>למשך כמה שבועות?</label>
+              <label for="f-weeks">למשך כמה שבועות?</label>
               <input id="f-weeks" type="number" value="8" min="2" max="52">
             </div>
           </div>
@@ -416,10 +462,10 @@ const App = (() => {
     const matches = students.filter(s => s.name.toLowerCase().includes(term));
     if (!matches.length) { pick.innerHTML = `<div class="picker-empty">לא נמצא תלמיד</div>`; return; }
     pick.innerHTML = matches.map(s => `
-      <div class="picker-row ${s.id === selId ? "sel" : ""}" onclick="App.pickStudent('${s.id}')">
+      <button type="button" class="picker-row ${s.id === selId ? "sel" : ""}" onclick="App.pickStudent('${s.id}')" aria-pressed="${s.id === selId}">
         <span>${escapeHtml(s.name)}</span>
         ${s.id === selId ? icon("check") : ""}
-      </div>`).join("");
+      </button>`).join("");
   }
 
   function pickStudent(id) {
@@ -440,8 +486,11 @@ const App = (() => {
   }
   function setRecurMode(mode) {
     document.getElementById("f-recur-mode").value = mode;
-    document.querySelectorAll("[data-recur]").forEach(b =>
-      b.classList.toggle("active", b.dataset.recur === mode));
+    document.querySelectorAll("[data-recur]").forEach(b => {
+      const active = b.dataset.recur === mode;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-pressed", String(active));
+    });
     document.getElementById("weeksWrap").style.display = mode === "count" ? "block" : "none";
   }
 
@@ -495,8 +544,8 @@ const App = (() => {
     if (btn) btn.classList.add("sel");
   }
 
-  function deleteLesson(id) {
-    if (!confirm("למחוק את השיעור?")) return;
+  async function deleteLesson(id) {
+    if (!await askConfirmation("השיעור יימחק מהיומן וממעקב התשלומים.", "מחיקת שיעור")) return;
     lessons = lessons.filter(l => l.id !== id);
     if (!save()) { render(); return; }
     closeModal(); render();
@@ -504,10 +553,10 @@ const App = (() => {
   }
 
   // מחיקת השיעור הנוכחי וכל החזרות שאחריו (כמו "אירוע זה ואילך" ביומן גוגל)
-  function deleteSeriesFuture(id) {
+  async function deleteSeriesFuture(id) {
     const l = lessons.find(x => x.id === id);
     if (!l) return;
-    if (!confirm("למחוק את השיעור הזה ואת כל החזרות הבאות שלו קדימה?")) return;
+    if (!await askConfirmation("השיעור הנוכחי וכל החזרות הבאות בסדרה יימחקו. שיעורים קודמים יישארו.", "מחיקת ההמשך")) return;
     const removed = lessons.filter(x => x.seriesId === l.seriesId && x.date >= l.date).length;
     lessons = lessons.filter(x => !(x.seriesId === l.seriesId && x.date >= l.date));
     // עצירת הסדרה — שלא תורחב שוב אוטומטית
@@ -548,6 +597,10 @@ const App = (() => {
     l.done = !l.done;
     if (!save()) { render(); return; }
     render();
+    toast(l.done ? "השיעור סומן כבוצע" : "סימון הביצוע בוטל", "ok", {
+      label: "ביטול",
+      run: () => toggleDone(id)
+    });
   }
 
   function lessonSorted() {
@@ -597,12 +650,14 @@ const App = (() => {
     const isToday = l.date === todayStr();
     return `
       <div class="lesson-row ${l.done ? "is-done" : ""} ${isToday ? "is-today" : ""}">
-        <div class="time-chip" onclick="App.openLessonForm('${l.id}')">${fmtTime(l.time) || "—"}${l.duration ? `<span class="dur">${l.duration}׳</span>` : ""}</div>
-        <div class="lesson-body" onclick="App.openLessonForm('${l.id}')">
-          <div class="lesson-name">${escapeHtml(s.name)}</div>
-          ${l.topic ? `<div class="lesson-topic">${icon("note", "ic-sub")} ${escapeHtml(l.topic)}</div>` : ""}
-        </div>
-        <button class="lesson-check ${l.done ? "done" : ""}" onclick="App.toggleDone('${l.id}')" title="${l.done ? "בוצע" : "סמן כבוצע"}">${icon("check")}</button>
+        <button type="button" class="lesson-open" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור עם ${escapeHtml(s.name)} בשעה ${fmtTime(l.time)}">
+          <span class="time-chip">${fmtTime(l.time) || "—"}${l.duration ? `<span class="dur">${l.duration}׳</span>` : ""}</span>
+          <span class="lesson-body">
+            <span class="lesson-name">${escapeHtml(s.name)}</span>
+            ${l.topic ? `<span class="lesson-topic">${icon("note", "ic-sub")} ${escapeHtml(l.topic)}</span>` : ""}
+          </span>
+        </button>
+        <button class="lesson-check ${l.done ? "done" : ""}" onclick="App.toggleDone('${l.id}')" aria-label="${l.done ? "ביטול סימון שיעור כבוצע" : "סימון שיעור כבוצע"}" aria-pressed="${l.done}" title="${l.done ? "בוצע" : "סמן כבוצע"}">${icon("check")}</button>
       </div>`;
   }
 
@@ -623,8 +678,11 @@ const App = (() => {
   function setCalendarMode(mode) {
     calMode = mode;
     if (mode === "month" && !selectedDay) selectedDay = todayStr();
-    document.querySelectorAll(".seg-btn").forEach(b =>
-      b.classList.toggle("active", b.dataset.cal === mode));
+    document.querySelectorAll(".seg-btn[data-cal]").forEach(b => {
+      const active = b.dataset.cal === mode;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-pressed", String(active));
+    });
     document.getElementById("calendarMonth").classList.toggle("hidden", mode !== "month");
     renderCalendar();
   }
@@ -673,7 +731,7 @@ const App = (() => {
       const marker = has
         ? `<span class="cal-count">${counts[ds]}</span>`
         : (h ? '<span class="cal-dot holiday-dot"></span>' : "");
-      cells += `<div class="${cls}"${title ? ` title="${escapeHtml(title)}"` : ""} onclick="App.selectCalDay('${ds}')">${day}${marker}</div>`;
+      cells += `<button type="button" class="${cls}" aria-label="${escapeHtml(`${day} ${calMonth.toLocaleDateString("he-IL", { month: "long" })}${title ? `, ${title}` : ""}`)}" onclick="App.selectCalDay('${ds}')">${day}${marker}</button>`;
     }
 
     grid.innerHTML = `
@@ -781,14 +839,14 @@ const App = (() => {
       const s = studentById(l.studentId) || { name: "?" };
       const isToday = l.date === today;
       return `<div class="item">
-        <div class="item-main" onclick="App.openLessonForm('${l.id}')">
-          <div class="item-title">${escapeHtml(s.name)} ${isToday ? '<span class="tag tag-soon">היום</span>' : ""}</div>
-          <div class="item-sub">${dateTimeLine(l)}</div>
-          ${l.topic ? `<div class="item-note">${icon("note", "ic-sub")} ${escapeHtml(l.topic)}</div>` : ""}
-        </div>
+        <button type="button" class="item-main item-main-button" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור עם ${escapeHtml(s.name)}">
+          <span class="item-title">${escapeHtml(s.name)} ${isToday ? '<span class="tag tag-soon">היום</span>' : ""}</span>
+          <span class="item-sub">${dateTimeLine(l)}</span>
+          ${l.topic ? `<span class="item-note">${icon("note", "ic-sub")} ${escapeHtml(l.topic)}</span>` : ""}
+        </button>
         <div class="item-actions">
           ${s.phone ? `<button class="btn btn-wa" onclick="App.sendLessonReminder('${l.id}')" aria-label="שליחת תזכורת">${icon("whatsapp")} תזכורת</button>` : ""}
-          <button class="lesson-check" onclick="App.toggleDone('${l.id}')" aria-label="סימון כבוצע" title="סמן כבוצע">${icon("check")}</button>
+          <button class="lesson-check" onclick="App.toggleDone('${l.id}')" aria-label="סימון כבוצע" aria-pressed="false" title="סמן כבוצע">${icon("check")}</button>
         </div>
       </div>`;
     }).join("") : `<div class="empty">אין שיעורים מתוכננים</div>`;
@@ -818,8 +876,11 @@ const App = (() => {
 
   // ========== כספים: מעבר בין תשלומים לסיכום ==========
   function applyMoneyTab() {
-    document.querySelectorAll(".seg-btn[data-money]").forEach(b =>
-      b.classList.toggle("active", b.dataset.money === moneyTab));
+    document.querySelectorAll(".seg-btn[data-money]").forEach(b => {
+      const active = b.dataset.money === moneyTab;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-pressed", String(active));
+    });
     document.getElementById("money-payments").classList.toggle("hidden", moneyTab !== "payments");
     document.getElementById("money-income").classList.toggle("hidden", moneyTab !== "income");
     if (moneyTab === "income") drawChart();
@@ -876,20 +937,33 @@ const App = (() => {
       ${cards}`;
   }
 
-  function togglePaid(id) {
+  function togglePaid(id, showUndo = true) {
     const l = lessons.find(x => x.id === id);
     if (!l) return;
     l.paid = !l.paid;
     if (!save()) { render(); return; }
     render();
-    toast(l.paid ? "סומן כשולם" : "בוטל סימון התשלום", "ok");
+    toast(l.paid ? "סומן כשולם" : "בוטל סימון התשלום", "ok", showUndo ? {
+      label: "ביטול",
+      run: () => togglePaid(id, false)
+    } : null);
   }
 
-  function markAllPaid(studentId) {
-    lessonIndex.unpaidForStudent(studentId).forEach(l => l.paid = true);
+  async function markAllPaid(studentId) {
+    const unpaid = [...lessonIndex.unpaidForStudent(studentId)];
+    if (!unpaid.length) return;
+    if (!await askConfirmation(`לסמן ${unpaid.length} ${unpaid.length === 1 ? "שיעור" : "שיעורים"} כשולמו?`, "סימון כשולם")) return;
+    unpaid.forEach(l => l.paid = true);
     if (!save()) { render(); return; }
     render();
-    toast("סומן כשולם", "ok");
+    toast("כל השיעורים סומנו כשולמו", "ok", {
+      label: "ביטול",
+      run: () => {
+        const ids = new Set(unpaid.map(lesson => lesson.id));
+        lessons.filter(lesson => ids.has(lesson.id)).forEach(lesson => { lesson.paid = false; });
+        if (save()) render();
+      }
+    });
   }
 
   // ----- וואטסאפ: הודעה מוכנה + קישור לשליחה בלחיצה -----
@@ -951,10 +1025,10 @@ const App = (() => {
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = e => {
+    reader.onload = async e => {
       try {
         const data = parseBackup(JSON.parse(e.target.result));
-        if (!confirm("שחזור יחליף את כל הנתונים הקיימים. להמשיך?")) { event.target.value = ""; return; }
+        if (!await askConfirmation("השחזור יחליף את כל התלמידים, השיעורים וההגדרות הקיימים.", "שחזור מגיבוי")) { event.target.value = ""; return; }
         students = data.students;
         lessons = data.lessons;
         settings = data.settings;
@@ -1116,9 +1190,9 @@ const App = (() => {
         <div class="setting-row">
           <div><div class="setting-label">ערכת נושא</div></div>
           <div class="theme-seg">
-            <button class="${settings.theme === "auto" ? "active" : ""}" onclick="App.setTheme('auto')">אוטומטי</button>
-            <button class="${settings.theme === "light" ? "active" : ""}" onclick="App.setTheme('light')">בהיר</button>
-            <button class="${settings.theme === "dark" ? "active" : ""}" onclick="App.setTheme('dark')">כהה</button>
+            <button class="${settings.theme === "auto" ? "active" : ""}" aria-pressed="${settings.theme === "auto"}" onclick="App.setTheme('auto')">אוטומטי</button>
+            <button class="${settings.theme === "light" ? "active" : ""}" aria-pressed="${settings.theme === "light"}" onclick="App.setTheme('light')">בהיר</button>
+            <button class="${settings.theme === "dark" ? "active" : ""}" aria-pressed="${settings.theme === "dark"}" onclick="App.setTheme('dark')">כהה</button>
           </div>
         </div>
       </div>
@@ -1167,9 +1241,8 @@ const App = (() => {
     renderSettings();
   }
 
-  function clearAll() {
-    if (!confirm("פעולה זו תמחק את כל התלמידים, השיעורים וההגדרות לצמיתות. להמשיך?")) return;
-    if (!confirm("בטוחה? אין דרך לשחזר ללא קובץ גיבוי.")) return;
+  async function clearAll() {
+    if (!await askConfirmation("כל התלמידים, השיעורים וההגדרות יימחקו לצמיתות. ניתן לשחזר רק מקובץ גיבוי קיים.", "מחיקת כל הנתונים")) return;
     students = []; lessons = [];
     settings = Object.assign({}, DEFAULT_SETTINGS);
     if (!save()) { render(); return; }
@@ -1292,25 +1365,51 @@ const App = (() => {
           data: { url: "./" }
         });
       }
-    } catch { /* התעלמות שקטה */ }
+    } catch (error) {
+      console.warn("Background notification scheduling is unavailable", error);
+    }
   }
 
-  const notified = new Set();
+  const NOTIFIED_KEY = "mt_notified_lessons";
+  function loadNotified() {
+    try {
+      const values = JSON.parse(localStorage.getItem(NOTIFIED_KEY) || "[]");
+      return new Set(Array.isArray(values) ? values : []);
+    } catch {
+      return new Set();
+    }
+  }
+  const notified = loadNotified();
+  const notificationSignature = lesson => `${lesson.id}:${lesson.date}:${lesson.time}`;
+  function rememberNotification(signature) {
+    notified.add(signature);
+    const activeSignatures = new Set(lessons.map(notificationSignature));
+    for (const value of notified) {
+      if (!activeSignatures.has(value)) notified.delete(value);
+    }
+    try { localStorage.setItem(NOTIFIED_KEY, JSON.stringify([...notified])); }
+    catch (error) { console.warn("Could not persist reminder history", error); }
+  }
   function checkReminders() {
     if (!notifSupported || Notification.permission !== "granted") return;
     const now = new Date();
     const lead = reminderLeadMinutes(settings.remindMinutes);
     lessons.forEach(l => {
-      if (l.done || notified.has(l.id)) return;
+      const signature = notificationSignature(l);
+      if (l.done || notified.has(signature)) return;
       const dt = new Date(`${l.date}T${l.time || "00:00"}`);
       const diffMin = (dt - now) / 60000;
       if (diffMin > 0 && diffMin <= lead) {
         const s = studentById(l.studentId);
-        new Notification("תזכורת שיעור", {
-          body: `שיעור עם ${s ? s.name : "תלמיד"} בשעה ${l.time}`,
-          icon: "icon-192.png"
-        });
-        notified.add(l.id);
+        try {
+          new Notification("תזכורת שיעור", {
+            body: `שיעור עם ${s ? s.name : "תלמיד"} בשעה ${l.time}`,
+            icon: "icon-192.png"
+          });
+          rememberNotification(signature);
+        } catch (error) {
+          console.warn("Could not show lesson reminder", error);
+        }
       }
     });
   }
@@ -1375,7 +1474,9 @@ const App = (() => {
 
   function registerSW() {
     if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("service-worker.js").catch(() => {});
+    navigator.serviceWorker.register("service-worker.js").catch(error => {
+      console.warn("Service worker registration failed", error);
+    });
     // עדכון אוטומטי שקט: כש-SW חדש משתלט (skipWaiting), מרעננים פעם אחת
     let refreshing = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {

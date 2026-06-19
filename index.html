@@ -68,6 +68,7 @@
         <button class="btn-add" onclick="App.openStudentForm()">+ תלמיד</button>
       </div>
       <div class="search-wrap">
+        <label class="sr-only" for="studentSearch">חיפוש תלמיד</label>
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         <input id="studentSearch" class="search-box" type="search" placeholder="חיפוש תלמיד..." oninput="App.renderStudents()">
       </div>
@@ -81,8 +82,8 @@
         <button class="btn-add" onclick="App.openLessonForm()">+ שיעור</button>
       </div>
       <div class="seg-toggle">
-        <button class="seg-btn active" data-cal="list" onclick="App.setCalendarMode('list')">רשימה</button>
-        <button class="seg-btn" data-cal="month" onclick="App.setCalendarMode('month')">לוח חודשי</button>
+        <button class="seg-btn active" data-cal="list" aria-pressed="true" onclick="App.setCalendarMode('list')">רשימה</button>
+        <button class="seg-btn" data-cal="month" aria-pressed="false" onclick="App.setCalendarMode('month')">לוח חודשי</button>
       </div>
       <div id="calendarMonth" class="calendar-month hidden"></div>
       <div id="lessonsList" class="list"></div>
@@ -92,8 +93,8 @@
     <section id="view-money" class="view">
       <div class="page-intro compact"><div><span class="eyebrow">תמונה עסקית</span><h2>כספים</h2></div><p>חובות פתוחים והכנסות בפועל.</p></div>
       <div class="seg-toggle">
-        <button class="seg-btn active" data-money="payments" onclick="App.setMoneyTab('payments')">תשלומים</button>
-        <button class="seg-btn" data-money="income" onclick="App.setMoneyTab('income')">סיכום הכנסות</button>
+        <button class="seg-btn active" data-money="payments" aria-pressed="true" onclick="App.setMoneyTab('payments')">תשלומים</button>
+        <button class="seg-btn" data-money="income" aria-pressed="false" onclick="App.setMoneyTab('income')">סיכום הכנסות</button>
       </div>
 
       <div id="money-payments" class="money-panel">
@@ -107,7 +108,7 @@
           <button aria-label="חודש הבא" onclick="App.changeMonth(1)">הבא ›</button>
         </div>
         <div id="incomeSummary"></div>
-        <canvas id="incomeChart" height="200" role="img" aria-label="גרף הכנסות 6 חודשים אחרונים"></canvas>
+        <canvas id="incomeChart" height="200" role="img" aria-label="גרף הכנסות 6 חודשים אחרונים">גרף הכנסות לפי חודש</canvas>
       </div>
     </section>
 
@@ -121,14 +122,14 @@
   </main>
 
   <nav class="bottom-nav" aria-label="ניווט ראשי">
-    <button class="nav-btn active" data-view="home" aria-label="בית" onclick="App.go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9"/></svg>בית</button>
+    <button class="nav-btn active" data-view="home" aria-label="בית" aria-current="page" onclick="App.go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9"/></svg>בית</button>
     <button class="nav-btn" data-view="students" aria-label="תלמידים" onclick="App.go('students')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20"/><circle cx="9.5" cy="8" r="3.5"/><path d="M21 20v-1.5a4 4 0 0 0-3-3.9"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/></svg>תלמידים</button>
     <button class="nav-btn" data-view="calendar" aria-label="יומן" onclick="App.go('calendar')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M16 2.5v4M8 2.5v4M3 9.5h18"/></svg>יומן</button>
     <button class="nav-btn" data-view="money" aria-label="כספים" onclick="App.go('money')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5.5a1.5 1.5 0 0 0-1.5-1.5H6a3 3 0 0 0 0 6h12a1.5 1.5 0 0 1 1.5 1.5V18a2 2 0 0 1-2 2H6a3 3 0 0 1-3-3V7"/><circle cx="16.5" cy="13.5" r="1.2"/></svg>כספים</button>
   </nav>
 
   <!-- חלון מודאל כללי -->
-  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-content">
       <div class="modal-grabber"></div>
       <button class="modal-close" aria-label="סגירה" onclick="App.closeModal()">✕</button>
@@ -136,8 +137,20 @@
     </div>
   </div>
 
+  <dialog id="confirmDialog" class="confirm-dialog" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+    <form method="dialog">
+      <span class="confirm-mark" aria-hidden="true">!</span>
+      <h2 id="confirmTitle">אישור פעולה</h2>
+      <p id="confirmMessage"></p>
+      <div class="confirm-actions">
+        <button class="btn btn-light" value="cancel">ביטול</button>
+        <button class="btn btn-danger confirm-submit" value="confirm">אישור</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- הודעות צפות -->
-  <div id="toastWrap" class="toast-wrap"></div>
+  <div id="toastWrap" class="toast-wrap" aria-live="polite" aria-atomic="false"></div>
 
   <script type="module" src="app.js?v=15"></script>
 </body>

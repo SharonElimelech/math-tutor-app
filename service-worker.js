@@ -1,5 +1,5 @@
 // Service Worker – מאפשר עבודה גם בלי אינטרנט (offline) והתקנה כאפליקציה
-const CACHE = "morti-v12";
+const CACHE = "morti-v13";
 const ASSETS = [
   "index.html",
   "styles.css",
@@ -40,16 +40,33 @@ self.addEventListener("notificationclick", e => {
   );
 });
 
-// רשת קודם: תמיד מנסה להביא גרסה עדכנית, ונופל למטמון רק כשאין אינטרנט
+// ניווט: רשת קודם כדי לקבל גרסה חדשה. נכסים מקומיים: מטמון קודם לטעינה מיידית.
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
-  e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy));
+  const url = new URL(e.request.url);
+
+  if (e.request.mode === "navigate") {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          if (res.ok) e.waitUntil(caches.open(CACHE).then(cache => cache.put("index.html", res.clone())));
+          return res;
+        })
+        .catch(() => caches.match("index.html"))
+    );
+    return;
+  }
+
+  if (url.origin === self.location.origin) {
+    e.respondWith(
+      caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+        if (res.ok) e.waitUntil(caches.open(CACHE).then(cache => cache.put(e.request, res.clone())));
         return res;
-      })
-      .catch(() => caches.match(e.request).then(r => r || caches.match("index.html")))
-  );
+      }))
+    );
+    return;
+  }
+
+  // משאבים חיצוניים (גופנים): רשת עם נפילה למטמון, בלי להחזיר HTML במקום נכס.
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
