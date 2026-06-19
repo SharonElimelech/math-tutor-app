@@ -16,6 +16,11 @@ import {
 } from "./src/calendar.js";
 import { buildLessonIndex, summarizeMonth } from "./src/selectors.js";
 import { AppStorage } from "./src/storage.js";
+import {
+  createLessonsCalendar,
+  dueLessonReminders,
+  reminderSignature
+} from "./src/reminders.js";
 
 /* =========================================================
    "המורה שלי" – אפליקציה לניהול שיעורים פרטיים
@@ -1108,6 +1113,7 @@ const App = (() => {
           ${notifSupported && Notification.permission === "granted"
             ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה</button>`
             : `<button class="btn btn-green btn-block" onclick="App.enableNotifications()">${icon("bell")} הפעלת התראות בטלפון</button>`}
+          <button class="btn btn-light btn-block" onclick="App.exportCalendar()">${icon("calendar")} הוספת השיעורים ליומן הטלפון</button>
           <div class="setting-sub" style="margin-top:8px">${notifHelpText()}</div>
         </div>
       </div>
@@ -1197,39 +1203,47 @@ const App = (() => {
 
   // ========== תזכורות / התראות ==========
   const notifSupported = "Notification" in window;
-  // תזמון התראות דרך ה-SW שעובד גם כשהאפליקציה סגורה (Chrome/Android)
-  const triggerSupported = notifSupported && "serviceWorker" in navigator && "TimestampTrigger" in window;
+  const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   let intervalStarted = false;
+  let reminderCheckRunning = false;
 
   function notifStatusText() {
+    if (isIOS() && !isStandalone()) return "כדי לקבל התראות באייפון יש להתקין את האפליקציה למסך הבית";
     if (!notifSupported) return "הדפדפן לא תומך בהתראות";
-    if (Notification.permission === "granted")
-      return triggerSupported
-        ? "מופעל — גם כשהאפליקציה ברקע/סגורה"
-        : "מופעל — בזמן שהאפליקציה פתוחה או ברקע";
+    if (Notification.permission === "granted") return "מופעל — ההתראה תישלח כשהאפליקציה פעילה";
     if (Notification.permission === "denied") return "חסום — יש לאפשר בהגדרות הדפדפן";
     return "כבוי — לחצי 'הפעלת התראות'";
   }
   function notifHelpText() {
-    return "התראה מתוזמנת ברקע אינה נתמכת בכל המכשירים (בעיקר אייפון). הדרך הבטוחה לוודא שהתלמיד מקבל תזכורת היא כפתור \"תזכורת\" שמכין הודעת וואטסאפ מוכנה לשליחה. מומלץ להתקין את האפליקציה למסך הבית.";
+    return "לתזכורת אמינה גם כשהאפליקציה סגורה, הוסיפי את השיעורים ליומן הטלפון. כל אירוע כולל התראה לפי מספר הדקות שבחרת.";
   }
 
   function initReminders() {
-    if (!notifSupported) return;
-    if (Notification.permission === "granted") {
-      reschedule();      // תזמון ברקע — בונוס היכן שנתמך
-      startInterval();   // גיבוי: תמיד פעיל בזמן שהאפליקציה פתוחה
-    }
+    if (notifSupported && Notification.permission === "granted") startInterval();
+    const resume = () => {
+      if (!notifSupported || Notification.permission !== "granted") return;
+      startInterval();
+      void checkReminders();
+      if (document.getElementById("view-settings")?.classList.contains("active")) renderSettings();
+    };
+    window.addEventListener("focus", resume);
+    window.addEventListener("pageshow", resume);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) resume(); });
   }
 
   function startInterval() {
     if (intervalStarted) return;
     intervalStarted = true;
-    setInterval(checkReminders, 60 * 1000);
-    checkReminders();
+    setInterval(() => void checkReminders(), 30 * 1000);
+    void checkReminders();
   }
 
   async function enableNotifications() {
+    if (isIOS() && !isStandalone()) {
+      toast("באייפון: הוסיפי קודם את האפליקציה למסך הבית, פתחי אותה משם ואז הפעילי התראות", "err");
+      return;
+    }
     if (!notifSupported) { toast("הדפדפן לא תומך בהתראות", "err"); return; }
     if (Notification.permission === "denied") {
       toast("ההתראות חסומות — יש לאפשר בהגדרות הדפדפן", "err");
@@ -1238,8 +1252,8 @@ const App = (() => {
     const p = await Notification.requestPermission();
     if (p === "granted") {
       toast("התראות הופעלו", "ok");
-      reschedule();
       startInterval();
+      await testNotification();
     } else {
       toast("ההרשאה לא ניתנה", "err");
     }
@@ -1249,52 +1263,25 @@ const App = (() => {
   async function testNotification() {
     if (Notification.permission !== "granted") return enableNotifications();
     try {
-      const reg = await navigator.serviceWorker.ready;
-      await reg.showNotification("בדיקת התראה ✓", {
+      await showAppNotification("בדיקת התראה ✓", {
         body: "מצוין — ההתראות עובדות!", icon: "icon-192.png", badge: "icon-192.png"
       });
-    } catch {
-      try { new Notification("בדיקת התראה ✓", { body: "ההתראות עובדות!", icon: "icon-192.png" }); }
-      catch { toast("לא ניתן להציג התראה", "err"); }
-    }
-  }
-
-  // תזמון מחדש של כל ההתראות המתוזמנות (debounced)
-  let rescheduleTimer = null;
-  function reschedule() {
-    if (!triggerSupported || Notification.permission !== "granted") return;
-    clearTimeout(rescheduleTimer);
-    rescheduleTimer = setTimeout(doSchedule, 500);
-  }
-  async function doSchedule() {
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      // ניקוי התראות שיעור שתוזמנו קודם
-      const existing = await reg.getNotifications({ includeTriggered: true });
-      existing.forEach(n => { if (n.tag && n.tag.startsWith("lesson-")) n.close(); });
-
-      const now = Date.now();
-      const lead = reminderLeadMinutes(settings.remindMinutes) * 60000;
-      const upcoming = lessonSorted()
-        .filter(l => !l.done)
-        .map(l => ({ l, fire: new Date(`${l.date}T${l.time || "00:00"}`).getTime() - lead }))
-        .filter(x => x.fire > now)
-        .slice(0, 30); // מגבלת מכסה
-
-      for (const { l, fire } of upcoming) {
-        const s = studentById(l.studentId);
-        await reg.showNotification("תזכורת שיעור 📚", {
-          tag: "lesson-" + l.id,
-          body: `שיעור עם ${s ? s.name : "תלמיד"} בשעה ${l.time}`,
-          icon: "icon-192.png",
-          badge: "icon-192.png",
-          showTrigger: new TimestampTrigger(fire),
-          data: { url: "./" }
-        });
-      }
     } catch (error) {
-      console.warn("Background notification scheduling is unavailable", error);
+      console.warn("Could not show test notification", error);
+      toast("לא ניתן להציג התראה. בדקי הרשאה בהגדרות הטלפון.", "err");
     }
+  }
+
+  async function showAppNotification(title, options) {
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      return reg.showNotification(title, { ...options, data: { url: "./" } });
+    }
+    return new Notification(title, options);
+  }
+
+  function reschedule() {
+    if (notifSupported && Notification.permission === "granted") void checkReminders();
   }
 
   const NOTIFIED_KEY = "mt_notified_lessons";
@@ -1307,38 +1294,50 @@ const App = (() => {
     }
   }
   const notified = loadNotified();
-  const notificationSignature = lesson => `${lesson.id}:${lesson.date}:${lesson.time}`;
   function rememberNotification(signature) {
     notified.add(signature);
-    const activeSignatures = new Set(lessons.map(notificationSignature));
+    const activeSignatures = new Set(lessons.map(reminderSignature));
     for (const value of notified) {
       if (!activeSignatures.has(value)) notified.delete(value);
     }
     try { localStorage.setItem(NOTIFIED_KEY, JSON.stringify([...notified])); }
     catch (error) { console.warn("Could not persist reminder history", error); }
   }
-  function checkReminders() {
-    if (!notifSupported || Notification.permission !== "granted") return;
-    const now = new Date();
-    const lead = reminderLeadMinutes(settings.remindMinutes);
-    lessons.forEach(l => {
-      const signature = notificationSignature(l);
-      if (l.done || notified.has(signature)) return;
-      const dt = new Date(`${l.date}T${l.time || "00:00"}`);
-      const diffMin = (dt - now) / 60000;
-      if (diffMin > 0 && diffMin <= lead) {
+  async function checkReminders() {
+    if (!notifSupported || Notification.permission !== "granted" || reminderCheckRunning) return;
+    reminderCheckRunning = true;
+    try {
+      const due = dueLessonReminders(lessons, new Date(), reminderLeadMinutes(settings.remindMinutes), notified);
+      for (const l of due) {
         const s = studentById(l.studentId);
-        try {
-          new Notification("תזכורת שיעור", {
-            body: `שיעור עם ${s ? s.name : "תלמיד"} בשעה ${l.time}`,
-            icon: "icon-192.png"
-          });
-          rememberNotification(signature);
-        } catch (error) {
-          console.warn("Could not show lesson reminder", error);
-        }
+        await showAppNotification("תזכורת שיעור 📚", {
+          tag: `lesson-${l.id}`,
+          body: `שיעור עם ${s ? s.name : "תלמיד"} בשעה ${l.time}`,
+          icon: "icon-192.png",
+          badge: "icon-192.png"
+        });
+        rememberNotification(reminderSignature(l));
       }
-    });
+    } catch (error) {
+      console.warn("Could not show lesson reminder", error);
+    } finally {
+      reminderCheckRunning = false;
+    }
+  }
+
+  function exportCalendar() {
+    const now = Date.now();
+    const upcoming = lessonSorted().filter(l => !l.done && new Date(`${l.date}T${l.time || "00:00"}:00`).getTime() >= now);
+    if (!upcoming.length) { toast("אין שיעורים עתידיים להוספה ליומן", "err"); return; }
+    const content = createLessonsCalendar(upcoming, lessonIndex.studentsById, reminderLeadMinutes(settings.remindMinutes));
+    const blob = new Blob([content], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `שיעורים-${todayStr()}.ics`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast("קובץ היומן מוכן — פתחי אותו ואשרי הוספה", "ok");
   }
 
   // ========== התקנה (PWA) — כפתור בהגדרות, ללא באנר צף ==========
@@ -1442,7 +1441,7 @@ const App = (() => {
     toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
     setCalendarMode, calShift, selectCalDay, calToday,
     setMoneyTab, sendWhatsApp, sendLessonReminder, markAllPaid,
-    exportData, importData,
+    exportData, importData, exportCalendar,
     changeMonth,
     updateSetting, setTheme, clearAll,
     enableNotifications, testNotification,

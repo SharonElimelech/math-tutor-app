@@ -1,0 +1,40 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  createLessonsCalendar,
+  dueLessonReminders,
+  reminderSignature
+} from "../src/reminders.js";
+
+const lesson = {
+  id: "lesson_1",
+  studentId: "student_1",
+  date: "2026-06-20",
+  time: "16:00",
+  duration: 60,
+  topic: "אלגברה",
+  done: false
+};
+
+test("finds reminders inside lead window and ignores delivered or done lessons", () => {
+  const now = new Date("2026-06-20T15:40:00");
+  assert.deepEqual(dueLessonReminders([lesson], now, 30), [lesson]);
+  assert.deepEqual(dueLessonReminders([lesson], now, 30, new Set([reminderSignature(lesson)])), []);
+  assert.deepEqual(dueLessonReminders([{ ...lesson, done: true }], now, 30), []);
+});
+
+test("zero-minute reminder gets a short polling grace window", () => {
+  assert.deepEqual(dueLessonReminders([lesson], new Date("2026-06-20T16:01:00"), 0), [lesson]);
+  assert.deepEqual(dueLessonReminders([lesson], new Date("2026-06-20T16:06:00"), 0), []);
+});
+
+test("calendar export includes lesson and native alarm", () => {
+  const students = new Map([["student_1", { name: "דנה" }]]);
+  const calendar = createLessonsCalendar([lesson], students, 30, new Date("2026-06-20T10:00:00Z"));
+  assert.match(calendar, /BEGIN:VEVENT\r\n/);
+  assert.match(calendar, /SUMMARY:שיעור עם דנה/);
+  assert.match(calendar, /DTSTART:20260620T160000/);
+  assert.match(calendar, /TRIGGER:-PT30M/);
+  assert.match(calendar, /END:VCALENDAR\r\n$/);
+});

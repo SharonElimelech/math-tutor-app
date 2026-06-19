@@ -30,3 +30,11 @@ test("service worker scopes document fallback to navigation", () => {
   assert.match(worker, /url\.origin === self\.location\.origin/);
   assert.doesNotMatch(worker, /r \|\| caches\.match\("index\.html"\)/);
 });
+
+test("lesson reminders use supported service-worker notifications", () => {
+  const source = read("app.js");
+  assert.match(source, /reg\.showNotification/);
+  assert.doesNotMatch(source, /TimestampTrigger|showTrigger/);
+  assert.match(source, /visibilitychange/);
+  assert.match(source, /exportCalendar/);
+});
