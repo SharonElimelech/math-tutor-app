@@ -1,0 +1,14 @@
+{
+  "name": "my-tutor-manager",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "npm run check:syntax && npm test",
+    "check:syntax": "node --check app.js && node --check service-worker.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
