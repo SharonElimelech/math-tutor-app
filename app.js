@@ -5,7 +5,16 @@ import {
   parseBackup,
   reminderLeadMinutes
 } from "./src/data.js";
+import {
+  formatDate as fmtDate,
+  formatTime as fmtTime,
+  holidayFor,
+  monthKey,
+  todayString as todayStr,
+  ymd
+} from "./src/calendar.js";
 import { buildLessonIndex, summarizeMonth } from "./src/selectors.js";
+import { AppStorage } from "./src/storage.js";
 
 /* =========================================================
    "המורה שלי" – אפליקציה לניהול שיעורים פרטיים
@@ -36,32 +45,8 @@ const App = (() => {
     `<svg class="${cls || "ic"}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${SVG[name]}</svg>`;
 
   // ----- שכבת נתונים -----
-  const STATE_KEY = "mt_state_v3";
   const clone = value => JSON.parse(JSON.stringify(value));
-  const DB = {
-    load() {
-      try {
-        const packed = localStorage.getItem(STATE_KEY);
-        if (packed) return { state: parseBackup(JSON.parse(packed)), error: null, needsPersist: false };
-
-        const legacy = {
-          students: JSON.parse(localStorage.getItem("mt_students") || "[]"),
-          lessons: JSON.parse(localStorage.getItem("mt_lessons") || "[]"),
-          settings: JSON.parse(localStorage.getItem("mt_settings") || "{}")
-        };
-        return { state: parseBackup(legacy), error: null, needsPersist: true };
-      } catch (error) {
-        return {
-          state: parseBackup({ students: [], lessons: [], settings: DEFAULT_SETTINGS }),
-          error,
-          needsPersist: false
-        };
-      }
-    },
-    save(state) {
-      localStorage.setItem(STATE_KEY, JSON.stringify(state));
-    }
-  };
+  const DB = new AppStorage(localStorage);
 
   const HORIZON_WEEKS = 52; // כמה שבועות קדימה לממש לשיעור חוזר קבוע
   const loaded = DB.load();
@@ -113,12 +98,7 @@ const App = (() => {
   };
   const saveSettings = () => persistSnapshot();
 
-  // ----- עזרי תאריך וכסף -----
-  const fmtDate = d => new Date(d).toLocaleDateString("he-IL", { weekday: "short", day: "numeric", month: "numeric" });
-  const fmtTime = t => t || "";
-  const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const todayStr = () => ymd(new Date());
-  const monthKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  // ----- עזרי כסף ותצוגה -----
   const cur = n => `${settings.currency}${n}`;
   const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -130,60 +110,6 @@ const App = (() => {
     const s = studentById(l.studentId);
     return s ? (s.price || 0) : 0;
   };
-
-  // ----- חגי ישראל (לוח עברי דרך Intl, ללא ספריות) -----
-  const HEB_FMT = new Intl.DateTimeFormat("en-u-ca-hebrew", { day: "numeric", month: "long" });
-  function hebParts(date) {
-    let month = "", day = 0;
-    for (const p of HEB_FMT.formatToParts(date)) {
-      if (p.type === "month") month = p.value;
-      if (p.type === "day") day = parseInt(p.value);
-    }
-    return { month, day };
-  }
-  const holidayCache = new Map();
-  function holidayFor(dateStr) {
-    if (holidayCache.has(dateStr)) return holidayCache.get(dateStr);
-    const { month: m, day } = hebParts(new Date(dateStr + "T00:00"));
-    let h = null;
-    if (m === "Tishri") {
-      if (day === 1 || day === 2) h = { name: "ראש השנה", chag: true };
-      else if (day === 3) h = { name: "צום גדליה" };
-      else if (day === 10) h = { name: "יום כיפור", chag: true };
-      else if (day === 15) h = { name: "סוכות", chag: true };
-      else if (day >= 16 && day <= 20) h = { name: "חול המועד סוכות" };
-      else if (day === 21) h = { name: "הושענא רבה" };
-      else if (day === 22) h = { name: "שמחת תורה", chag: true };
-    } else if ((m === "Kislev" && day >= 25) || (m === "Tevet" && day <= 2)) {
-      h = { name: "חנוכה" };
-    } else if (m === "Tevet" && day === 10) {
-      h = { name: "צום עשרה בטבת" };
-    } else if (m === "Shevat" && day === 15) {
-      h = { name: "ט״ו בשבט" };
-    } else if (m === "Adar" || m === "Adar II") {
-      if (day === 13) h = { name: "תענית אסתר" };
-      else if (day === 14) h = { name: "פורים", chag: true };
-      else if (day === 15) h = { name: "שושן פורים" };
-    } else if (m === "Nisan") {
-      if (day === 15) h = { name: "פסח", chag: true };
-      else if (day >= 16 && day <= 20) h = { name: "חול המועד פסח" };
-      else if (day === 21) h = { name: "שביעי של פסח", chag: true };
-      else if (day === 27) h = { name: "יום השואה" };
-    } else if (m === "Iyar") {
-      if (day === 4) h = { name: "יום הזיכרון" };
-      else if (day === 5) h = { name: "יום העצמאות", chag: true };
-      else if (day === 18) h = { name: "ל״ג בעומר" };
-      else if (day === 28) h = { name: "יום ירושלים" };
-    } else if (m === "Sivan" && day === 6) {
-      h = { name: "שבועות", chag: true };
-    } else if (m === "Tammuz" && day === 17) {
-      h = { name: "צום י״ז בתמוז" };
-    } else if (m === "Av" && day === 9) {
-      h = { name: "תשעה באב" };
-    }
-    holidayCache.set(dateStr, h);
-    return h;
-  }
 
   // ----- הודעות צפות (toast) -----
   function toast(msg, type = "", action = null) {
