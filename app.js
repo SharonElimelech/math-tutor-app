@@ -1,3 +1,11 @@
+import {
+  DATA_VERSION,
+  DEFAULT_SETTINGS,
+  createSnapshot,
+  parseBackup,
+  reminderLeadMinutes
+} from "./src/data.js";
+
 /* =========================================================
    "המורה שלי" – אפליקציה לניהול שיעורים פרטיים
    כל הנתונים נשמרים מקומית בטלפון (localStorage).
@@ -27,32 +35,40 @@ const App = (() => {
     `<svg class="${cls || "ic"}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${SVG[name]}</svg>`;
 
   // ----- שכבת נתונים -----
+  const STATE_KEY = "mt_state_v3";
+  const clone = value => JSON.parse(JSON.stringify(value));
   const DB = {
-    load(key, def) {
-      try { const v = JSON.parse(localStorage.getItem("mt_" + key)); return v ?? def; }
-      catch { return def; }
+    load() {
+      try {
+        const packed = localStorage.getItem(STATE_KEY);
+        if (packed) return { state: parseBackup(JSON.parse(packed)), error: null, needsPersist: false };
+
+        const legacy = {
+          students: JSON.parse(localStorage.getItem("mt_students") || "[]"),
+          lessons: JSON.parse(localStorage.getItem("mt_lessons") || "[]"),
+          settings: JSON.parse(localStorage.getItem("mt_settings") || "{}")
+        };
+        return { state: parseBackup(legacy), error: null, needsPersist: true };
+      } catch (error) {
+        return {
+          state: parseBackup({ students: [], lessons: [], settings: DEFAULT_SETTINGS }),
+          error,
+          needsPersist: false
+        };
+      }
     },
-    save(key, val) {
-      try { localStorage.setItem("mt_" + key, JSON.stringify(val)); }
-      catch (e) { toast("שמירה נכשלה — אחסון מלא?", "err"); }
+    save(state) {
+      localStorage.setItem(STATE_KEY, JSON.stringify(state));
     }
   };
 
-  const DATA_VERSION = 2;
   const HORIZON_WEEKS = 52; // כמה שבועות קדימה לממש לשיעור חוזר קבוע
-  const DEFAULT_SETTINGS = {
-    teacherName: "",
-    currency: "₪",
-    defaultPrice: 120,
-    defaultTime: "16:00",
-    defaultDuration: 60,
-    theme: "auto",        // auto | light | dark
-    remindMinutes: 30
-  };
-
-  let students = DB.load("students", []);
-  let lessons  = DB.load("lessons", []);
-  let settings = Object.assign({}, DEFAULT_SETTINGS, DB.load("settings", {}));
+  const loaded = DB.load();
+  let students = loaded.state.students;
+  let lessons = loaded.state.lessons;
+  let settings = loaded.state.settings;
+  let lastSavedState = clone(loaded.state);
+  let startupDataError = loaded.error;
 
   let viewMonth = new Date();      // החודש שמוצג בסיכום הכנסות
   let calMonth  = new Date();      // החודש שמוצג בלוח החודשי
@@ -63,23 +79,34 @@ const App = (() => {
 
   // ----- מיגרציית נתונים -----
   function migrate() {
-    const stored = DB.load("version", 1);
-    let changed = false;
-    if (stored < 2) {
-      lessons.forEach(l => {
-        if (typeof l.paid !== "boolean") l.paid = false;
-        if (typeof l.done !== "boolean") l.done = false;
-        if (typeof l.duration !== "number") l.duration = DEFAULT_SETTINGS.defaultDuration;
-      });
-      changed = true;
-    }
-    if (changed) { DB.save("lessons", lessons); }
-    DB.save("version", DATA_VERSION);
+    if (loaded.needsPersist) persistSnapshot();
   }
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const save = () => { DB.save("students", students); DB.save("lessons", lessons); reschedule(); };
-  const saveSettings = () => DB.save("settings", settings);
+  function restoreLastSavedState() {
+    const restored = clone(lastSavedState);
+    students = restored.students;
+    lessons = restored.lessons;
+    settings = restored.settings;
+  }
+  function persistSnapshot() {
+    try {
+      const snapshot = createSnapshot(students, lessons, settings);
+      DB.save(snapshot);
+      lastSavedState = clone(snapshot);
+      return true;
+    } catch (error) {
+      restoreLastSavedState();
+      toast("השמירה נכשלה. הנתונים הקודמים נשמרו ולא נפגעו.", "err");
+      return false;
+    }
+  }
+  const save = () => {
+    const saved = persistSnapshot();
+    if (saved) reschedule();
+    return saved;
+  };
+  const saveSettings = () => persistSnapshot();
 
   // ----- עזרי תאריך וכסף -----
   const fmtDate = d => new Date(d).toLocaleDateString("he-IL", { weekday: "short", day: "numeric", month: "numeric" });
@@ -263,21 +290,22 @@ const App = (() => {
       phone,
       price: Math.max(0, parseFloat(document.getElementById("f-price").value) || 0)
     };
+    const successMessage = id ? "התלמיד עודכן" : "תלמיד נוסף";
     if (id) {
       Object.assign(studentById(id), data);
-      toast("התלמיד עודכן", "ok");
     } else {
       students.push({ id: uid(), ...data });
-      toast("תלמיד נוסף", "ok");
     }
-    save(); closeModal(); render();
+    if (!save()) { render(); return; }
+    closeModal(); render(); toast(successMessage, "ok");
   }
 
   function deleteStudent(id) {
     if (!confirm("למחוק את התלמיד וכל השיעורים שלו?")) return;
     students = students.filter(s => s.id !== id);
     lessons = lessons.filter(l => l.studentId !== id);
-    save(); closeModal(); render();
+    if (!save()) { render(); return; }
+    closeModal(); render();
     toast("התלמיד נמחק");
   }
 
@@ -309,7 +337,7 @@ const App = (() => {
     if (!students.length) { toast("צריך קודם להוסיף לפחות תלמיד אחד", "err"); return; }
     const l = id
       ? lessons.find(x => x.id === id)
-      : { studentId: presetStudentId || students[0].id, date: selectedDay || todayStr(), time: settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
+      : { studentId: presetStudentId || "", date: selectedDay || todayStr(), time: settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
     const priceVal = (typeof l.price === "number") ? l.price : "";
     openModal(`
       <h3>${id ? "עריכת שיעור" : "שיעור חדש"}</h3>
@@ -420,10 +448,12 @@ const App = (() => {
       duration: durRaw === "" ? settings.defaultDuration : Math.max(0, parseInt(durRaw) || 0),
       price: priceRaw === "" ? undefined : Math.max(0, parseFloat(priceRaw) || 0)
     };
+    if (!data.studentId) { toast("נא לבחור תלמיד", "err"); return; }
     if (!data.date) { toast("נא לבחור תאריך", "err"); return; }
+    let successMessage = "";
     if (id) {
       Object.assign(lessons.find(x => x.id === id), data);
-      toast("השיעור עודכן", "ok");
+      successMessage = "השיעור עודכן";
     } else {
       const repeat = document.getElementById("f-repeat");
       if (repeat && repeat.checked) {
@@ -438,13 +468,14 @@ const App = (() => {
           d.setDate(d.getDate() + i * 7);
           lessons.push({ id: uid(), paid: false, done: false, seriesId, recur: "weekly", openEnded, ...data, date: ymd(d) });
         }
-        toast(openEnded ? "נקבע שיעור שבועי קבוע" : `נקבעו ${weeks} שיעורים`, "ok");
+        successMessage = openEnded ? "נקבע שיעור שבועי קבוע" : `נקבעו ${weeks} שיעורים`;
       } else {
         lessons.push({ id: uid(), paid: false, done: false, ...data });
-        toast("השיעור נקבע", "ok");
+        successMessage = "השיעור נקבע";
       }
     }
-    save(); closeModal(); render();
+    if (!save()) { render(); return; }
+    closeModal(); render(); toast(successMessage, "ok");
   }
 
   function setLessonDate(offset, btn) {
@@ -459,7 +490,8 @@ const App = (() => {
   function deleteLesson(id) {
     if (!confirm("למחוק את השיעור?")) return;
     lessons = lessons.filter(l => l.id !== id);
-    save(); closeModal(); render();
+    if (!save()) { render(); return; }
+    closeModal(); render();
     toast("השיעור נמחק");
   }
 
@@ -472,7 +504,8 @@ const App = (() => {
     lessons = lessons.filter(x => !(x.seriesId === l.seriesId && x.date >= l.date));
     // עצירת הסדרה — שלא תורחב שוב אוטומטית
     lessons.forEach(x => { if (x.seriesId === l.seriesId) x.openEnded = false; });
-    save(); closeModal(); render();
+    if (!save()) { render(); return; }
+    closeModal(); render();
     toast(`נמחקו ${removed} שיעורים`);
   }
 
@@ -499,13 +532,14 @@ const App = (() => {
         added = true;
       }
     });
-    if (added) DB.save("lessons", lessons);
+    if (added) persistSnapshot();
   }
 
   function toggleDone(id) {
     const l = lessons.find(x => x.id === id);
     l.done = !l.done;
-    save(); render();
+    if (!save()) { render(); return; }
+    render();
   }
 
   function lessonSorted() {
@@ -818,14 +852,16 @@ const App = (() => {
     const l = lessons.find(x => x.id === id);
     if (!l) return;
     l.paid = !l.paid;
-    save(); render();
+    if (!save()) { render(); return; }
+    render();
     toast(l.paid ? "סומן כשולם" : "בוטל סימון התשלום", "ok");
   }
 
   function markAllPaid(studentId) {
     lessons.filter(l => l.studentId === studentId && l.done && !l.paid)
       .forEach(l => l.paid = true);
-    save(); render();
+    if (!save()) { render(); return; }
+    render();
     toast("סומן כשולם", "ok");
   }
 
@@ -873,7 +909,7 @@ const App = (() => {
 
   // ========== גיבוי ושחזור ==========
   function exportData() {
-    const data = { students, lessons, settings, exportedAt: new Date().toISOString(), version: DATA_VERSION };
+    const data = { ...createSnapshot(students, lessons, settings), exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -890,14 +926,13 @@ const App = (() => {
     const reader = new FileReader();
     reader.onload = e => {
       try {
-        const data = JSON.parse(e.target.result);
-        if (!Array.isArray(data.students) || !Array.isArray(data.lessons))
-          throw new Error("מבנה קובץ לא תקין");
+        const data = parseBackup(JSON.parse(e.target.result));
         if (!confirm("שחזור יחליף את כל הנתונים הקיימים. להמשיך?")) { event.target.value = ""; return; }
         students = data.students;
         lessons = data.lessons;
-        if (data.settings) settings = Object.assign({}, DEFAULT_SETTINGS, data.settings);
-        save(); saveSettings(); applyTheme(); render();
+        settings = data.settings;
+        if (!save()) { render(); return; }
+        applyTheme(); render();
         toast("השחזור הושלם בהצלחה", "ok");
       } catch (err) {
         toast("שגיאה בקריאת הקובץ: " + err.message, "err");
@@ -1103,7 +1138,7 @@ const App = (() => {
     }
     if (key === "currency" && !value) value = "₪";
     settings[key] = value;
-    saveSettings();
+    if (!saveSettings()) { render(); return; }
     if (key === "remindMinutes") reschedule();
     render();
     toast("נשמר", "ok");
@@ -1111,7 +1146,7 @@ const App = (() => {
 
   function setTheme(theme) {
     settings.theme = theme;
-    saveSettings();
+    if (!saveSettings()) { renderSettings(); return; }
     applyTheme();
     renderSettings();
   }
@@ -1121,7 +1156,8 @@ const App = (() => {
     if (!confirm("בטוחה? אין דרך לשחזר ללא קובץ גיבוי.")) return;
     students = []; lessons = [];
     settings = Object.assign({}, DEFAULT_SETTINGS);
-    save(); saveSettings(); applyTheme(); render();
+    if (!save()) { render(); return; }
+    applyTheme(); render();
     toast("כל הנתונים נמחקו");
   }
 
@@ -1222,7 +1258,7 @@ const App = (() => {
       existing.forEach(n => { if (n.tag && n.tag.startsWith("lesson-")) n.close(); });
 
       const now = Date.now();
-      const lead = (settings.remindMinutes || 30) * 60000;
+      const lead = reminderLeadMinutes(settings.remindMinutes) * 60000;
       const upcoming = lessonSorted()
         .filter(l => !l.done)
         .map(l => ({ l, fire: new Date(`${l.date}T${l.time || "00:00"}`).getTime() - lead }))
@@ -1247,7 +1283,7 @@ const App = (() => {
   function checkReminders() {
     if (!notifSupported || Notification.permission !== "granted") return;
     const now = new Date();
-    const lead = settings.remindMinutes || 30;
+    const lead = reminderLeadMinutes(settings.remindMinutes);
     lessons.forEach(l => {
       if (l.done || notified.has(l.id)) return;
       const dt = new Date(`${l.date}T${l.time || "00:00"}`);
@@ -1328,6 +1364,10 @@ const App = (() => {
     registerSW();
     applyTheme();
     try { render(); } catch (e) { console.error(e); }
+    if (startupDataError) {
+      toast("הנתונים המקומיים לא היו תקינים. האפליקציה נפתחה במצב בטוח — אפשר לשחזר מגיבוי.", "err");
+      startupDataError = null;
+    }
     initReminders();
     handleLaunchParams();
   }
@@ -1351,3 +1391,5 @@ const App = (() => {
     promptInstall
   };
 })();
+
+window.App = App;
