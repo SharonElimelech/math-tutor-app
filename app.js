@@ -108,6 +108,7 @@ const App = (() => {
   const cur = n => `${settings.currency}${n}`;
   const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const initials = name => String(name || "?").trim().split(/\s+/).slice(0, 2).map(part => part[0] || "").join("");
 
   const studentById = id => lessonIndex.studentsById.get(id);
   // מחיר שיעור: עדיפות למחיר ששמור על השיעור, אחרת מחיר התלמיד
@@ -221,21 +222,28 @@ const App = (() => {
   function openStudentForm(id) {
     const s = id ? studentById(id) : { name: "", parentName: "", phone: "", price: settings.defaultPrice };
     openModal(`
-      <h3 id="modalTitle">${id ? "עריכת תלמיד" : "תלמיד חדש"}</h3>
-      <label for="f-name">שם התלמיד</label>
-      <input id="f-name" value="${escapeHtml(s.name)}" placeholder="לדוגמה: דנה כהן">
-      <div id="err-name" class="field-error" style="display:none">נא להזין שם תלמיד</div>
-      <label for="f-parent">שם ההורה</label>
-      <input id="f-parent" value="${escapeHtml(s.parentName)}" placeholder="לדוגמה: רונית">
-      <label for="f-phone">טלפון ההורה (לוואטסאפ)</label>
-      <input id="f-phone" type="tel" inputmode="tel" value="${escapeHtml(s.phone)}" placeholder="05X-XXXXXXX">
-      <label for="f-price">מחיר לשיעור (${escapeHtml(settings.currency)})</label>
-      <input id="f-price" type="number" inputmode="numeric" min="0" value="${escapeHtml(s.price)}" placeholder="120">
-      <button class="btn btn-green btn-block" onclick="App.saveStudent('${id || ""}')">שמירה</button>
+      <div class="modal-title-block">
+        <span class="modal-title-icon">${icon("edit")}</span>
+        <div><h3 id="modalTitle">${id ? "עריכת תלמיד" : "תלמיד חדש"}</h3><p>${id ? "עדכון פרטי הקשר והתעריף" : "הפרטים הדרושים לקביעת שיעור ושליחת תזכורת"}</p></div>
+      </div>
+      <div class="form-section">
+        <label for="f-name">שם התלמיד <span class="required-note">חובה</span></label>
+        <input id="f-name" value="${escapeHtml(s.name)}" placeholder="לדוגמה: דנה כהן" autocomplete="name">
+        <div id="err-name" class="field-error" style="display:none">נא להזין שם תלמיד</div>
+        <div class="row">
+          <div><label for="f-parent">שם ההורה</label><input id="f-parent" value="${escapeHtml(s.parentName)}" placeholder="לדוגמה: רונית"></div>
+          <div><label for="f-phone">טלפון לוואטסאפ</label><input id="f-phone" type="tel" inputmode="tel" value="${escapeHtml(s.phone)}" placeholder="05X-XXXXXXX" autocomplete="tel"></div>
+        </div>
+        <label for="f-price">מחיר לשיעור (${escapeHtml(settings.currency)})</label>
+        <input id="f-price" type="number" inputmode="numeric" min="0" value="${escapeHtml(s.price)}" placeholder="120">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-green btn-block" onclick="App.saveStudent('${id || ""}')">${icon("check")} ${id ? "שמירת שינויים" : "הוספת תלמיד"}</button>
+        ${id ? `<button class="btn btn-light btn-block" onclick="App.scheduleForStudent('${id}')">${icon("calendar")} קביעת שיעור</button>` : ""}
+      </div>
       ${id ? `
-        <button class="btn btn-light btn-block" onclick="App.scheduleForStudent('${id}')">${icon("calendar")} קביעת שיעור לתלמיד זה</button>
         ${studentSummaryLine(id)}
-        <button class="btn btn-danger btn-block" onclick="App.deleteStudent('${id}')">מחיקת תלמיד</button>
+        <div class="danger-zone"><div><strong>מחיקת תלמיד</strong><span>כולל כל השיעורים והיסטוריית התשלומים</span></div><button class="btn btn-danger" onclick="App.deleteStudent('${id}')">מחיקה</button></div>
       ` : ""}
     `);
   }
@@ -246,8 +254,9 @@ const App = (() => {
     const upcoming = lessonIndex.forStudent(id).filter(l => l.date >= today && !l.done).length;
     const owed = lessonIndex.unpaidForStudent(id)
       .reduce((sum, l) => sum + lessonPrice(l), 0);
-    return `<div class="setting-sub" style="text-align:center;margin:10px 0">
-      ${upcoming} שיעורים קרובים${owed > 0 ? ` · חוב פתוח: ${cur(owed)}` : ""}
+    return `<div class="profile-summary" aria-label="סיכום תלמיד">
+      <span><b>${upcoming}</b> שיעורים קרובים</span>
+      <span class="${owed > 0 ? "has-debt" : ""}"><b>${cur(owed)}</b> יתרה פתוחה</span>
     </div>`;
   }
 
@@ -293,29 +302,32 @@ const App = (() => {
 
   function renderStudents() {
     const el = document.getElementById("studentsList");
-    if (!students.length) { el.innerHTML = `<div class="empty">אין תלמידים עדיין.<br>הוסיפי תלמיד ראשון עם הכפתור שלמעלה.</div>`; return; }
+    if (!students.length) { el.innerHTML = `<div class="empty empty-action">${icon("plus")}<h3>עדיין אין תלמידים</h3><p>הוסיפי תלמיד ראשון כדי לקבוע שיעור ולעקוב אחר תשלומים.</p><button class="btn btn-green" onclick="App.openStudentForm()">הוספת תלמיד</button></div>`; return; }
     const searchEl = document.getElementById("studentSearch");
     const q = searchEl ? searchEl.value.trim().toLowerCase() : "";
     const filtered = q
       ? students.filter(s => (s.name + " " + (s.parentName || "")).toLowerCase().includes(q))
       : students;
-    if (!filtered.length) { el.innerHTML = `<div class="empty">לא נמצאו תלמידים בחיפוש</div>`; return; }
-    el.innerHTML = filtered.map(s => `
-      <button type="button" class="item item-button" onclick="App.openStudentForm('${s.id}')" aria-label="פתיחת הפרופיל של ${escapeHtml(s.name)}">
-        <span class="item-main">
-          <span class="item-title">${escapeHtml(s.name)}</span>
-          <span class="item-sub">
-            ${escapeHtml(s.parentName) || "ללא איש קשר"} ${s.phone ? "· " + escapeHtml(s.phone) : ""}
+    if (!filtered.length) { el.innerHTML = `<div class="empty empty-action"><h3>לא נמצאו תלמידים</h3><p>נסי שם תלמיד או שם הורה אחר.</p></div>`; return; }
+    el.innerHTML = filtered.map(s => {
+      const upcoming = lessonIndex.forStudent(s.id).filter(l => l.date >= todayStr() && !l.done);
+      const next = upcoming[0];
+      const unpaid = lessonIndex.unpaidForStudent(s.id);
+      const owed = unpaid.reduce((sum, lesson) => sum + lessonPrice(lesson), 0);
+      return `
+        <button type="button" class="student-card" onclick="App.openStudentForm('${s.id}')" aria-label="פתיחת הפרופיל של ${escapeHtml(s.name)}">
+          <span class="student-avatar" aria-hidden="true">${escapeHtml(initials(s.name))}</span>
+          <span class="student-card-main">
+            <span class="student-card-top"><strong>${escapeHtml(s.name)}</strong><span>${cur(s.price)} לשיעור</span></span>
+            <span class="student-contact">${escapeHtml(s.parentName) || "לא הוגדר איש קשר"}${s.phone ? ` · ${escapeHtml(s.phone)}` : ""}</span>
+            <span class="student-insights">
+              <span>${next ? `${dayLabelPlain(next.date)} · ${fmtTime(next.time)}` : "אין שיעור קרוב"}</span>
+              <span class="${owed > 0 ? "debt" : "clear"}">${owed > 0 ? `חוב ${cur(owed)}` : "אין חוב פתוח"}</span>
+            </span>
           </span>
-          <span class="item-meta">
-            <span>${lessonIndex.forStudent(s.id).filter(l => l.date >= todayStr() && !l.done).length} שיעורים קרובים</span>
-            <span>${cur(s.price)} לשיעור</span>
-            ${lessonIndex.unpaidForStudent(s.id).length ? `<span class="meta-due">${lessonIndex.unpaidForStudent(s.id).length} ממתינים לתשלום</span>` : ""}
-          </span>
-        </span>
-        <span class="item-actions"><span class="btn btn-light" aria-hidden="true">${icon("edit")}</span></span>
-      </button>
-    `).join("");
+          <span class="student-card-arrow" aria-hidden="true">‹</span>
+        </button>`;
+    }).join("");
   }
 
   // ========== שיעורים / יומן ==========
@@ -326,7 +338,11 @@ const App = (() => {
       : { studentId: presetStudentId || "", date: selectedDay || todayStr(), time: settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
     const priceVal = (typeof l.price === "number") ? l.price : "";
     openModal(`
-      <h3 id="modalTitle">${id ? "עריכת שיעור" : "שיעור חדש"}</h3>
+      <div class="modal-title-block">
+        <span class="modal-title-icon">${icon("calendar")}</span>
+        <div><h3 id="modalTitle">${id ? "עריכת שיעור" : "שיעור חדש"}</h3><p>${id ? "עדכון מועד, תוכן ופרטי תשלום" : "קביעת מועד חדש ביומן"}</p></div>
+      </div>
+      <div class="form-section">
       <label for="f-student-search">תלמיד <span class="required-note">בחירה נדרשת</span></label>
       <input id="f-student-search" placeholder="הקלידי שם ובחרי תלמיד" autocomplete="off" oninput="App.renderStudentPicker()">
       <input type="hidden" id="f-student" value="${l.studentId}">
@@ -369,16 +385,17 @@ const App = (() => {
             </div>
           </div>
         ` : ""}
-      </div>
-      <button class="btn btn-green btn-block" onclick="App.saveLesson('${id || ""}')">שמירה</button>
+      </div></div>
+      <div class="modal-actions">
+      <button class="btn btn-green btn-block" onclick="App.saveLesson('${id || ""}')">${icon("check")} ${id ? "שמירת שינויים" : "קביעת שיעור"}</button>
       ${id && studentById(l.studentId) && studentById(l.studentId).phone
         ? `<button class="btn btn-wa btn-block" onclick="App.sendLessonReminder('${id}')">${icon("whatsapp")} שליחת תזכורת לתלמיד</button>` : ""}
+      </div>
       ${id ? (l.seriesId ? `
-        <div class="setting-sub" style="text-align:center;margin:10px 0">${icon("repeat", "ic-sub")} שיעור חוזר שבועי</div>
-        <button class="btn btn-danger btn-block" onclick="App.deleteLesson('${id}')">מחיקת שיעור זה בלבד</button>
-        <button class="btn btn-danger btn-block" onclick="App.deleteSeriesFuture('${id}')">מחיקת השיעור וכל ההמשך</button>
+        <div class="series-note">${icon("repeat", "ic-sub")} שיעור חוזר שבועי</div>
+        <div class="danger-zone lesson-danger"><div><strong>מחיקת שיעור</strong><span>אפשר למחוק רק את המועד הזה או את כל ההמשך</span></div><div><button class="btn btn-danger" onclick="App.deleteLesson('${id}')">מועד זה</button><button class="btn btn-danger" onclick="App.deleteSeriesFuture('${id}')">כל ההמשך</button></div></div>
       ` : `
-        <button class="btn btn-danger btn-block" onclick="App.deleteLesson('${id}')">מחיקת שיעור</button>
+        <div class="danger-zone"><div><strong>מחיקת שיעור</strong><span>השיעור יוסר מהיומן</span></div><button class="btn btn-danger" onclick="App.deleteLesson('${id}')">מחיקה</button></div>
       `) : ""}
     `);
     renderStudentPicker();
@@ -597,13 +614,13 @@ const App = (() => {
     const count = dayLessons.length;
     const h = holidayFor(date);
     return `
-      <div class="day-group">
+      <section class="day-group" aria-labelledby="day-${date}">
         <div class="day-head">
-          <span class="day-label">${dayLabel(date)} ${h ? `<span class="holiday-tag">${icon("info", "ic-sub")} ${escapeHtml(h.name)}</span>` : ""}</span>
+          <h3 class="day-label" id="day-${date}">${dayLabel(date)} ${h ? `<span class="holiday-tag">${icon("info", "ic-sub")} ${escapeHtml(h.name)}</span>` : ""}</h3>
           <span class="day-count">${count} ${count === 1 ? "שיעור" : "שיעורים"}</span>
         </div>
         <div class="day-lessons">${dayLessons.map(lessonRow).join("")}</div>
-      </div>`;
+      </section>`;
   }
 
   // ----- מתג רשימה / לוח חודשי -----
@@ -688,7 +705,7 @@ const App = (() => {
       el.innerHTML = (h ? `<div class="holiday-banner">${icon("info")} ${escapeHtml(h.name)}</div>` : "") +
         (dayLessons.length
           ? dayGroupHtml(day, dayLessons)
-          : `<div class="empty">אין שיעורים ב-${fmtDate(day)}</div>`) +
+          : `<div class="empty empty-action">${icon("calendar")}<h3>היום הזה פנוי</h3><p>אין שיעורים ב-${fmtDate(day)}.</p></div>`) +
         addBtn;
       return;
     }
@@ -696,7 +713,7 @@ const App = (() => {
     // מצב רשימה
     const list = lessonSorted();
     if (!list.length) {
-      el.innerHTML = `<div class="empty">אין שיעורים ביומן.<br>קבעי שיעור עם הכפתור שלמעלה.</div>`;
+      el.innerHTML = `<div class="empty empty-action">${icon("calendar")}<h3>היומן עדיין ריק</h3><p>קבעי שיעור ראשון כדי להתחיל לבנות את השבוע.</p><button class="btn btn-green" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
       return;
     }
     const today = todayStr();
@@ -707,7 +724,7 @@ const App = (() => {
     if (upcoming.length) {
       groupByDate(upcoming).forEach((ls, date) => { html += dayGroupHtml(date, ls); });
     } else {
-      html += `<div class="empty">אין שיעורים קרובים</div>`;
+      html += `<div class="empty empty-action"><h3>אין שיעורים קרובים</h3><p>אפשר לקבוע עכשיו את המועד הבא.</p><button class="btn btn-green" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
     }
     if (past.length) {
       html += `<button class="past-toggle" onclick="App.togglePast()">${showPast ? "הסתר" : "הצג"} שיעורים שעברו (${past.length})</button>`;
@@ -754,15 +771,21 @@ const App = (() => {
     const today = todayStr();
     const todayLessons = lessonIndex.onDate(today);
     const nextLesson = lessonSorted().find(l => l.date >= today && !l.done);
+    const nextStudent = nextLesson ? studentById(nextLesson.studentId) : null;
+    const openPayments = lessons.filter(l => l.done && !l.paid).length;
     document.getElementById("todaySummary").innerHTML = `
-      <div class="summary-kicker">${new Date().toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" })}</div>
-      <div class="summary-number"><b>${todayLessons.length}</b><span>${todayLessons.length === 1 ? "שיעור היום" : "שיעורים היום"}</span></div>
-      <div class="summary-next">
-        ${nextLesson
-          ? `${icon("clock")} הבא: <strong>${escapeHtml(studentById(nextLesson.studentId)?.name || "תלמיד")}</strong> · ${dayLabelPlain(nextLesson.date)} · ${fmtTime(nextLesson.time)}`
-          : `${icon("checkCircle")} היומן פנוי — אפשר לקבוע שיעור חדש`}
+      <div class="summary-top">
+        <span>${new Date().toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" })}</span>
+        <span class="summary-status">${todayLessons.length ? `${todayLessons.length} ${todayLessons.length === 1 ? "שיעור היום" : "שיעורים היום"}` : "יום פנוי"}</span>
       </div>
-      <div class="summary-foot"><span>${students.length} ${students.length === 1 ? "תלמיד פעיל" : "תלמידים פעילים"}</span><span>${lessons.filter(l => l.done && !l.paid).length} ${lessons.filter(l => l.done && !l.paid).length === 1 ? "תשלום פתוח" : "תשלומים פתוחים"}</span></div>
+      <div class="summary-focus">
+        <div><span>${nextLesson ? "השיעור הבא" : "היומן מוכן"}</span><strong>${nextLesson ? escapeHtml(nextStudent?.name || "תלמיד") : "אין שיעורים קרובים"}</strong><p>${nextLesson ? `${dayLabelPlain(nextLesson.date)} בשעה ${fmtTime(nextLesson.time)}${nextLesson.topic ? ` · ${escapeHtml(nextLesson.topic)}` : ""}` : "אפשר לקבוע שיעור חדש בכל רגע."}</p></div>
+        ${nextLesson ? `<button class="summary-time" onclick="App.openLessonForm('${nextLesson.id}')" aria-label="פתיחת השיעור הבא בשעה ${fmtTime(nextLesson.time)}">${fmtTime(nextLesson.time)}<span>פתיחת שיעור</span></button>` : `<button class="summary-time summary-add" onclick="App.openLessonForm()" aria-label="קביעת שיעור חדש">${icon("plus")}<span>שיעור חדש</span></button>`}
+      </div>
+      <div class="summary-foot">
+        <span><b>${students.length}</b> ${students.length === 1 ? "תלמיד פעיל" : "תלמידים פעילים"}</span>
+        <span><b>${openPayments}</b> ${openPayments === 1 ? "תשלום פתוח" : "תשלומים פתוחים"}</span>
+      </div>
     `;
 
     const upcoming = lessonSorted().filter(l => l.date >= today && !l.done).slice(0, 5);
@@ -770,18 +793,17 @@ const App = (() => {
     up.innerHTML = upcoming.length ? upcoming.map(l => {
       const s = studentById(l.studentId) || { name: "?" };
       const isToday = l.date === today;
-      return `<div class="item">
-        <button type="button" class="item-main item-main-button" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור עם ${escapeHtml(s.name)}">
-          <span class="item-title">${escapeHtml(s.name)} ${isToday ? '<span class="tag tag-soon">היום</span>' : ""}</span>
-          <span class="item-sub">${dateTimeLine(l)}</span>
-          ${l.topic ? `<span class="item-note">${icon("note", "ic-sub")} ${escapeHtml(l.topic)}</span>` : ""}
+      return `<article class="agenda-item">
+        <button type="button" class="agenda-main" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור עם ${escapeHtml(s.name)}">
+          <span class="agenda-date"><b>${fmtTime(l.time)}</b><small>${isToday ? "היום" : dayLabelPlain(l.date)}</small></span>
+          <span class="agenda-copy"><strong>${escapeHtml(s.name)}</strong><span>${l.topic ? escapeHtml(l.topic) : `${l.duration || settings.defaultDuration} דקות`}</span></span>
         </button>
-        <div class="item-actions">
-          ${s.phone ? `<button class="btn btn-wa" onclick="App.sendLessonReminder('${l.id}')" aria-label="שליחת תזכורת">${icon("whatsapp")} תזכורת</button>` : ""}
+        <div class="agenda-actions">
+          ${s.phone ? `<button class="agenda-remind" onclick="App.sendLessonReminder('${l.id}')" aria-label="שליחת תזכורת ל-${escapeHtml(s.name)}">${icon("whatsapp")}<span>תזכורת</span></button>` : ""}
           <button class="lesson-check" onclick="App.toggleDone('${l.id}')" aria-label="סימון כבוצע" aria-pressed="false" title="סמן כבוצע">${icon("check")}</button>
         </div>
-      </div>`;
-    }).join("") : `<div class="empty">אין שיעורים מתוכננים</div>`;
+      </article>`;
+    }).join("") : `<div class="empty empty-action">${icon("calendar")}<h3>אין שיעורים מתוכננים</h3><p>היומן פנוי. אפשר לקבוע את השיעור הבא.</p><button class="btn btn-green" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
 
     const dues = students.map(student => {
       const unpaid = lessonIndex.unpaidForStudent(student.id);
@@ -793,16 +815,15 @@ const App = (() => {
     }).filter(item => item.count > 0).sort((a, b) => b.owed - a.owed);
     const pa = document.getElementById("paymentAlerts");
     pa.innerHTML = dues.length ? dues.map(({ student, count, owed }) => {
-      return `<div class="item">
-        <div class="item-main">
-          <div class="item-title">${escapeHtml(student.name)} <span class="tag tag-due">${cur(owed)}</span></div>
-          <div class="item-sub">${count} ${count === 1 ? "שיעור ממתין" : "שיעורים ממתינים"} לתשלום</div>
-        </div>
-        <div class="item-actions">
-          <button class="btn btn-wa" onclick="App.sendWhatsApp('${student.id}')">${icon("whatsapp")} תזכורת</button>
-        </div>
-      </div>`;
-    }).join("") : `<div class="empty"><span style="color:var(--green)">${icon("checkCircle")}</span> הכול שולם</div>`;
+      return `<article class="debt-alert">
+        <span class="debt-avatar" aria-hidden="true">${escapeHtml(initials(student.name))}</span>
+        <div><strong>${escapeHtml(student.name)}</strong><span>${count} ${count === 1 ? "שיעור ממתין" : "שיעורים ממתינים"}</span></div>
+        <b>${cur(owed)}</b>
+        ${student.phone
+          ? `<button onclick="App.sendWhatsApp('${student.id}')" aria-label="שליחת תזכורת תשלום ל-${escapeHtml(student.name)}">${icon("whatsapp")}</button>`
+          : `<button onclick="App.openStudentForm('${student.id}')" aria-label="הוספת מספר טלפון ל-${escapeHtml(student.name)}">${icon("edit")}</button>`}
+      </article>`;
+    }).join("") : `<div class="debt-clear">${icon("checkCircle")}<div><strong>הכול מעודכן</strong><span>אין כרגע תשלומים פתוחים.</span></div></div>`;
 
   }
 
@@ -1020,26 +1041,30 @@ const App = (() => {
     const summary = summarizeMonth(monthLessons, lessonIndex.studentsById, lessonPrice);
     const { earned, pending, students: perStudent } = summary;
 
+    const total = earned + pending;
+    const collectionRate = total > 0 ? Math.round((earned / total) * 100) : 0;
     const breakdown = perStudent.length ? `
-      <h3>פירוט לפי תלמיד</h3>
-      <div class="list">
-        ${perStudent.map(x => `
-          <div class="item">
-            <div class="item-main">
-              <div class="item-title">${escapeHtml(x.student.name)}</div>
-              <div class="item-sub">${x.count} שיעורים · התקבל ${cur(x.earned)}${x.pending > 0 ? ` · <span style="color:var(--red)">חוב ${cur(x.pending)}</span>` : ""}</div>
-            </div>
-            <div class="item-actions"><b style="font-size:1.05rem">${cur(x.earned + x.pending)}</b></div>
-          </div>`).join("")}
-      </div>` : "";
+      <section class="income-breakdown" aria-labelledby="incomeBreakdownTitle">
+        <div class="income-section-head"><div><h3 id="incomeBreakdownTitle">פירוט לפי תלמיד</h3><p>${perStudent.length} ${perStudent.length === 1 ? "תלמיד" : "תלמידים"} החודש</p></div></div>
+        <div class="income-students">
+          ${perStudent.map(x => `
+            <div class="income-student">
+              <span class="student-avatar" aria-hidden="true">${escapeHtml(initials(x.student.name))}</span>
+              <div><strong>${escapeHtml(x.student.name)}</strong><span>${x.count} ${x.count === 1 ? "שיעור" : "שיעורים"} · התקבל ${cur(x.earned)}</span></div>
+              <div class="income-student-total"><b>${cur(x.earned + x.pending)}</b>${x.pending > 0 ? `<span>ממתין ${cur(x.pending)}</span>` : `<span class="paid">שולם</span>`}</div>
+            </div>`).join("")}
+        </div>
+      </section>` : `<div class="empty empty-action"><h3>אין הכנסות בחודש הזה</h3><p>שיעורים שסומנו כבוצעו יופיעו כאן.</p></div>`;
 
     document.getElementById("incomeSummary").innerHTML = `
-      <div class="card summary-card">
-        <div>שיעורים שבוצעו: <b>${monthLessons.length}</b></div>
-        <div>התקבל בפועל: <b>${cur(earned)}</b></div>
-        <div>ממתין לתשלום: <b>${cur(pending)}</b></div>
-        <div style="font-size:1.2rem;margin-top:6px">סה"כ החודש: <b>${cur(earned + pending)}</b></div>
-      </div>
+      <section class="income-overview" aria-label="סיכום הכנסות לחודש">
+        <div class="income-total"><span>מחזור החודש</span><strong>${cur(total)}</strong><small>${monthLessons.length} ${monthLessons.length === 1 ? "שיעור שבוצע" : "שיעורים שבוצעו"}</small></div>
+        <div class="income-metrics">
+          <div><span>התקבל</span><strong>${cur(earned)}</strong></div>
+          <div class="pending"><span>ממתין</span><strong>${cur(pending)}</strong></div>
+        </div>
+        <div class="collection-rate"><div><span>שיעור גבייה</span><b>${collectionRate}%</b></div><span class="rate-track" aria-hidden="true"><i style="width:${collectionRate}%"></i></span></div>
+      </section>
       ${breakdown}`;
 
     drawChart();
@@ -1053,6 +1078,7 @@ const App = (() => {
     const css = getComputedStyle(document.documentElement);
     const textCol = css.getPropertyValue("--text").trim() || "#1f2937";
     const faintCol = css.getPropertyValue("--faint").trim() || "#9aa1ab";
+    const brandCol = css.getPropertyValue("--brand-1").trim() || "#2947c7";
     const dpr = window.devicePixelRatio || 1;
     const W = canvas.clientWidth, H = 200;
     if (W < 60) return; // הקנבס מוסתר/צר מדי — אין מה לצייר
@@ -1080,10 +1106,7 @@ const App = (() => {
       const x = pad + i * (bw + gap);
       const h = (m.total / max) * (H - 50);
       const y = H - 25 - h;
-      const grad = ctx.createLinearGradient(0, y, 0, H - 25);
-      grad.addColorStop(0, m.current ? "#f59e0b" : "#d97706");
-      grad.addColorStop(1, m.current ? "#d97706" : "#b45309");
-      ctx.fillStyle = grad;
+      ctx.fillStyle = m.current ? brandCol : css.getPropertyValue("--chart-muted").trim() || "#aeb9cc";
       const r = Math.min(6, bw / 2);
       ctx.beginPath();
       ctx.moveTo(x, H - 25);
@@ -1105,8 +1128,9 @@ const App = (() => {
   function renderSettings() {
     const body = document.getElementById("settingsBody");
     body.innerHTML = `
-      <div class="settings-group">
-        <div class="group-title">כללי</div>
+      <section class="settings-group">
+        <div class="settings-group-head"><span>${icon("edit")}</span><div><h3>פרופיל</h3><p>הפרטים שמופיעים באפליקציה</p></div></div>
+        <div class="settings-panel">
         <div class="setting-row">
           <div><label class="setting-label" for="set-name">שם המורה</label><div class="setting-sub">יופיע בברכה במסך הבית</div></div>
           <input type="text" id="set-name" value="${escapeHtml(settings.teacherName)}" placeholder="שמך" onchange="App.updateSetting('teacherName', this.value)">
@@ -1115,10 +1139,12 @@ const App = (() => {
           <div><label class="setting-label" for="set-cur">מטבע</label></div>
           <input type="text" id="set-cur" value="${escapeHtml(settings.currency)}" maxlength="3" onchange="App.updateSetting('currency', this.value)">
         </div>
-      </div>
+        </div>
+      </section>
 
-      <div class="settings-group">
-        <div class="group-title">ברירות מחדל לשיעור</div>
+      <section class="settings-group">
+        <div class="settings-group-head"><span>${icon("calendar")}</span><div><h3>ברירות מחדל לשיעור</h3><p>חוסך הקלדה בכל שיעור חדש</p></div></div>
+        <div class="settings-panel">
         <div class="setting-row">
           <div><label class="setting-label" for="set-price">מחיר ברירת מחדל</label></div>
           <input id="set-price" type="number" inputmode="numeric" min="0" value="${settings.defaultPrice}" onchange="App.updateSetting('defaultPrice', this.value)">
@@ -1131,25 +1157,29 @@ const App = (() => {
           <div><label class="setting-label" for="set-duration">משך (דקות)</label></div>
           <input id="set-duration" type="number" inputmode="numeric" min="0" step="15" value="${settings.defaultDuration}" onchange="App.updateSetting('defaultDuration', this.value)">
         </div>
-      </div>
+        </div>
+      </section>
 
-      <div class="settings-group">
-        <div class="group-title">התראות</div>
+      <section class="settings-group settings-wide">
+        <div class="settings-group-head"><span>${icon("bell")}</span><div><h3>התראות ותזכורות</h3><p>הכנה לקראת שיעורים קרובים</p></div></div>
+        <div class="settings-panel">
         <div class="setting-row">
           <div><div class="setting-label">תזכורת לפני שיעור</div><div class="setting-sub">${notifStatusText()}</div></div>
           <input type="number" inputmode="numeric" min="0" value="${settings.remindMinutes}" onchange="App.updateSetting('remindMinutes', this.value)" aria-label="דקות לפני שיעור">
         </div>
-        <div class="card" style="margin-top:10px">
+        </div>
+        <div class="settings-action-stack">
           ${notifSupported && Notification.permission === "granted"
             ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה</button>`
             : `<button class="btn btn-green btn-block" onclick="App.enableNotifications()">${icon("bell")} הפעלת התראות בטלפון</button>`}
           <button class="btn btn-light btn-block" onclick="App.exportCalendar()">${icon("calendar")} הוספת השיעורים ליומן הטלפון</button>
-          <div class="setting-sub" style="margin-top:8px">${notifHelpText()}</div>
+          <p class="settings-help">${notifHelpText()}</p>
         </div>
-      </div>
+      </section>
 
-      <div class="settings-group">
-        <div class="group-title">מראה</div>
+      <section class="settings-group">
+        <div class="settings-group-head"><span>${icon("info")}</span><div><h3>מראה</h3><p>התאמה לתאורה ולהעדפה שלך</p></div></div>
+        <div class="settings-panel">
         <div class="setting-row">
           <div><div class="setting-label">ערכת נושא</div></div>
           <div class="theme-seg">
@@ -1158,28 +1188,29 @@ const App = (() => {
             <button class="${settings.theme === "dark" ? "active" : ""}" aria-pressed="${settings.theme === "dark"}" onclick="App.setTheme('dark')">כהה</button>
           </div>
         </div>
-      </div>
+        </div>
+      </section>
 
-      <div class="settings-group">
-        <div class="group-title">התקנה</div>
-        <div class="card">
+      <section class="settings-group">
+        <div class="settings-group-head"><span>${icon("checkCircle")}</span><div><h3>התקנה</h3><p>גישה מהירה ממסך הבית</p></div></div>
+        <div class="settings-action-stack compact">
           ${isStandalone()
-            ? `<div class="setting-sub" style="text-align:center"><span style="color:var(--green)">${icon("checkCircle")}</span> האפליקציה מותקנת</div>`
+            ? `<div class="install-status">${icon("checkCircle")}<div><strong>האפליקציה מותקנת</strong><span>הגרסה מתעדכנת אוטומטית</span></div></div>`
             : canInstall()
               ? `<button class="btn btn-green btn-block" onclick="App.promptInstall()">התקנת האפליקציה למסך הבית</button>`
-              : `<div class="setting-sub" style="text-align:center">להתקנה: פתחי את תפריט הדפדפן ובחרי <b>"הוספה למסך הבית"</b></div>`}
+              : `<p class="settings-help">להתקנה: פתחי את תפריט הדפדפן ובחרי <b>"הוספה למסך הבית"</b>.</p>`}
         </div>
-      </div>
+      </section>
 
-      <div class="settings-group">
-        <div class="group-title">נתונים</div>
-        <div class="card">
+      <section class="settings-group settings-wide">
+        <div class="settings-group-head"><span>${icon("note")}</span><div><h3>נתונים וגיבוי</h3><p>המידע נשמר מקומית במכשיר הזה</p></div></div>
+        <div class="settings-action-stack settings-data-actions">
           <button class="btn btn-light btn-block" onclick="App.exportData()">ייצוא גיבוי לקובץ</button>
           <button class="btn btn-light btn-block" onclick="document.getElementById('importFile').click()">שחזור מקובץ גיבוי</button>
           <button class="btn btn-danger btn-block" onclick="App.clearAll()">מחיקת כל הנתונים</button>
         </div>
-        <div class="setting-sub" style="margin-top:8px;text-align:center">המורה שלי · גרסה ${APP_VERSION}</div>
-      </div>
+        <div class="app-version">המורה שלי · גרסה ${APP_VERSION}</div>
+      </section>
     `;
   }
 

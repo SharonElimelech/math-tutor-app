@@ -49,3 +49,20 @@ test("payment queue is semantic, touch friendly, and responsive", () => {
   assert.match(styles, /\.payment-mark\s*\{[^}]*min-height:\s*44px/s);
   assert.match(styles, /@media \(max-width: 520px\)[\s\S]*\.payment-actions\s*\{[^}]*flex-direction:\s*column/);
 });
+
+test("high-end redesign keeps every product surface structured", () => {
+  const html = read("index.html");
+  const source = read("app.js");
+  const styles = read("styles.css");
+
+  assert.match(html, /class="app-brand"/);
+  assert.doesNotMatch(html, /class="eyebrow"/);
+  assert.match(source, /class="agenda-item"/);
+  assert.match(source, /class="student-card"/);
+  assert.match(source, /class="income-overview"/);
+  assert.match(source, /class="settings-group-head"/);
+  assert.match(source, /<section class="day-group" aria-labelledby=/);
+  assert.doesNotMatch(styles, /transition:\s*all|ease-in-out/);
+  assert.match(styles, /body\s*\{[^}]*overflow-x:\s*hidden/s);
+  assert.match(styles, /@media \(max-width: 520px\)[\s\S]*\.income-overview\s*\{[^}]*grid-template-columns:\s*1fr/);
+});

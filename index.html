@@ -9,15 +9,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Heebo:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=16">
+  <link rel="stylesheet" href="styles.css?v=17">
   <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
   <header class="app-header">
-    <h1>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 2.7 3 6 3s6-2 6-3v-5"/><path d="M22 10v6"/></svg>
-      המורה שלי
-    </h1>
+    <div class="app-brand">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 2.7 3 6 3s6-2 6-3v-5"/><path d="M22 10v6"/></svg></span>
+      <div><h1>המורה שלי</h1><span>ניהול הוראה פרטית</span></div>
+    </div>
     <div class="header-right">
       <div id="reminderBadge" class="reminder-badge hidden"></div>
       <button class="header-icon-btn" aria-label="הגדרות" onclick="App.go('settings')">
@@ -31,10 +31,9 @@
     <section id="view-home" class="view active">
       <div class="page-intro">
         <div>
-          <span class="eyebrow">שולחן העבודה</span>
           <h2 id="homeGreeting">שלום</h2>
+          <p>כל מה שדורש תשומת לב היום, במקום אחד.</p>
         </div>
-        <p>השיעורים, התשלומים והפעולות החשובות — במקום אחד.</p>
       </div>
       <div id="onboard"></div>
       <div class="home-dashboard">
@@ -50,11 +49,11 @@
               תלמיד חדש
             </button>
           </div>
-          <div class="section-heading"><h3>השיעורים הקרובים</h3><span>5 הקרובים</span></div>
+          <div class="section-heading"><h3>השיעורים הקרובים</h3><span>סדר היום שלך</span></div>
           <div id="upcomingLessons" class="list timeline-list"></div>
         </div>
         <aside class="home-secondary">
-          <div class="section-heading"><h3>מעקב תשלומים</h3><span>דורש טיפול</span></div>
+          <div class="section-heading"><h3>גבייה פתוחה</h3><span>לפי סדר עדיפות</span></div>
           <div id="paymentAlerts" class="list"></div>
         </aside>
       </div>
@@ -64,8 +63,8 @@
     <!-- מסך: תלמידים -->
     <section id="view-students" class="view">
       <div class="view-head">
-        <div><span class="eyebrow">קשר והתקדמות</span><h2>התלמידים שלי</h2></div>
-        <button class="btn-add" onclick="App.openStudentForm()">+ תלמיד</button>
+        <div class="view-head-copy"><h2>התלמידים שלי</h2><p>פרטי קשר, תעריף, שיעורים ותשלומים.</p></div>
+        <button class="btn-add" onclick="App.openStudentForm()"><span aria-hidden="true">+</span> תלמיד חדש</button>
       </div>
       <div class="search-wrap">
         <label class="sr-only" for="studentSearch">חיפוש תלמיד</label>
@@ -78,8 +77,8 @@
     <!-- מסך: יומן -->
     <section id="view-calendar" class="view">
       <div class="view-head">
-        <div><span class="eyebrow">תכנון שבועי</span><h2>יומן שיעורים</h2></div>
-        <button class="btn-add" onclick="App.openLessonForm()">+ שיעור</button>
+        <div class="view-head-copy"><h2>יומן שיעורים</h2><p>תכנון, מעקב וסימון ביצוע.</p></div>
+        <button class="btn-add" onclick="App.openLessonForm()"><span aria-hidden="true">+</span> שיעור חדש</button>
       </div>
       <div class="seg-toggle">
         <button class="seg-btn active" data-cal="list" aria-pressed="true" onclick="App.setCalendarMode('list')">רשימה</button>
@@ -91,7 +90,7 @@
 
     <!-- מסך: כספים (תשלומים + סיכום) -->
     <section id="view-money" class="view">
-      <div class="page-intro compact"><div><span class="eyebrow">תמונה עסקית</span><h2>כספים</h2></div><p>חובות פתוחים והכנסות בפועל.</p></div>
+      <div class="page-intro compact"><div><h2>כספים</h2><p>גבייה פתוחה ותמונת הכנסות חודשית.</p></div></div>
       <div class="seg-toggle">
         <button class="seg-btn active" data-money="payments" aria-pressed="true" onclick="App.setMoneyTab('payments')">תשלומים</button>
         <button class="seg-btn" data-money="income" aria-pressed="false" onclick="App.setMoneyTab('income')">סיכום הכנסות</button>
@@ -108,14 +107,17 @@
           <button aria-label="חודש הבא" onclick="App.changeMonth(1)">הבא ›</button>
         </div>
         <div id="incomeSummary"></div>
-        <canvas id="incomeChart" height="200" role="img" aria-label="גרף הכנסות 6 חודשים אחרונים">גרף הכנסות לפי חודש</canvas>
+        <section class="income-chart-card" aria-labelledby="incomeChartTitle">
+          <div class="income-section-head"><div><h3 id="incomeChartTitle">מגמת הכנסות</h3><p>ששת החודשים האחרונים</p></div></div>
+          <canvas id="incomeChart" height="220" role="img" aria-label="גרף הכנסות ששת החודשים האחרונים">גרף הכנסות לפי חודש</canvas>
+        </section>
       </div>
     </section>
 
     <!-- מסך: הגדרות -->
     <section id="view-settings" class="view">
       <div class="view-head">
-        <div><span class="eyebrow">התאמה אישית</span><h2>הגדרות</h2></div>
+        <div class="view-head-copy"><h2>הגדרות</h2><p>התאמה של העבודה, ההתראות והנתונים.</p></div>
       </div>
       <div id="settingsBody"></div>
     </section>
@@ -152,6 +154,6 @@
   <!-- הודעות צפות -->
   <div id="toastWrap" class="toast-wrap" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="app.js?v=18"></script>
+  <script type="module" src="app.js?v=19"></script>
 </body>
 </html>
