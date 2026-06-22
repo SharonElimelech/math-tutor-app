@@ -19,6 +19,22 @@ export function dueLessonReminders(lessons, now = Date.now(), leadMinutes = 30, 
   });
 }
 
+export function nextLessonReminderTimestamp(lessons, now = Date.now(), leadMinutes = 30, notified = new Set()) {
+  const nowTime = now instanceof Date ? now.getTime() : Number(now);
+  const lead = Math.max(0, Number(leadMinutes) || 0) * MINUTE;
+  const grace = 5 * MINUTE;
+  let next = Infinity;
+
+  for (const lesson of lessons) {
+    if (lesson.done || notified.has(reminderSignature(lesson))) continue;
+    const start = lessonStartTimestamp(lesson);
+    if (!Number.isFinite(start) || nowTime > start + grace) continue;
+    next = Math.min(next, Math.max(nowTime, start - lead));
+  }
+
+  return Number.isFinite(next) ? next : null;
+}
+
 const calendarEscape = value => String(value ?? "")
   .replace(/\\/g, "\\\\")
   .replace(/\r?\n/g, "\\n")

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createLessonsCalendar,
   dueLessonReminders,
+  nextLessonReminderTimestamp,
   reminderSignature
 } from "../src/reminders.js";
 
@@ -27,6 +28,21 @@ test("finds reminders inside lead window and ignores delivered or done lessons",
 test("zero-minute reminder gets a short polling grace window", () => {
   assert.deepEqual(dueLessonReminders([lesson], new Date("2026-06-20T16:01:00"), 0), [lesson]);
   assert.deepEqual(dueLessonReminders([lesson], new Date("2026-06-20T16:06:00"), 0), []);
+});
+
+test("finds the next reminder time", () => {
+  assert.equal(
+    nextLessonReminderTimestamp([lesson], new Date("2026-06-20T12:00:00"), 30),
+    new Date("2026-06-20T15:30:00").getTime()
+  );
+  assert.equal(
+    nextLessonReminderTimestamp([lesson], new Date("2026-06-20T15:40:00"), 30),
+    new Date("2026-06-20T15:40:00").getTime()
+  );
+  assert.equal(
+    nextLessonReminderTimestamp([lesson], new Date("2026-06-20T16:06:00"), 30),
+    null
+  );
 });
 
 test("calendar export includes lesson and native alarm", () => {

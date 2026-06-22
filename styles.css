@@ -5,13 +5,13 @@
 
 :root {
   /* סטודיו לימודי — דיו כחול, זמן בזעפרן, הצלחה בטורקיז */
-  --brand-1: #3653d4;
-  --brand-2: #253a96;
-  --brand-3: #e9a33b;
+  --brand-1: #0891b2;
+  --brand-2: #0e7490;
+  --brand-3: #059669;
   --ink-1: #142035;
   --ink-2: #0d1626;
-  --grad-brand: linear-gradient(145deg, #4564e4 0%, #304bc5 100%);
-  --grad-hero: linear-gradient(145deg, #182943 0%, #111c2e 100%);
+  --grad-brand: linear-gradient(145deg, #06a8c7 0%, #087d9b 100%);
+  --grad-hero: linear-gradient(145deg, #123247 0%, #0e2434 100%);
 
   /* נייטרליים חמים */
   --bg: #f1f4f8;
@@ -176,6 +176,7 @@ body {
   font-size: .8rem;
   font-weight: 600;
   position: relative;
+  white-space: nowrap;
 }
 
 main { width: 100%; padding: 24px 16px; max-width: 760px; margin: 0 auto; }
@@ -628,6 +629,33 @@ main { width: 100%; padding: 24px 16px; max-width: 760px; margin: 0 auto; }
 .settings-action-stack .btn-block:first-child { margin-top: 0; }
 .settings-action-stack.compact { margin-top: 0; }
 .settings-help { color: var(--muted); font-size: .8rem; line-height: 1.55; padding: 10px 4px 2px; }
+.reminder-status-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--brand-1) 22%, var(--border));
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--brand-1) 8%, var(--surface));
+  box-shadow: var(--sh-sm);
+}
+.reminder-status-card h4 { margin: 8px 0 3px; color: var(--text); font: 800 1.05rem "Heebo", "Assistant", sans-serif; }
+.reminder-status-card p { color: var(--muted); font-size: .84rem; line-height: 1.5; }
+.reminder-status-card input { margin: 0; text-align: center; }
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--brand-2);
+  font-size: .76rem;
+  font-weight: 800;
+}
+.reminder-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.reminder-actions .btn-block { margin: 0; }
 .settings-data-actions { display: grid; gap: 8px; }
 .settings-data-actions .btn-block { margin: 0; }
 .install-status { display: flex; align-items: center; gap: 12px; padding: 4px; color: var(--green); }
@@ -864,6 +892,23 @@ html[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
   border: 0;
 }
 
+.skip-link {
+  position: absolute;
+  top: -100px;
+  inset-inline-start: 12px;
+  z-index: 1000;
+  padding: 10px 16px;
+  background: #047857; /* darker than --brand-3 for WCAG AA contrast (~5:1) with #fff */
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top .15s ease;
+}
+.skip-link:focus {
+  top: 12px;
+}
+
 .checkbox-row {
   display: flex;
   align-items: center;
@@ -926,10 +971,9 @@ html[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
 ::-webkit-scrollbar { width: 0; height: 0; }
 
 /* ---------- פעולות מהירות במסך הבית ---------- */
-.home-actions { display: flex; gap: 12px; margin: 16px 0 6px; }
+.home-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0 6px; }
 .home-actions > * { min-width: 0; }
 .action-tile {
-  flex: 1;
   min-height: 88px;
   border-radius: var(--r-md);
   border: 1px solid var(--border);
@@ -1382,7 +1426,10 @@ input, select { min-height: 48px; }
   .setting-row input[type="text"] { max-width: none; text-align: right; }
   .theme-seg { width: 100%; }
   .theme-seg button { flex: 1; }
-  .reminder-badge { display: none; }
+  .reminder-badge { max-width: 128px; overflow: hidden; padding-inline: 10px; text-overflow: ellipsis; font-size: .72rem; }
+  .home-actions { grid-template-columns: 1fr; }
+  .reminder-status-card { grid-template-columns: 1fr; }
+  .reminder-actions { grid-template-columns: 1fr; }
   .summary-focus { align-items: flex-end; gap: 12px; }
   .summary-focus strong { font-size: 1.45rem; }
   .summary-time { min-width: 78px; min-height: 66px; font-size: 1.15rem; }

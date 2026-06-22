@@ -19,6 +19,7 @@ import { AppStorage } from "./src/storage.js";
 import {
   createLessonsCalendar,
   dueLessonReminders,
+  nextLessonReminderTimestamp,
   reminderSignature
 } from "./src/reminders.js";
 
@@ -48,7 +49,7 @@ const App = (() => {
     warn: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>'
   };
   const icon = (name, cls) =>
-    `<svg class="${cls || "ic"}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${SVG[name]}</svg>`;
+    `<svg class="${cls || "ic"}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SVG[name]}</svg>`;
 
   // ----- שכבת נתונים -----
   const clone = value => JSON.parse(JSON.stringify(value));
@@ -159,6 +160,9 @@ const App = (() => {
     });
     render(view);
     window.scrollTo(0, 0);
+    // Move focus to the new view's heading so screen readers announce the change.
+    const heading = target.querySelector("h2");
+    if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }
   }
 
   // ----- מודאל -----
@@ -1162,18 +1166,19 @@ const App = (() => {
 
       <section class="settings-group settings-wide">
         <div class="settings-group-head"><span>${icon("bell")}</span><div><h3>התראות ותזכורות</h3><p>הכנה לקראת שיעורים קרובים</p></div></div>
-        <div class="settings-panel">
-        <div class="setting-row">
-          <div><div class="setting-label">תזכורת לפני שיעור</div><div class="setting-sub">${notifStatusText()}</div></div>
+        <div class="reminder-status-card">
+          <div>
+            <span class="status-pill">${notifStatusText()}</span>
+            <h4>תזכורת ${settings.remindMinutes} דקות לפני שיעור</h4>
+            <p>${notifHelpText()}</p>
+          </div>
           <input type="number" inputmode="numeric" min="0" value="${settings.remindMinutes}" onchange="App.updateSetting('remindMinutes', this.value)" aria-label="דקות לפני שיעור">
         </div>
-        </div>
-        <div class="settings-action-stack">
+        <div class="settings-action-stack reminder-actions">
+          <button class="btn btn-green btn-block" onclick="App.exportCalendar()">${icon("calendar")} הוספת השיעורים ליומן הטלפון</button>
           ${notifSupported && Notification.permission === "granted"
-            ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה</button>`
-            : `<button class="btn btn-green btn-block" onclick="App.enableNotifications()">${icon("bell")} הפעלת התראות בטלפון</button>`}
-          <button class="btn btn-light btn-block" onclick="App.exportCalendar()">${icon("calendar")} הוספת השיעורים ליומן הטלפון</button>
-          <p class="settings-help">${notifHelpText()}</p>
+            ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה (באפליקציה פתוחה)</button>`
+            : `<button class="btn btn-light btn-block" onclick="App.enableNotifications()">${icon("bell")} הפעלת התראות באפליקציה</button>`}
         </div>
       </section>
 
@@ -1268,16 +1273,17 @@ const App = (() => {
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   let intervalStarted = false;
   let reminderCheckRunning = false;
+  let reminderTimer = 0;
 
   function notifStatusText() {
     if (isIOS() && !isStandalone()) return "כדי לקבל התראות באייפון יש להתקין את האפליקציה למסך הבית";
     if (!notifSupported) return "הדפדפן לא תומך בהתראות";
-    if (Notification.permission === "granted") return "מופעל — ההתראה תישלח כשהאפליקציה פעילה";
+    if (Notification.permission === "granted") return "מופעל באפליקציה פתוחה";
     if (Notification.permission === "denied") return "חסום — יש לאפשר בהגדרות הדפדפן";
     return "כבוי — לחצי 'הפעלת התראות'";
   }
   function notifHelpText() {
-    return "לתזכורת אמינה גם כשהאפליקציה סגורה, הוסיפי את השיעורים ליומן הטלפון. כל אירוע כולל התראה לפי מספר הדקות שבחרת.";
+    return "דפדפן לא מבטיח התראות כשהאפליקציה סגורה. לתזכורת אמינה במסך נעול, הורידי את השיעורים ליומן הטלפון.";
   }
 
   function initReminders() {
@@ -1297,7 +1303,18 @@ const App = (() => {
     if (intervalStarted) return;
     intervalStarted = true;
     setInterval(() => void checkReminders(), 30 * 1000);
+    scheduleNextReminder();
     void checkReminders();
+  }
+
+  function scheduleNextReminder() {
+    clearTimeout(reminderTimer);
+    if (!notifSupported || Notification.permission !== "granted") return;
+    const next = nextLessonReminderTimestamp(lessons, new Date(), reminderLeadMinutes(settings.remindMinutes), notified);
+    if (next === null) return;
+    // ponytail: normal web notifications cannot wake a closed app; this only tightens timing while it is open.
+    const delay = Math.min(Math.max(30 * 1000, next - Date.now()), 2147483647);
+    reminderTimer = setTimeout(() => void checkReminders(), delay);
   }
 
   async function enableNotifications() {
@@ -1342,7 +1359,10 @@ const App = (() => {
   }
 
   function reschedule() {
-    if (notifSupported && Notification.permission === "granted") void checkReminders();
+    if (notifSupported && Notification.permission === "granted") {
+      scheduleNextReminder();
+      void checkReminders();
+    }
   }
 
   const NOTIFIED_KEY = "mt_notified_lessons";
@@ -1371,7 +1391,7 @@ const App = (() => {
       const due = dueLessonReminders(lessons, new Date(), reminderLeadMinutes(settings.remindMinutes), notified);
       for (const l of due) {
         const s = studentById(l.studentId);
-        await showAppNotification("תזכורת שיעור 📚", {
+        await showAppNotification("תזכורת שיעור", {
           tag: `lesson-${l.id}`,
           body: `שיעור עם ${s ? s.name : "תלמיד"} בשעה ${l.time}`,
           icon: "icon-192.png",
@@ -1383,6 +1403,7 @@ const App = (() => {
       console.warn("Could not show lesson reminder", error);
     } finally {
       reminderCheckRunning = false;
+      scheduleNextReminder();
     }
   }
 
