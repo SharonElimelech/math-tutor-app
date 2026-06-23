@@ -23,7 +23,7 @@ const lesson = {
 };
 
 test("release exposes the expected app version", () => {
-  assert.equal(APP_VERSION, "3.3.3");
+  assert.equal(APP_VERSION, "3.3.4");
 });
 
 test("backup parser normalizes a valid snapshot", () => {

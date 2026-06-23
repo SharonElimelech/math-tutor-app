@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   createLessonsCalendar,
   dueLessonReminders,
+  duePaymentReminders,
   nextLessonReminderTimestamp,
+  paymentSignature,
   reminderSignature
 } from "../src/reminders.js";
 
@@ -23,6 +25,17 @@ test("finds reminders inside lead window and ignores delivered or done lessons",
   assert.deepEqual(dueLessonReminders([lesson], now, 30), [lesson]);
   assert.deepEqual(dueLessonReminders([lesson], now, 30, new Set([reminderSignature(lesson)])), []);
   assert.deepEqual(dueLessonReminders([{ ...lesson, done: true }], now, 30), []);
+});
+
+test("payment reminders flag finished, done, unpaid lessons only once", () => {
+  const ended = { ...lesson, done: true, paid: false };
+  const after = new Date("2026-06-20T17:30:00");
+  const before = new Date("2026-06-20T15:00:00");
+  assert.deepEqual(duePaymentReminders([ended], after), [ended]);
+  assert.deepEqual(duePaymentReminders([ended], before), []); // not finished yet
+  assert.deepEqual(duePaymentReminders([{ ...ended, paid: true }], after), []); // already paid
+  assert.deepEqual(duePaymentReminders([{ ...lesson, done: false }], after), []); // not done
+  assert.deepEqual(duePaymentReminders([ended], after, new Set([paymentSignature(ended)])), []); // already reminded
 });
 
 test("zero-minute reminder gets a short polling grace window", () => {

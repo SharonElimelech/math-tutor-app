@@ -1,6 +1,19 @@
 const MINUTE = 60 * 1000;
 
 export const reminderSignature = lesson => `${lesson.id}:${lesson.date}:${lesson.time}`;
+export const paymentSignature = lesson => `pay:${lesson.id}:${lesson.date}:${lesson.time}`;
+
+// Lessons that are done but still unpaid and already finished — i.e. money you
+// likely forgot to collect. now/grace let it fire shortly after the lesson ends.
+export function duePaymentReminders(lessons, now = Date.now(), notified = new Set()) {
+  const nowTime = now instanceof Date ? now.getTime() : Number(now);
+  return lessons.filter(lesson => {
+    if (!lesson.done || lesson.paid) return false;
+    if (notified.has(paymentSignature(lesson))) return false;
+    const start = lessonStartTimestamp(lesson);
+    return Number.isFinite(start) && nowTime >= start;
+  });
+}
 
 export function lessonStartTimestamp(lesson) {
   return new Date(`${lesson.date}T${lesson.time || "00:00"}:00`).getTime();

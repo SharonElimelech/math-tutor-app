@@ -19,7 +19,9 @@ import { AppStorage } from "./src/storage.js";
 import {
   createLessonsCalendar,
   dueLessonReminders,
+  duePaymentReminders,
   nextLessonReminderTimestamp,
+  paymentSignature,
   reminderSignature
 } from "./src/reminders.js";
 
@@ -606,7 +608,7 @@ const App = (() => {
         <button type="button" class="lesson-open" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור עם ${escapeHtml(s.name)} בשעה ${fmtTime(l.time)}">
           <span class="time-chip">${fmtTime(l.time) || "—"}${l.duration ? `<span class="dur">${l.duration}׳</span>` : ""}</span>
           <span class="lesson-body">
-            <span class="lesson-name">${escapeHtml(s.name)}</span>
+            <span class="lesson-name">${escapeHtml(s.name)}${l.done && !l.paid && lessonPrice(l) > 0 ? `<span class="tag tag-due lesson-unpaid">${icon("warn", "ic-sub")} לא שולם</span>` : ""}</span>
             ${l.topic ? `<span class="lesson-topic">${icon("note", "ic-sub")} ${escapeHtml(l.topic)}</span>` : ""}
           </span>
         </button>
@@ -1377,7 +1379,8 @@ const App = (() => {
   const notified = loadNotified();
   function rememberNotification(signature) {
     notified.add(signature);
-    const activeSignatures = new Set(lessons.map(reminderSignature));
+    const activeSignatures = new Set();
+    for (const l of lessons) { activeSignatures.add(reminderSignature(l)); activeSignatures.add(paymentSignature(l)); }
     for (const value of notified) {
       if (!activeSignatures.has(value)) notified.delete(value);
     }
@@ -1398,6 +1401,21 @@ const App = (() => {
           badge: "icon-192.png"
         });
         rememberNotification(reminderSignature(l));
+      }
+      // תזכורת גבייה: שיעור שהסתיים, סומן כבוצע, אך טרם שולם
+      const duePay = duePaymentReminders(lessons, new Date(), notified);
+      for (const l of duePay) {
+        const price = lessonPrice(l);
+        if (price > 0) {
+          const s = studentById(l.studentId);
+          await showAppNotification("תזכורת גבייה", {
+            tag: `pay-${l.id}`,
+            body: `עדיין לא נגבה תשלום מ${s ? s.name : "תלמיד"} (${cur(price)})`,
+            icon: "icon-192.png",
+            badge: "icon-192.png"
+          });
+        }
+        rememberNotification(paymentSignature(l));
       }
     } catch (error) {
       console.warn("Could not show lesson reminder", error);
@@ -1456,9 +1474,13 @@ const App = (() => {
   }
   function renderHeader() {
     const todayLessons = lessonIndex.onDate(todayStr());
+    const unpaidCount = lessons.filter(l => l.done && !l.paid && lessonPrice(l) > 0).length;
     const badge = document.getElementById("reminderBadge");
-    if (todayLessons.length) {
-      badge.innerHTML = `${icon("bell")} ${todayLessons.length} ${todayLessons.length === 1 ? "שיעור היום" : "שיעורים היום"}`;
+    const parts = [];
+    if (todayLessons.length) parts.push(`${icon("bell")} ${todayLessons.length} ${todayLessons.length === 1 ? "שיעור היום" : "שיעורים היום"}`);
+    if (unpaidCount) parts.push(`${icon("warn")} ${unpaidCount} לגבייה`);
+    if (parts.length) {
+      badge.innerHTML = parts.join('<span class="badge-sep"></span>');
       badge.classList.remove("hidden");
     } else {
       badge.classList.add("hidden");
