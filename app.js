@@ -487,7 +487,11 @@ const App = (() => {
       }
     }
     if (!save()) { render(); return; }
-    closeModal(); render(); toast(successMessage, "ok");
+    closeModal(); render();
+    // נדנוד עדין: רענון היומן שומר על תזכורות אמינות גם כשהאפליקציה סגורה.
+    // ייבוא חוזר מעדכן לפי UID, בלי כפילויות.
+    const hasFuture = lessons.some(l => !l.done && new Date(`${l.date}T${l.time || "00:00"}:00`).getTime() >= Date.now());
+    toast(successMessage, "ok", hasFuture ? { label: "הוסף ליומן", run: exportCalendar } : null);
   }
 
   function setLessonDate(offset, btn) {
