@@ -1553,7 +1553,9 @@ input, select { min-height: 48px; }
 .student-card-top > span { color: var(--muted); font-size: .76rem; white-space: nowrap; }
 .student-contact { overflow: hidden; margin-top: 3px; color: var(--muted); font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
 .student-insights { display: flex !important; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.student-insights > span { padding: 4px 8px; border-radius: 999px; background: var(--bg-soft); color: var(--muted); font-size: .69rem; font-weight: 700; }
+.student-insights > span { display: inline-flex; align-items: center; gap: 3px; padding: 4px 9px; border-radius: 999px; background: var(--bg-soft); color: var(--muted); font-size: .69rem; font-weight: 700; }
+.student-insights .ic-sub { width: 12px; height: 12px; }
+.student-card:active { transform: scale(.99); }
 .student-insights .debt { background: var(--red-bg); color: var(--red); }
 .student-insights .clear { background: var(--green-bg); color: var(--green); }
 .student-card-arrow { color: var(--faint); font-size: 1.5rem; line-height: 1; transition: transform .2s var(--ease-out); }

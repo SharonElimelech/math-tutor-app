@@ -327,8 +327,8 @@ const App = (() => {
             <span class="student-card-top"><strong>${escapeHtml(s.name)}</strong><span>${cur(s.price)} לשיעור</span></span>
             <span class="student-contact">${escapeHtml(s.parentName) || "לא הוגדר איש קשר"}${s.phone ? ` · ${escapeHtml(s.phone)}` : ""}</span>
             <span class="student-insights">
-              <span>${next ? `${dayLabelPlain(next.date)} · ${fmtTime(next.time)}` : "אין שיעור קרוב"}</span>
-              <span class="${owed > 0 ? "debt" : "clear"}">${owed > 0 ? `חוב ${cur(owed)}` : "אין חוב פתוח"}</span>
+              <span>${icon("calendar", "ic-sub")} ${next ? `${dayLabelPlain(next.date)} · ${fmtTime(next.time)}` : "אין שיעור קרוב"}</span>
+              <span class="${owed > 0 ? "debt" : "clear"}">${owed > 0 ? `${icon("warn", "ic-sub")} חוב ${cur(owed)}` : `${icon("checkCircle", "ic-sub")} אין חוב`}</span>
             </span>
           </span>
           <span class="student-card-arrow" aria-hidden="true">‹</span>
