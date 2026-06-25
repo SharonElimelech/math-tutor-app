@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Heebo:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=22">
+  <link rel="stylesheet" href="styles.css?v=23">
   <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
@@ -86,8 +86,9 @@
         <button class="btn-add" onclick="App.openLessonForm()"><span aria-hidden="true">+</span> שיעור חדש</button>
       </div>
       <div class="seg-toggle">
-        <button class="seg-btn active" data-cal="list" aria-pressed="true" onclick="App.setCalendarMode('list')">רשימה</button>
-        <button class="seg-btn" data-cal="month" aria-pressed="false" onclick="App.setCalendarMode('month')">לוח חודשי</button>
+        <button class="seg-btn active" data-cal="week" aria-pressed="true" onclick="App.setCalendarMode('week')">שבוע</button>
+        <button class="seg-btn" data-cal="month" aria-pressed="false" onclick="App.setCalendarMode('month')">חודש</button>
+        <button class="seg-btn" data-cal="list" aria-pressed="false" onclick="App.setCalendarMode('list')">רשימה</button>
       </div>
       <div id="calendarMonth" class="calendar-month hidden"></div>
       <div id="lessonsList" class="list"></div>
@@ -159,6 +160,6 @@
   <!-- הודעות צפות -->
   <div id="toastWrap" class="toast-wrap" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="app.js?v=23"></script>
+  <script type="module" src="app.js?v=24"></script>
 </body>
 </html>
