@@ -57,7 +57,10 @@ test("high-end redesign keeps every product surface structured", () => {
 
   assert.match(html, /class="app-brand"/);
   assert.doesNotMatch(html, /class="eyebrow"/);
-  assert.match(source, /class="agenda-item"/);
+  // Home embeds the calendar (week strip + day agenda), like Google Calendar.
+  assert.match(html, /id="homeCalendar"/);
+  assert.match(source, /class="week-strip"/);
+  assert.match(source, /class="agenda-block /);
   assert.match(source, /class="student-card"/);
   assert.match(source, /class="income-overview"/);
   assert.match(source, /class="settings-group-head"/);

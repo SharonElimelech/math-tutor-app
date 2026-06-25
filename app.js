@@ -646,9 +646,16 @@ const App = (() => {
     renderCalendar();
   }
 
-  // ניווט מודע-מצב: שבוע מזיז שבוע, חודש מזיז חודש
+  // היומן מוטמע גם בבית; ניווט צריך לרענן את המסך הפעיל
+  function refreshCalendarSurface() {
+    if (activeViewName() === "home") renderHome();
+    else renderCalendar();
+  }
+
+  // ניווט מודע-מצב: בבית תמיד שבוע; ביומן לפי המתג
   function calShift(delta) {
-    if (calMode === "week") {
+    const weekMode = calMode === "week" || activeViewName() === "home";
+    if (weekMode) {
       const base = new Date((selectedDay || todayStr()) + "T00:00");
       base.setDate(base.getDate() + delta * 7);
       selectedDay = ymd(base);
@@ -656,7 +663,7 @@ const App = (() => {
     } else {
       calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + delta, 1);
     }
-    renderCalendar();
+    refreshCalendarSurface();
   }
 
   const toMinutes = t => { const [h, m] = String(t || "0:0").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
@@ -668,13 +675,13 @@ const App = (() => {
 
   function selectCalDay(dateStr) {
     selectedDay = dateStr;
-    renderCalendar();
+    refreshCalendarSurface();
   }
 
   function calToday() {
     calMonth = new Date();
     selectedDay = todayStr();
-    renderCalendar();
+    refreshCalendarSurface();
   }
 
   // סרגל ניווט משותף לשבוע/חודש
@@ -902,22 +909,9 @@ const App = (() => {
       </div>
     `;
 
-    const upcoming = lessonSorted().filter(l => l.date >= today && !l.done).slice(0, 5);
-    const up = document.getElementById("upcomingLessons");
-    up.innerHTML = upcoming.length ? upcoming.map(l => {
-      const s = studentById(l.studentId) || { name: "?" };
-      const isToday = l.date === today;
-      return `<article class="agenda-item">
-        <button type="button" class="agenda-main" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור עם ${escapeHtml(s.name)}">
-          <span class="agenda-date"><b>${fmtTime(l.time)}</b><small>${isToday ? "היום" : dayLabelPlain(l.date)}</small></span>
-          <span class="agenda-copy"><strong>${escapeHtml(s.name)}</strong><span>${l.topic ? escapeHtml(l.topic) : `${l.duration || settings.defaultDuration} דקות`}</span></span>
-        </button>
-        <div class="agenda-actions">
-          ${s.phone ? `<button class="agenda-remind" onclick="App.sendLessonReminder('${l.id}')" aria-label="שליחת תזכורת ל-${escapeHtml(s.name)}">${icon("whatsapp")}<span>תזכורת</span></button>` : ""}
-          <button class="lesson-check" onclick="App.toggleDone('${l.id}')" aria-label="סימון כבוצע" aria-pressed="false" title="סמן כבוצע">${icon("check")}</button>
-        </div>
-      </article>`;
-    }).join("") : `<div class="empty empty-action">${icon("calendar")}<h3>אין שיעורים מתוכננים</h3><p>היומן פנוי. אפשר לקבוע את השיעור הבא.</p><button class="btn btn-green" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
+    // יומן מוטמע בבית — רצועת שבוע + אג'נדת היום שנבחר (כמו ביומן המלא)
+    const calDay = selectedDay || today;
+    document.getElementById("homeCalendar").innerHTML = renderWeekStrip(calDay) + renderDayAgenda(calDay);
 
     const dues = students.map(student => {
       const unpaid = lessonIndex.unpaidForStudent(student.id);
