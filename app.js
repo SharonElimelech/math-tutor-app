@@ -697,12 +697,12 @@ const App = (() => {
     refreshCalendarSurface();
   }
 
-  // סרגל ניווט משותף לשבוע/חודש
+  // סרגל ניווט משותף לשבוע/חודש (הלוח LTR — ‹ אחורה, › קדימה)
   function calToolbarHtml(label) {
     return `<div class="cal-toolbar">
       <div class="cal-toolbar-nav">
-        <button type="button" class="cal-nav" aria-label="הקודם" onclick="App.calShift(1)">‹</button>
-        <button type="button" class="cal-nav" aria-label="הבא" onclick="App.calShift(-1)">›</button>
+        <button type="button" class="cal-nav" aria-label="הקודם" onclick="App.calShift(-1)">‹</button>
+        <button type="button" class="cal-nav" aria-label="הבא" onclick="App.calShift(1)">›</button>
       </div>
       <span class="cal-toolbar-label">${label}</span>
       <button type="button" class="btn-today" onclick="App.calToday()">היום</button>
@@ -1854,25 +1854,63 @@ const App = (() => {
     handleLaunchParams();
   }
 
-  // גרירה חיה של היומן — אצבע או עכבר: התוכן נתפס וזז ממש עם התנועה;
-  // בשחרור מחליק לשבוע/חודש הבא-הקודם או קופץ חזרה. (RTL: ימינה = קדימה)
+  // גרירה חיה של היומן — אצבע או עכבר: התוכן נתפס וזז ממש עם התנועה,
+  // והשבוע/חודש השכן נראה נכנס מהצד תוך כדי (כמו יומן גוגל).
+  // הלוח LTR: גרירה שמאלה = קדימה, ימינה = אחורה.
   function initCalendarSwipe() {
     attachLiveSwipe(document.getElementById("homeCalendar"),
-      () => [document.getElementById("homeCalSlide")].filter(Boolean));
-    // בטאב היומן התוכן מפוצל בין שני אלמנטים — מזיזים את שניהם יחד
+      () => [document.getElementById("homeCalSlide")].filter(Boolean),
+      homeNeighborHtml);
+    // בטאב היומן התוכן מפוצל בין שני אלמנטים — מזיזים את שניהם יחד, בלי פנל שכן
     attachLiveSwipe(document.getElementById("view-calendar"),
       () => ["calendarMonth", "lessonsList"].map(id => document.getElementById(id))
         .filter(el => el && !el.classList.contains("hidden")));
   }
 
-  function attachLiveSwipe(container, slides) {
-    if (!container) return;
-    let sx = 0, sy = 0, active = false, locked = false, pid = 0;
+  // התוכן של התקופה השכנה (dir = 1 קדימה / -1 אחורה) — מוצג בזמן הגרירה
+  function homeNeighborHtml(dir) {
+    const day = selectedDay || todayStr();
+    if (homeCalMode === "month") {
+      const keep = calMonth;
+      calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + dir, 1);
+      const html = monthGridHtml();
+      calMonth = keep;
+      return html;
+    }
+    const d = new Date(day + "T00:00");
+    d.setDate(d.getDate() + dir * 7);
+    const ds = ymd(d);
+    return homeCalMode === "week" ? renderWeekGrid(ds) : renderWeekStrip(ds) + renderDayAgenda(ds);
+  }
 
+  function attachLiveSwipe(container, slides, neighborHtml) {
+    if (!container) return;
+    let sx = 0, sy = 0, active = false, locked = false, pid = 0, neighbors = [];
+
+    const parts = () => [...slides(), ...neighbors];
     const setX = (els, x, transition) => els.forEach(el => {
       el.style.transition = transition;
       el.style.transform = `translateX(${x}px)`;
     });
+
+    // פנלים שכנים משני הצדדים — רואים לאן גוררים עוד לפני השחרור
+    function spawnNeighbors() {
+      if (!neighborHtml) return;
+      const el = slides()[0];
+      if (!el) return;
+      const w = el.offsetWidth;
+      neighbors = [1, -1].map(dir => {
+        const p = document.createElement("div");
+        p.className = "cal-slide cal-neighbor";
+        p.style.cssText = `position:absolute;top:${el.offsetTop}px;left:${el.offsetLeft + dir * w}px;width:${w}px;margin:0;`;
+        p.innerHTML = neighborHtml(dir);
+        container.appendChild(p);
+        const rail = p.querySelector(".week-grid, .day-agenda");
+        if (rail) rail.scrollTop = calScroll ?? 7 * (rail.classList.contains("week-grid") ? 48 : 64);
+        return p;
+      });
+    }
+    function clearNeighbors() { neighbors.forEach(p => p.remove()); neighbors = []; }
 
     container.addEventListener("pointerdown", e => {
       if (e.button !== 0 || !e.isPrimary || lessonDragging) return;
@@ -1883,20 +1921,22 @@ const App = (() => {
     container.addEventListener("pointermove", e => {
       if (!active || e.pointerId !== pid) return;
       if (lessonDragging) { // גרירת שיעור התחילה — משחררים את היומן
-        if (locked) setX(slides(), 0, "");
+        if (locked) { setX(slides(), 0, ""); clearNeighbors(); }
         active = false; locked = false;
         container.classList.remove("cal-dragging");
         return;
       }
       const dx = e.clientX - sx, dy = e.clientY - sy;
       if (!locked) {
-        if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) {   // כוונה אופקית
+        // נעילה אופקית קפדנית — גלילה אנכית לא מזיזה את היומן לצדדים
+        if (Math.abs(dx) > 14 && Math.abs(dx) > 1.6 * Math.abs(dy)) {
           locked = true;
           container.classList.add("cal-dragging");
+          spawnNeighbors();
           try { container.setPointerCapture(pid); } catch { /* מצביע כבר לא פעיל */ }
-        } else if (Math.abs(dy) > 12) { active = false; return; } // גלילה אנכית מנצחת
+        } else if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) { active = false; return; }
       }
-      if (locked) setX(slides(), dx, "none");
+      if (locked) setX(parts(), dx, "none");
     });
 
     container.addEventListener("pointerup", e => {
@@ -1909,30 +1949,37 @@ const App = (() => {
       const swallow = ev => { ev.stopPropagation(); ev.preventDefault(); };
       container.addEventListener("click", swallow, true);
       setTimeout(() => container.removeEventListener("click", swallow, true), 350);
-      const els = slides();
+      const els = parts();
       if (!els.length) return;
       const dx = e.clientX - sx;
       const width = container.offsetWidth || 320;
       if (Math.abs(dx) < Math.min(90, width * 0.25)) {
         setX(els, 0, "transform .2s ease-out"); // לא מספיק — קפיצה חזרה
+        setTimeout(clearNeighbors, 220);
         return;
       }
-      const dir = dx > 0 ? 1 : -1;
-      setX(els, dir * width, "transform .16s ease-out");
+      const dir = dx < 0 ? 1 : -1; // LTR: שמאלה = קדימה
+      setX(els, -dir * width, "transform .18s ease-out");
       setTimeout(() => {
-        calShift(dir); // מרנדר מחדש — תוכן חדש ונקי
-        const next = slides();
-        if (!next.length) return;
-        setX(next, -dir * width, "none"); // נכנס מהצד הנגדי
-        requestAnimationFrame(() => setX(next, 0, "transform .22s ease-out"));
-      }, 160);
+        calShift(dir); // מרנדר מחדש; בבית הפנל השכן כבר הראה את היעד — אין קפיצה
+        clearNeighbors();
+        if (!neighborHtml) { // בלי פנל שכן — התוכן החדש נכנס מהצד
+          const next = slides();
+          setX(next, dir * width, "none");
+          requestAnimationFrame(() => setX(next, 0, "transform .22s ease-out"));
+        }
+      }, 180);
     });
 
     container.addEventListener("pointercancel", e => {
       if (!active || e.pointerId !== pid) return;
       active = false;
       container.classList.remove("cal-dragging");
-      if (locked) { locked = false; setX(slides(), 0, "transform .2s ease-out"); }
+      if (locked) {
+        locked = false;
+        setX(parts(), 0, "transform .2s ease-out");
+        setTimeout(clearNeighbors, 220);
+      }
     });
   }
 
@@ -2009,13 +2056,13 @@ const App = (() => {
       return null;
     }
 
-    // RTL: הימים מתקדמים שמאלה — קצה שמאלי = קדימה, ימני = אחורה.
+    // הלוח LTR כמו יומן גוגל — קצה ימני = קדימה, שמאלי = אחורה.
     // ברשת שבוע ורצועת יום מדפדף שבוע; בלוח חודשי מדפדף חודש (calShift מודע-מצב).
     function edgeCheck(x) {
       drag.x = x;
       const surface = document.querySelector(".week-grid, .cal-grid, .week-strip");
       const r = surface && surface.getBoundingClientRect();
-      const dir = !r ? 0 : x < r.left + 34 ? 1 : x > r.right - 34 ? -1 : 0;
+      const dir = !r ? 0 : x > r.right - 34 ? 1 : x < r.left + 34 ? -1 : 0;
       if (!dir) { clearTimeout(edgeTimer); edgeTimer = 0; return; }
       if (!edgeTimer) edgeTimer = setTimeout(() => { edgeTimer = 0; calShift(dir); if (drag) edgeCheck(drag.x); }, 450);
     }

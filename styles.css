@@ -1588,9 +1588,16 @@ input, select { min-height: 48px; }
 .push-status.warn { color: var(--muted); }
 .push-status.err { color: var(--red); }
 
+/* היומן בכיוון LTR כמו יומן גוגל — ראשון משמאל, ציר שעות משמאל */
+.week-grid, .week-strip, .cal-grid, .cal-head, .day-agenda, .cal-toolbar-nav { direction: ltr; }
+
 /* גרירת שיעור ביומן — לחיצה ארוכה ואז גרירה */
 #homeCalendar, #view-calendar { touch-action: pan-y; }
 .cal-dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+
+/* פנל השבוע/חודש השכן — נראה נכנס מהצד בזמן גרירת היומן */
+#homeCalendar { position: relative; overflow-x: hidden; }
+.cal-neighbor { pointer-events: none; }
 .wg-block, .agenda-block, .lesson-row { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .drag-ghost { position: fixed; z-index: 999; margin: 0; opacity: .92; box-shadow: 0 10px 24px rgba(0, 0, 0, .3); pointer-events: none; }
 .drag-src { opacity: .35; }
