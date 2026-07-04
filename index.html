@@ -33,17 +33,17 @@
   <main id="app">
     <!-- מסך: בית / שיעורים קרובים -->
     <section id="view-home" class="view active">
-      <div class="page-intro">
-        <div>
-          <h2 id="homeGreeting">שלום</h2>
-          <p>כל מה שדורש תשומת לב היום, במקום אחד.</p>
-        </div>
-      </div>
+      <div id="homeCalendar" class="home-calendar"></div>
+      <div id="confirmQueue"></div>
       <div id="onboard"></div>
       <div class="home-dashboard">
         <div class="home-primary">
-          <div id="confirmQueue"></div>
-          <div id="homeCalendar" class="home-calendar"></div>
+          <div class="page-intro">
+            <div>
+              <h2 id="homeGreeting">שלום</h2>
+              <p>כל מה שדורש תשומת לב היום, במקום אחד.</p>
+            </div>
+          </div>
           <div id="todaySummary" class="card summary-card"></div>
           <div class="home-actions">
             <button class="action-tile primary" onclick="App.openLessonForm()">
