@@ -19,6 +19,17 @@ export function lessonStartTimestamp(lesson) {
   return new Date(`${lesson.date}T${lesson.time || "00:00"}:00`).getTime();
 }
 
+// שיעורים שכבר הסתיימו ולא סומנו "בוצע" — ממתינים לאישור המורה בדף הבית
+export function lessonsAwaitingConfirmation(lessons, now = Date.now()) {
+  const nowTime = now instanceof Date ? now.getTime() : Number(now);
+  return lessons.filter(lesson => {
+    if (lesson.done) return false;
+    const start = lessonStartTimestamp(lesson);
+    if (!Number.isFinite(start)) return false;
+    return start + (Number(lesson.duration) || 60) * MINUTE <= nowTime;
+  });
+}
+
 export function dueLessonReminders(lessons, now = Date.now(), leadMinutes = 30, notified = new Set()) {
   const nowTime = now instanceof Date ? now.getTime() : Number(now);
   const lead = Math.max(0, Number(leadMinutes) || 0) * MINUTE;

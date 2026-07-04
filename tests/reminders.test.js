@@ -5,6 +5,7 @@ import {
   createLessonsCalendar,
   dueLessonReminders,
   duePaymentReminders,
+  lessonsAwaitingConfirmation,
   nextLessonReminderTimestamp,
   paymentSignature,
   reminderSignature
@@ -66,4 +67,16 @@ test("calendar export includes lesson and native alarm", () => {
   assert.match(calendar, /DTSTART:20260620T160000/);
   assert.match(calendar, /TRIGGER:-PT30M/);
   assert.match(calendar, /END:VCALENDAR\r\n$/);
+});
+
+test("awaiting-confirmation lists only lessons that already ended and are not done", () => {
+  const base = { studentId: "student_1", time: "16:00", duration: 60, done: false };
+  const out = lessonsAwaitingConfirmation([
+    { ...base, id: "ended", date: "2026-06-20" },
+    { ...base, id: "running", date: "2026-06-21", time: "09:30" },
+    { ...base, id: "future", date: "2026-06-22" },
+    { ...base, id: "already-done", date: "2026-06-19", done: true },
+    { ...base, id: "bad-date", date: "oops" }
+  ], new Date("2026-06-21T10:00:00"));
+  assert.deepEqual(out.map(l => l.id), ["ended"]);
 });

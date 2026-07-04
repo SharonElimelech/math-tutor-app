@@ -20,6 +20,7 @@ import {
   createLessonsCalendar,
   dueLessonReminders,
   duePaymentReminders,
+  lessonsAwaitingConfirmation,
   nextLessonReminderTimestamp,
   paymentSignature,
   reminderSignature
@@ -885,11 +886,68 @@ const App = (() => {
       </div>`;
   }
 
+  // ----- אישור שיעורים שעברו: "השיעור התקיים?" -----
+  const pendingConfirmations = () => lessonsAwaitingConfirmation(lessonSorted());
+
+  function confirmLesson(id, paid) {
+    const l = lessons.find(x => x.id === id);
+    if (!l) return;
+    l.done = true;
+    if (paid) l.paid = true;
+    if (!save()) { render(); return; }
+    render();
+    toast(paid ? "סומן: התקיים ושולם" : "סומן: השיעור התקיים", "ok", {
+      label: "ביטול",
+      run: () => { l.done = false; if (paid) l.paid = false; save(); render(); }
+    });
+  }
+
+  // "לא התקיים" — מסירים מהיומן, עם ביטול מיידי בטוסט (בלי חלון אישור)
+  function skipLesson(id) {
+    const idx = lessons.findIndex(x => x.id === id);
+    if (idx === -1) return;
+    const [removed] = lessons.splice(idx, 1);
+    if (!save()) { render(); return; }
+    render();
+    toast("השיעור הוסר — לא התקיים", "ok", {
+      label: "ביטול",
+      run: () => { lessons.push(removed); save(); render(); }
+    });
+  }
+
+  function renderConfirmQueue() {
+    const el = document.getElementById("confirmQueue");
+    if (!el) return;
+    const pending = pendingConfirmations();
+    if (!pending.length) { el.innerHTML = ""; return; }
+    const shown = pending.slice(0, 4);
+    const rows = shown.map(l => {
+      const s = studentById(l.studentId);
+      const price = lessonPrice(l);
+      return `<article class="confirm-row">
+        <div class="confirm-info">
+          <strong>${escapeHtml(s?.name || "תלמיד")}</strong>
+          <span>${escapeHtml(dayLabelPlain(l.date))} · ${fmtTime(l.time)}${price > 0 ? ` · ${cur(price)}` : ""}</span>
+        </div>
+        <div class="confirm-actions">
+          <button class="btn btn-green" onclick="App.confirmLesson('${l.id}', true)">${icon("check")} התקיים ושולם</button>
+          <button class="btn btn-light" onclick="App.confirmLesson('${l.id}', false)">התקיים</button>
+          <button class="btn btn-light confirm-skip" onclick="App.skipLesson('${l.id}')" aria-label="השיעור לא התקיים — הסרה מהיומן">לא התקיים</button>
+        </div>
+      </article>`;
+    }).join("");
+    el.innerHTML = `<div class="card confirm-card">
+      <div class="confirm-head">${icon("bell")}<h3>שיעורים שעברו — מה קרה איתם?</h3>${pending.length > shown.length ? `<span class="confirm-more">ועוד ${pending.length - shown.length}</span>` : ""}</div>
+      ${rows}
+    </div>`;
+  }
+
   function renderHome() {
     document.getElementById("homeGreeting").textContent =
       settings.teacherName ? `שלום ${settings.teacherName}` : "שלום";
 
     renderOnboard();
+    renderConfirmQueue();
     const today = todayStr();
     const todayLessons = lessonIndex.onDate(today);
     const nextLesson = lessonSorted().find(l => l.date >= today && !l.done);
@@ -1665,6 +1723,7 @@ const App = (() => {
     go, closeModal, renderStudents,
     openStudentForm, saveStudent, deleteStudent,
     openLessonForm, saveLesson, deleteLesson, deleteSeriesFuture, toggleDone,
+    confirmLesson, skipLesson,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
     setCalendarMode, calShift, selectCalDay, calToday,
