@@ -1808,7 +1808,29 @@ const App = (() => {
       startupDataError = null;
     }
     initReminders();
+    initCalendarSwipe();
     handleLaunchParams();
+  }
+
+  // החלקה עם האצבע על היומן — שבוע/חודש קדימה ואחורה (RTL: ימינה = קדימה)
+  function initCalendarSwipe() {
+    let sx = 0, sy = 0, tracking = false;
+    const onStart = e => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; tracking = true; };
+    const onEnd = e => {
+      if (!tracking) return;
+      tracking = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx, dy = t.clientY - sy;
+      // החלקה אופקית מובהקת בלבד — שלא תתנגש בגלילה אנכית
+      if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+      calShift(dx > 0 ? 1 : -1);
+    };
+    for (const id of ["homeCalendar", "view-calendar"]) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      el.addEventListener("touchstart", onStart, { passive: true });
+      el.addEventListener("touchend", onEnd, { passive: true });
+    }
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

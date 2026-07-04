@@ -1,4 +1,4 @@
-export const APP_VERSION = "3.5.1";
+export const APP_VERSION = "3.5.2";
 export const DATA_VERSION = 3;
 
 export const DEFAULT_SETTINGS = Object.freeze({
