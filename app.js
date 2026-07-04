@@ -25,7 +25,7 @@ import {
   paymentSignature,
   reminderSignature
 } from "./src/reminders.js";
-import { enablePush, pushSupported, syncPush } from "./src/push.js";
+import { enablePush, pushSupported, syncPush, sendClosedAppTest } from "./src/push.js";
 
 /* =========================================================
    "המורה שלי" – אפליקציה לניהול שיעורים פרטיים
@@ -611,7 +611,7 @@ const App = (() => {
     const s = studentById(l.studentId) || { name: "תלמיד שנמחק" };
     const isToday = l.date === todayStr();
     return `
-      <div class="lesson-row ${l.done ? "is-done" : ""} ${isToday ? "is-today" : ""}">
+      <div class="lesson-row ${l.done ? "is-done" : ""} ${isToday ? "is-today" : ""}" data-id="${l.id}">
         <button type="button" class="lesson-open" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור עם ${escapeHtml(s.name)} בשעה ${fmtTime(l.time)}">
           <span class="time-chip">${fmtTime(l.time) || "—"}${l.duration ? `<span class="dur">${l.duration}׳</span>` : ""}</span>
           <span class="lesson-body">
@@ -653,6 +653,16 @@ const App = (() => {
   function refreshCalendarSurface() {
     if (activeViewName() === "home") renderHome();
     else renderCalendar();
+  }
+
+  // ציר שעות של יממה מלאה נגלל בתוך הרשת; זוכרים את המיקום בין רינדורים.
+  // ברירת מחדל: פתיחה על 07:00.
+  let calScroll = null;
+  function applyCalScroll() {
+    const el = document.querySelector(".week-grid, .day-agenda");
+    if (!el) return;
+    el.scrollTop = calScroll ?? 7 * (el.classList.contains("week-grid") ? 48 : 64);
+    el.onscroll = () => { calScroll = el.scrollTop; };
   }
 
   // ניווט מודע-מצב: בבית לפי מתג הבית; ביומן לפי המתג שלו
@@ -712,7 +722,7 @@ const App = (() => {
       const isSel = ds === day;
       const cls = ["week-day", isToday ? "today" : "", isSel ? "sel" : ""].filter(Boolean).join(" ");
       const label = `${d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" })}${n ? `, ${n} שיעורים` : ", אין שיעורים"}`;
-      return `<button type="button" class="${cls}" aria-pressed="${isSel}"${isToday ? ' aria-current="date"' : ""} aria-label="${escapeHtml(label)}" onclick="App.selectCalDay('${ds}')">
+      return `<button type="button" class="${cls}" data-day="${ds}" aria-pressed="${isSel}"${isToday ? ' aria-current="date"' : ""} aria-label="${escapeHtml(label)}" onclick="App.selectCalDay('${ds}')">
         <span class="week-dow">${dows[d.getDay()]}</span>
         <span class="week-num">${d.getDate()}</span>
         <span class="week-dot ${n ? "" : "is-empty"}" aria-hidden="true">${n > 1 ? `<i>${n}</i>` : ""}</span>
@@ -728,18 +738,11 @@ const App = (() => {
     const banner = h ? `<div class="holiday-banner">${icon("info")} ${escapeHtml(h.name)}</div>` : "";
     const addBtn = `<button class="btn btn-light btn-block agenda-add" onclick="App.openLessonForm()">${icon("plus")} קביעת שיעור ב-${escapeHtml(fmtDate(day))}</button>`;
     const dayLessons = lessonSorted().filter(l => l.date === day);
-    if (!dayLessons.length) {
-      return banner + `<div class="empty empty-action">${icon("calendar")}<h3>יום פנוי</h3><p>אין שיעורים ב-${escapeHtml(fmtDate(day))}.</p></div>` + addBtn;
-    }
     const HOUR_PX = 64;
-    const starts = dayLessons.map(l => toMinutes(l.time));
-    const ends = dayLessons.map((l, i) => starts[i] + (Number(l.duration) || 60));
-    let startH = Math.max(0, Math.floor(Math.min(...starts) / 60));
-    let endH = Math.min(24, Math.ceil(Math.max(...ends) / 60));
-    if (endH <= startH) endH = startH + 1;
+    const startH = 0, endH = 24; // יממה מלאה — אפשר לגרור שיעור לכל שעה
     const rows = [];
     for (let hr = startH; hr <= endH; hr++) {
-      rows.push(`<div class="hour-row"><span class="hour-label">${String(hr).padStart(2, "0")}:00</span><span class="hour-line"></span></div>`);
+      rows.push(`<div class="hour-row"><span class="hour-label">${String(hr % 24).padStart(2, "0")}:00</span><span class="hour-line"></span></div>`);
     }
     const blocks = dayLessons.map(l => {
       const s = studentById(l.studentId) || { name: "תלמיד שנמחק" };
@@ -753,7 +756,7 @@ const App = (() => {
           ? `<span class="agenda-status done">${icon("check", "ic-sub")} בוצע</span>`
           : "";
       const aria = `${fmtTime(l.time)} ${s.name}${l.topic ? ", " + l.topic : ""}, ${dur} דקות`;
-      return `<button type="button" class="agenda-block ${l.done ? "is-done" : ""}" style="top:${Math.round(top)}px;height:${Math.round(height)}px" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור: ${escapeHtml(aria)}">
+      return `<button type="button" class="agenda-block ${l.done ? "is-done" : ""}" data-id="${l.id}" style="top:${Math.round(top)}px;height:${Math.round(height)}px" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור: ${escapeHtml(aria)}">
         <span class="agenda-time">${fmtTime(l.time)}</span>
         <span class="agenda-info"><span class="agenda-name">${escapeHtml(s.name)}</span>${l.topic ? `<span class="agenda-topic">${escapeHtml(l.topic)}</span>` : ""}</span>
         ${status}
@@ -761,7 +764,7 @@ const App = (() => {
     }).join("");
     const railH = (endH - startH + 1) * HOUR_PX;
     const nowLine = day === todayStr() ? nowLineHtml(startH, endH, HOUR_PX) : "";
-    return banner + `<div class="day-agenda" style="--rail-h:${railH}px">
+    return banner + `<div class="day-agenda" data-day="${day}" data-start="${startH}" style="--rail-h:${railH}px">
       <div class="hour-rail">${rows.join("")}</div>
       <div class="agenda-events">${nowLine}${blocks}</div>
     </div>` + addBtn;
@@ -773,15 +776,8 @@ const App = (() => {
     const days = weekDaysFor(day);
     const byDay = new Map(days.map(ds => [ds, []]));
     lessonSorted().forEach(l => { if (byDay.has(l.date)) byDay.get(l.date).push(l); });
-    const all = [...byDay.values()].flat();
     const HOUR_PX = 48;
-    let startH = 8, endH = 20;
-    if (all.length) {
-      const starts = all.map(l => toMinutes(l.time));
-      const ends = all.map(l => toMinutes(l.time) + (Number(l.duration) || 60));
-      startH = Math.min(startH, Math.max(0, Math.floor(Math.min(...starts) / 60)));
-      endH = Math.max(endH, Math.min(24, Math.ceil(Math.max(...ends) / 60)));
-    }
+    const startH = 0, endH = 24; // יממה מלאה, כמו יומן גוגל
     weekGridStartH = startH;
     const railH = (endH - startH) * HOUR_PX;
     const dows = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
@@ -798,16 +794,16 @@ const App = (() => {
         const top = (toMinutes(l.time) - startH * 60) / 60 * HOUR_PX;
         const h = Math.max(26, (Number(l.duration) || 60) / 60 * HOUR_PX - 2);
         const aria = `${fmtTime(l.time)} ${s?.name || "תלמיד"}`;
-        return `<button type="button" class="wg-block ${l.done ? "is-done" : ""}" style="top:${Math.round(top)}px;height:${Math.round(h)}px" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור: ${escapeHtml(aria)}"><b>${fmtTime(l.time)}</b><span>${escapeHtml((s?.name || "תלמיד").split(" ")[0])}</span></button>`;
+        return `<button type="button" class="wg-block ${l.done ? "is-done" : ""}" data-id="${l.id}" style="top:${Math.round(top)}px;height:${Math.round(h)}px" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור: ${escapeHtml(aria)}"><b>${fmtTime(l.time)}</b><span>${escapeHtml((s?.name || "תלמיד").split(" ")[0])}</span></button>`;
       }).join("");
       const isToday = ds === todayStr();
-      return `<div class="wg-col ${isToday ? "today" : ""}">
+      return `<div class="wg-col ${isToday ? "today" : ""}" data-day="${ds}">
         <button type="button" class="wg-add" onclick="App.quickAddLesson('${ds}', event)" aria-label="קביעת שיעור ב-${escapeHtml(fmtDate(ds))}"></button>
         ${isToday ? nowLineHtml(startH, endH, HOUR_PX) : ""}${blocks}
       </div>`;
     }).join("");
     const monthLabel = new Date(day + "T00:00").toLocaleDateString("he-IL", { month: "long", year: "numeric" });
-    return calToolbarHtml(monthLabel) + `<div class="week-grid" style="--wg-h:${railH}px">
+    return calToolbarHtml(monthLabel) + `<div class="week-grid" data-start="${startH}" style="--wg-h:${railH}px">
       <div class="wg-corner"></div><div class="wg-heads">${heads}</div>
       <div class="wg-rail">${rail}</div>
       <div class="wg-cols">${cols}</div>
@@ -865,7 +861,7 @@ const App = (() => {
           ? `<span class="cal-time">${fmtTime(firstTime[ds])}</span>`
           : `<span class="cal-count">${counts[ds]}</span>`)
         : (h ? '<span class="cal-dot holiday-dot"></span>' : "");
-      cells += `<button type="button" class="${cls}" aria-label="${escapeHtml(`${day} ${calMonth.toLocaleDateString("he-IL", { month: "long" })}${title ? `, ${title}` : ""}`)}" onclick="App.selectCalDay('${ds}')">${day}${marker}</button>`;
+      cells += `<button type="button" class="${cls}" data-day="${ds}" aria-label="${escapeHtml(`${day} ${calMonth.toLocaleDateString("he-IL", { month: "long" })}${title ? `, ${title}` : ""}`)}" onclick="App.selectCalDay('${ds}')">${day}${marker}</button>`;
     }
 
     return `
@@ -905,6 +901,7 @@ const App = (() => {
       top.classList.remove("hidden");
       top.innerHTML = renderWeekStrip(day);
       el.innerHTML = renderDayAgenda(day);
+      applyCalScroll();
       return;
     }
 
@@ -1066,7 +1063,8 @@ const App = (() => {
       : homeCalMode === "month"
         ? monthGridHtml() + monthDayDetailHtml(calDay)
         : renderWeekStrip(calDay) + renderDayAgenda(calDay);
-    document.getElementById("homeCalendar").innerHTML = modeBar + body;
+    document.getElementById("homeCalendar").innerHTML = modeBar + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
+    applyCalScroll();
 
     const dues = students.map(student => {
       const unpaid = lessonIndex.unpaidForStudent(student.id);
@@ -1430,13 +1428,15 @@ const App = (() => {
             <span class="status-pill">${notifStatusText()}</span>
             <h4>תזכורת ${settings.remindMinutes} דקות לפני שיעור</h4>
             <p>${notifHelpText()}</p>
+            ${pushStatusHtml()}
           </div>
           <input type="number" inputmode="numeric" min="0" value="${settings.remindMinutes}" onchange="App.updateSetting('remindMinutes', this.value)" aria-label="דקות לפני שיעור">
         </div>
         <div class="settings-action-stack reminder-actions">
           <button class="btn btn-green btn-block" onclick="App.exportCalendar()">${icon("calendar")} הוספת השיעורים ליומן הטלפון</button>
           ${notifSupported && Notification.permission === "granted"
-            ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה</button>`
+            ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה</button>` +
+              (pushSupported() ? `<button class="btn btn-light btn-block" onclick="App.testClosedPush()">${icon("bell")} בדיקת התראה כשהאפליקציה סגורה</button>` : "")
             : `<button class="btn btn-light btn-block" onclick="App.enableNotifications()">${icon("bell")} הפעלת התראות</button>`}
         </div>
       </section>
@@ -1638,11 +1638,52 @@ const App = (() => {
     }
   }
 
-  // סנכרון תזכורות לשרת ה-push — רץ ברקע אחרי כל שמירה, כשלון לא מפריע לאפליקציה
+  // סנכרון תזכורות לשרת ה-push — רץ ברקע אחרי כל שמירה, כשלון לא מפריע לאפליקציה.
+  // התוצאה נשמרת כדי שמסך ההגדרות יראה אם התראות ברקע באמת עובדות.
+  const PUSH_SYNC_KEY = "mt_push_sync";
+  function rememberPushSync(state) {
+    try { localStorage.setItem(PUSH_SYNC_KEY, JSON.stringify({ state, at: Date.now() })); } catch { /* אין אחסון */ }
+    if (document.getElementById("view-settings")?.classList.contains("active")) renderSettings();
+  }
+  function lastPushSync() {
+    try { return JSON.parse(localStorage.getItem(PUSH_SYNC_KEY)); } catch { return null; }
+  }
   function trySyncPush() {
     if (!pushSupported()) return;
     syncPush(lessons, lessonIndex.studentsById, reminderLeadMinutes(settings.remindMinutes))
-      .catch(error => console.warn("Push sync failed", error));
+      .then(state => rememberPushSync(state))
+      .catch(error => { rememberPushSync("fail"); console.warn("Push sync failed", error); });
+  }
+
+  // שורת סטטוס להתראות ברקע במסך ההגדרות
+  function pushStatusHtml() {
+    if (!pushSupported() || Notification.permission !== "granted") return "";
+    const s = lastPushSync();
+    if (!s) return "";
+    if (s.state === "ok") {
+      const when = new Date(s.at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+      return `<p class="push-status ok">✓ התראות ברקע מסונכרנות (עודכן ${when})</p>`;
+    }
+    if (s.state === "nosub") return `<p class="push-status warn">התראות ברקע לא הופעלו במכשיר הזה — לחצי "הפעלת התראות"</p>`;
+    return `<p class="push-status err">סנכרון ההתראות נכשל — בדקי חיבור לאינטרנט. ינוסה שוב אוטומטית.</p>`;
+  }
+
+  // בדיקה אמיתית של התראה כשהאפליקציה סגורה — עוברת דרך השרת, לא דרך הדף
+  async function testClosedPush() {
+    try {
+      await sendClosedAppTest(lessons, lessonIndex.studentsById, reminderLeadMinutes(settings.remindMinutes));
+      rememberPushSync("ok");
+      toast("נשלח! סגרי עכשיו את האפליקציה — ההתראה תגיע תוך 2-7 דקות", "ok");
+    } catch (error) {
+      console.warn("Closed-app push test failed", error);
+      if (String(error.message) === "no-subscription") {
+        toast("אין מנוי התראות במכשיר — לחצי קודם 'הפעלת התראות'", "err");
+      } else {
+        rememberPushSync("fail");
+        toast("השליחה לשרת נכשלה — בדקי חיבור לאינטרנט", "err");
+      }
+      renderSettings();
+    }
   }
 
   const NOTIFIED_KEY = "mt_notified_lessons";
@@ -1809,27 +1850,221 @@ const App = (() => {
     }
     initReminders();
     initCalendarSwipe();
+    initLessonDrag();
     handleLaunchParams();
   }
 
-  // החלקה עם האצבע על היומן — שבוע/חודש קדימה ואחורה (RTL: ימינה = קדימה)
+  // גרירה חיה של היומן — אצבע או עכבר: התוכן נתפס וזז ממש עם התנועה;
+  // בשחרור מחליק לשבוע/חודש הבא-הקודם או קופץ חזרה. (RTL: ימינה = קדימה)
   function initCalendarSwipe() {
-    let sx = 0, sy = 0, tracking = false;
-    const onStart = e => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; tracking = true; };
-    const onEnd = e => {
-      if (!tracking) return;
-      tracking = false;
-      const t = e.changedTouches[0];
-      const dx = t.clientX - sx, dy = t.clientY - sy;
-      // החלקה אופקית מובהקת בלבד — שלא תתנגש בגלילה אנכית
-      if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
-      calShift(dx > 0 ? 1 : -1);
+    attachLiveSwipe(document.getElementById("homeCalendar"),
+      () => [document.getElementById("homeCalSlide")].filter(Boolean));
+    // בטאב היומן התוכן מפוצל בין שני אלמנטים — מזיזים את שניהם יחד
+    attachLiveSwipe(document.getElementById("view-calendar"),
+      () => ["calendarMonth", "lessonsList"].map(id => document.getElementById(id))
+        .filter(el => el && !el.classList.contains("hidden")));
+  }
+
+  function attachLiveSwipe(container, slides) {
+    if (!container) return;
+    let sx = 0, sy = 0, active = false, locked = false, pid = 0;
+
+    const setX = (els, x, transition) => els.forEach(el => {
+      el.style.transition = transition;
+      el.style.transform = `translateX(${x}px)`;
+    });
+
+    container.addEventListener("pointerdown", e => {
+      if (e.button !== 0 || !e.isPrimary || lessonDragging) return;
+      sx = e.clientX; sy = e.clientY;
+      active = true; locked = false; pid = e.pointerId;
+    });
+
+    container.addEventListener("pointermove", e => {
+      if (!active || e.pointerId !== pid) return;
+      if (lessonDragging) { // גרירת שיעור התחילה — משחררים את היומן
+        if (locked) setX(slides(), 0, "");
+        active = false; locked = false;
+        container.classList.remove("cal-dragging");
+        return;
+      }
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if (!locked) {
+        if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) {   // כוונה אופקית
+          locked = true;
+          container.classList.add("cal-dragging");
+          try { container.setPointerCapture(pid); } catch { /* מצביע כבר לא פעיל */ }
+        } else if (Math.abs(dy) > 12) { active = false; return; } // גלילה אנכית מנצחת
+      }
+      if (locked) setX(slides(), dx, "none");
+    });
+
+    container.addEventListener("pointerup", e => {
+      if (!active || e.pointerId !== pid) return;
+      active = false;
+      container.classList.remove("cal-dragging");
+      if (!locked) return;
+      locked = false;
+      // בליעת הקליק שאחרי הגרירה — שלא ייבחר יום בטעות
+      const swallow = ev => { ev.stopPropagation(); ev.preventDefault(); };
+      container.addEventListener("click", swallow, true);
+      setTimeout(() => container.removeEventListener("click", swallow, true), 350);
+      const els = slides();
+      if (!els.length) return;
+      const dx = e.clientX - sx;
+      const width = container.offsetWidth || 320;
+      if (Math.abs(dx) < Math.min(90, width * 0.25)) {
+        setX(els, 0, "transform .2s ease-out"); // לא מספיק — קפיצה חזרה
+        return;
+      }
+      const dir = dx > 0 ? 1 : -1;
+      setX(els, dir * width, "transform .16s ease-out");
+      setTimeout(() => {
+        calShift(dir); // מרנדר מחדש — תוכן חדש ונקי
+        const next = slides();
+        if (!next.length) return;
+        setX(next, -dir * width, "none"); // נכנס מהצד הנגדי
+        requestAnimationFrame(() => setX(next, 0, "transform .22s ease-out"));
+      }, 160);
+    });
+
+    container.addEventListener("pointercancel", e => {
+      if (!active || e.pointerId !== pid) return;
+      active = false;
+      container.classList.remove("cal-dragging");
+      if (locked) { locked = false; setX(slides(), 0, "transform .2s ease-out"); }
+    });
+  }
+
+  // ----- גרירת שיעור ביומן: לחיצה ארוכה על שיעור ואז גרירה ליום/שעה אחרים -----
+  // בקצה רשת השבוע: השהייה קצרה מדפדפת לשבוע הבא/הקודם — אפשר להעביר שיעור בין שבועות.
+  let lessonDragging = false;
+  function initLessonDrag() {
+    const HOLD_MS = 280, SNAP = 15;
+    let drag = null, edgeTimer = 0;
+
+    const snapTime = min => {
+      const m = Math.max(0, Math.min(23 * 60 + 45, Math.round(min / SNAP) * SNAP));
+      return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
     };
-    for (const id of ["homeCalendar", "view-calendar"]) {
-      const el = document.getElementById(id);
-      if (!el) continue;
-      el.addEventListener("touchstart", onStart, { passive: true });
-      el.addEventListener("touchend", onEnd, { passive: true });
+    const stopScroll = e => e.preventDefault();
+
+    document.addEventListener("pointerdown", e => {
+      if (e.button !== 0 || !e.isPrimary || lessonDragging) return;
+      const block = e.target.closest(".wg-block, .agenda-block, .lesson-row");
+      if (!block || !block.dataset.id) return;
+      const sx = e.clientX, sy = e.clientY;
+      let holdTimer = 0;
+      const cancel = () => {
+        clearTimeout(holdTimer);
+        document.removeEventListener("pointermove", watch);
+        document.removeEventListener("pointerup", cancel);
+        document.removeEventListener("pointercancel", cancel);
+      };
+      const watch = ev => { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) cancel(); };
+      document.addEventListener("pointermove", watch);
+      document.addEventListener("pointerup", cancel);
+      document.addEventListener("pointercancel", cancel);
+      holdTimer = setTimeout(() => { cancel(); startDrag(block, e); }, HOLD_MS);
+    });
+
+    function startDrag(block, e0) {
+      const l = lessons.find(x => x.id === block.dataset.id);
+      if (!l) return;
+      lessonDragging = true;
+      if (navigator.vibrate) navigator.vibrate(20);
+      const r = block.getBoundingClientRect();
+      const ghost = block.cloneNode(true);
+      ghost.classList.add("drag-ghost");
+      Object.assign(ghost.style, {
+        left: `${r.left}px`, top: `${r.top}px`, right: "auto",
+        width: `${r.width}px`, height: `${r.height}px`
+      });
+      document.body.appendChild(ghost);
+      block.classList.add("drag-src");
+      drag = { l, ghost, ox: e0.clientX - r.left, oy: e0.clientY - r.top, from: { date: l.date, time: l.time }, target: null, x: e0.clientX };
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointercancel", onCancel);
+      document.addEventListener("touchmove", stopScroll, { passive: false });
+    }
+
+    // היעד: עמודת יום ברשת השבוע / ציר השעות של היום (שעה לפי החלק העליון של הבלוק),
+    // או יום בלוח החודשי / רצועת השבוע (היום משתנה, השעה נשמרת)
+    function targetAt(fx, fy, topY) {
+      const el = document.elementFromPoint(fx, fy);
+      if (!el) return null;
+      const col = el.closest(".wg-col");
+      if (col) {
+        const startH = Number(col.closest(".week-grid")?.dataset.start || 8);
+        return { date: col.dataset.day, time: snapTime(startH * 60 + (topY - col.getBoundingClientRect().top) / 48 * 60) };
+      }
+      const agenda = el.closest(".day-agenda");
+      if (agenda) {
+        const startH = Number(agenda.dataset.start || 8);
+        return { date: agenda.dataset.day, time: snapTime(startH * 60 + (topY - agenda.getBoundingClientRect().top) / 64 * 60) };
+      }
+      const dayCell = el.closest(".cal-cell[data-day], .week-day[data-day]");
+      if (dayCell) return { date: dayCell.dataset.day, time: drag.l.time };
+      return null;
+    }
+
+    // RTL: הימים מתקדמים שמאלה — קצה שמאלי = קדימה, ימני = אחורה.
+    // ברשת שבוע ורצועת יום מדפדף שבוע; בלוח חודשי מדפדף חודש (calShift מודע-מצב).
+    function edgeCheck(x) {
+      drag.x = x;
+      const surface = document.querySelector(".week-grid, .cal-grid, .week-strip");
+      const r = surface && surface.getBoundingClientRect();
+      const dir = !r ? 0 : x < r.left + 34 ? 1 : x > r.right - 34 ? -1 : 0;
+      if (!dir) { clearTimeout(edgeTimer); edgeTimer = 0; return; }
+      if (!edgeTimer) edgeTimer = setTimeout(() => { edgeTimer = 0; calShift(dir); if (drag) edgeCheck(drag.x); }, 450);
+    }
+
+    function onMove(ev) {
+      const topY = ev.clientY - drag.oy;
+      drag.ghost.style.left = `${ev.clientX - drag.ox}px`;
+      drag.ghost.style.top = `${topY}px`;
+      // גרירה לקצה העליון/תחתון של ציר השעות — גוללת אותו כדי להגיע לכל שעה
+      const rail = document.querySelector(".week-grid, .day-agenda");
+      if (rail) {
+        const rr = rail.getBoundingClientRect();
+        if (ev.clientY < rr.top + 44) rail.scrollTop -= 14;
+        else if (ev.clientY > rr.bottom - 44) rail.scrollTop += 14;
+      }
+      drag.target = targetAt(ev.clientX, ev.clientY, topY);
+      const label = drag.ghost.querySelector(".agenda-time, .time-chip, b");
+      if (label && drag.target) label.textContent = drag.target.time;
+      edgeCheck(ev.clientX);
+    }
+
+    const onUp = () => endDrag(true);
+    const onCancel = () => endDrag(false);
+
+    function endDrag(commit) {
+      clearTimeout(edgeTimer); edgeTimer = 0;
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onCancel);
+      document.removeEventListener("touchmove", stopScroll);
+      // בליעת הקליק שמגיע אחרי השחרור — שלא ייפתח טופס עריכה
+      const swallow = e => { e.stopPropagation(); e.preventDefault(); };
+      document.addEventListener("click", swallow, true);
+      setTimeout(() => document.removeEventListener("click", swallow, true), 350);
+      drag.ghost.remove();
+      lessonDragging = false;
+      const { l, from, target } = drag;
+      drag = null;
+      if (commit && target && (target.date !== l.date || target.time !== l.time)) {
+        l.date = target.date; l.time = target.time;
+        if (!save()) { l.date = from.date; l.time = from.time; render(); return; }
+        refreshCalendarSurface();
+        toast(`השיעור הועבר ${dayLabelPlain(l.date)} בשעה ${fmtTime(l.time)}`, "ok", {
+          label: "ביטול",
+          run: () => { l.date = from.date; l.time = from.time; save(); render(); }
+        });
+      } else {
+        refreshCalendarSurface();
+      }
     }
   }
 
@@ -1849,7 +2084,7 @@ const App = (() => {
     exportData, importData, exportCalendar,
     changeMonth,
     updateSetting, setTheme, clearAll,
-    enableNotifications, testNotification,
+    enableNotifications, testNotification, testClosedPush,
     promptInstall
   };
 })();

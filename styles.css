@@ -652,9 +652,11 @@ main { width: 100%; padding: 24px 16px; max-width: 760px; margin: 0 auto; }
 .day-agenda {
   position: relative;
   height: var(--rail-h);
+  max-height: 62vh;
+  overflow-y: auto;
   margin: var(--sp-4) 0 var(--sp-3);
 }
-.hour-rail { position: absolute; inset: 0; }
+.hour-rail { position: absolute; inset-inline: 0; top: 0; height: var(--rail-h); }
 .hour-row { position: relative; height: 64px; }
 .hour-row .hour-line {
   position: absolute; top: 0;
@@ -675,7 +677,8 @@ main { width: 100%; padding: 24px 16px; max-width: 760px; margin: 0 auto; }
 }
 .agenda-events {
   position: absolute;
-  inset-block: 0;
+  top: 0;
+  height: var(--rail-h);
   inset-inline: 56px 0;
 }
 .agenda-block {
@@ -1550,14 +1553,15 @@ input, select { min-height: 48px; }
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
   grid-template-rows: auto var(--wg-h);
-  overflow: hidden;
+  max-height: 62vh;
+  overflow-y: auto;
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: var(--r-md);
   background: var(--surface);
   box-shadow: var(--sh-sm);
 }
-.wg-corner { border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
-.wg-heads { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.wg-corner { position: sticky; top: 0; z-index: 3; background: var(--surface); border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.wg-heads { position: sticky; top: 0; z-index: 3; background: var(--surface); display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
 .wg-head { display: grid; place-items: center; gap: 1px; padding: 7px 0 6px; border: 0; border-inline-start: 1px solid color-mix(in srgb, var(--border) 45%, transparent); background: none; color: var(--muted); font-family: inherit; font-size: .68rem; font-weight: 700; cursor: pointer; }
 .wg-head b { min-width: 24px; padding: 2px 0; border-radius: 8px; color: var(--text); font-size: .85rem; font-variant-numeric: tabular-nums; }
 .wg-head.today b { background: var(--brand-1); color: #fff; }
@@ -1577,6 +1581,19 @@ input, select { min-height: 48px; }
 .wg-block b { display: block; font-size: .6rem; font-weight: 800; font-variant-numeric: tabular-nums; opacity: .9; }
 .wg-block span { display: block; overflow: hidden; font-size: .68rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .wg-block.is-done { background: color-mix(in srgb, var(--muted) 28%, var(--surface)); color: var(--muted); }
+
+/* סטטוס התראות ברקע בהגדרות */
+.push-status { margin-top: 6px; font-size: .74rem; font-weight: 600; }
+.push-status.ok { color: var(--green); }
+.push-status.warn { color: var(--muted); }
+.push-status.err { color: var(--red); }
+
+/* גרירת שיעור ביומן — לחיצה ארוכה ואז גרירה */
+#homeCalendar, #view-calendar { touch-action: pan-y; }
+.cal-dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+.wg-block, .agenda-block, .lesson-row { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.drag-ghost { position: fixed; z-index: 999; margin: 0; opacity: .92; box-shadow: 0 10px 24px rgba(0, 0, 0, .3); pointer-events: none; }
+.drag-src { opacity: .35; }
 
 /* קו "עכשיו" — כמו ביומן גוגל */
 .now-line { position: absolute; inset-inline: 0; z-index: 2; height: 2px; background: var(--red); pointer-events: none; }

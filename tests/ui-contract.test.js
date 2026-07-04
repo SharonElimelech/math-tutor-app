@@ -21,7 +21,7 @@ test("generated interactive surfaces use native controls", () => {
   assert.doesNotMatch(source, /\bconfirm\s*\(/);
   assert.match(source, /<button type="button" class="picker-row/);
   assert.match(source, /<button type="button" class="lesson-open/);
-  assert.match(source, /<button type="button" class="\$\{cls\}" aria-label=/);
+  assert.match(source, /<button type="button" class="\$\{cls\}"[^>]* aria-label=/);
 });
 
 test("service worker scopes document fallback to navigation", () => {

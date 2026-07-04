@@ -7,12 +7,20 @@ const enc = new TextEncoder();
 const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf)))
   .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-const CORS = {
-  "Access-Control-Allow-Origin": "https://sharonelimelech.github.io",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type"
+const ORIGINS = [
+  "https://sharonelimelech.github.io",
+  "http://localhost:8000",
+  "http://127.0.0.1:8000"
+];
+const corsFor = req => {
+  const origin = req.headers.get("Origin");
+  return {
+    "Access-Control-Allow-Origin": ORIGINS.includes(origin) ? origin : ORIGINS[0],
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Vary": "Origin"
+  };
 };
-const reply = (body, status = 200) => new Response(body, { status, headers: CORS });
 
 async function vapidAuth(endpoint, env) {
   const key = await crypto.subtle.importKey(
@@ -36,6 +44,7 @@ const subKey = async endpoint =>
 
 export default {
   async fetch(req, env) {
+    const reply = (body, status = 200) => new Response(body, { status, headers: corsFor(req) });
     if (req.method === "OPTIONS") return reply(null, 204);
     const url = new URL(req.url);
     if (req.method !== "POST" || url.pathname !== "/sync") return reply("not found", 404);

@@ -49,14 +49,8 @@ export async function enablePush() {
   });
 }
 
-// סנכרון: כותב את פרטי התזכורות למטמון (בשביל ה-SW) ואת הזמנים לשרת.
-// אין מנוי → לא עושה כלום. רץ fire-and-forget אחרי כל שמירה.
-export async function syncPush(lessons, studentsById, leadMinutes) {
-  if (!pushSupported()) return false;
-  const reg = await navigator.serviceWorker.ready;
-  const sub = await reg.pushManager.getSubscription();
-  if (!sub) return false;
-  const items = upcomingPushReminders(lessons, studentsById, leadMinutes);
+// כתיבה למטמון (בשביל ה-SW) ושליחת הזמנים לשרת. זורק על כשל HTTP.
+async function writeAndSync(sub, items) {
   const cache = await caches.open(PUSH_CACHE);
   await cache.put("reminders", new Response(JSON.stringify(items), {
     headers: { "Content-Type": "application/json" }
@@ -66,5 +60,42 @@ export async function syncPush(lessons, studentsById, leadMinutes) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sub: sub.toJSON(), times: items.map(i => i.t) })
   });
-  return res.ok;
+  if (!res.ok) throw new Error(`sync-failed-${res.status}`);
+}
+
+// האם קיים מנוי push פעיל במכשיר הזה
+export async function pushSubscribed() {
+  if (!pushSupported()) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    return Boolean(await reg.pushManager.getSubscription());
+  } catch {
+    return false;
+  }
+}
+
+// סנכרון: תזכורות למטמון + זמנים לשרת. רץ אחרי כל שמירה.
+// מחזיר "ok" / "nosub" (אין מנוי או אין תמיכה); זורק על כשל רשת/שרת.
+export async function syncPush(lessons, studentsById, leadMinutes) {
+  if (!pushSupported()) return "nosub";
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (!sub) return "nosub";
+  await writeAndSync(sub, upcomingPushReminders(lessons, studentsById, leadMinutes));
+  return "ok";
+}
+
+// בדיקת "אפליקציה סגורה": תזכורת בדיקה בעוד 2 דק' + סנכרון לשרת.
+// ה-cron רץ כל 5 דק' — ההתראה תגיע תוך 2-7 דקות. מחזיר את זמן הבדיקה.
+// ponytail: סנכרון רגיל שירוץ לפני שהבדיקה נורתה ידרוס אותה — זניח, המשתמשת מתבקשת לסגור את האפליקציה.
+export async function sendClosedAppTest(lessons, studentsById, leadMinutes) {
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (!sub) throw new Error("no-subscription");
+  const items = upcomingPushReminders(lessons, studentsById, leadMinutes);
+  const t = Date.now() + 2 * MINUTE;
+  items.push({ t, title: "בדיקת התראות ✓", body: "מצוין — ההתראות מגיעות גם כשהאפליקציה סגורה", tag: "push-test" });
+  items.sort((a, b) => a.t - b.t);
+  await writeAndSync(sub, items);
+  return t;
 }
