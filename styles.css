@@ -1544,6 +1544,40 @@ input, select { min-height: 48px; }
 .debt-clear strong { color: var(--text); font-size: .9rem; }
 .debt-clear span { font-size: .74rem; }
 
+/* ---------- בית: תצוגת שבוע מלאה (כמו יומן גוגל) ---------- */
+.home-cal-seg { margin-bottom: 12px; }
+.week-grid {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-rows: auto var(--wg-h);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+}
+.wg-corner { border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.wg-heads { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.wg-head { display: grid; place-items: center; gap: 1px; padding: 7px 0 6px; border: 0; border-inline-start: 1px solid color-mix(in srgb, var(--border) 45%, transparent); background: none; color: var(--muted); font-family: inherit; font-size: .68rem; font-weight: 700; cursor: pointer; }
+.wg-head b { min-width: 24px; padding: 2px 0; border-radius: 8px; color: var(--text); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.wg-head.today b { background: var(--brand-1); color: #fff; }
+.wg-rail { position: relative; }
+.wg-hour { height: 48px; padding-top: 2px; color: var(--muted); font-size: .62rem; font-variant-numeric: tabular-nums; text-align: center; border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
+.wg-hour:first-child { border-top: 0; }
+.wg-cols { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.wg-col { position: relative; min-width: 0; border-inline-start: 1px solid color-mix(in srgb, var(--border) 45%, transparent); background: repeating-linear-gradient(to bottom, transparent 0 47px, color-mix(in srgb, var(--border) 40%, transparent) 47px 48px); }
+.wg-add { position: absolute; inset: 0; border: 0; background: none; cursor: pointer; }
+.wg-col.today { background-color: color-mix(in srgb, var(--brand-1) 5%, transparent); }
+.wg-block {
+  position: absolute; inset-inline: 1px; z-index: 1;
+  overflow: hidden; padding: 3px 4px; border: 0; border-radius: 7px;
+  background: color-mix(in srgb, var(--brand-1) 88%, #000 0%);
+  color: #fff; font-family: inherit; text-align: right; cursor: pointer;
+}
+.wg-block b { display: block; font-size: .6rem; font-weight: 800; font-variant-numeric: tabular-nums; opacity: .9; }
+.wg-block span { display: block; overflow: hidden; font-size: .68rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.wg-block.is-done { background: color-mix(in srgb, var(--muted) 28%, var(--surface)); color: var(--muted); }
+
 /* ---------- בית: אישור שיעורים שעברו ---------- */
 .confirm-card { margin-top: var(--sp-3); border-inline-start: 3px solid var(--brand-1); }
 .confirm-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }

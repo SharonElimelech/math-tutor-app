@@ -72,6 +72,7 @@ const App = (() => {
   let calMonth  = new Date();      // החודש שמוצג בלוח החודשי
   let selectedDay = null;          // יום נבחר בלוח החודשי
   let calMode = "week";            // week | month | list
+  let homeCalMode = localStorage.getItem("mt_home_cal") || "day"; // day | week | month — תצוגת היומן בבית
   let moneyTab = "payments";       // payments | income
   let showPast = false;
 
@@ -654,9 +655,9 @@ const App = (() => {
     else renderCalendar();
   }
 
-  // ניווט מודע-מצב: בבית תמיד שבוע; ביומן לפי המתג
+  // ניווט מודע-מצב: בבית לפי מתג הבית; ביומן לפי המתג שלו
   function calShift(delta) {
-    const weekMode = calMode === "week" || activeViewName() === "home";
+    const weekMode = activeViewName() === "home" ? homeCalMode !== "month" : calMode === "week";
     if (weekMode) {
       const base = new Date((selectedDay || todayStr()) + "T00:00");
       base.setDate(base.getDate() + delta * 7);
@@ -765,11 +766,57 @@ const App = (() => {
     </div>` + addBtn;
   }
 
-  function renderMonthGrid() {
-    const grid = document.getElementById("calendarMonth");
-    if (calMode !== "month") { grid.classList.add("hidden"); return; }
-    grid.classList.remove("hidden");
+  // תצוגת שבוע מלאה — 7 עמודות על ציר שעות, כמו יומן גוגל.
+  // לחיצה על שיעור = עריכה; לחיצה על עמודה ריקה = שיעור חדש באותו יום.
+  function renderWeekGrid(day) {
+    const days = weekDaysFor(day);
+    const byDay = new Map(days.map(ds => [ds, []]));
+    lessonSorted().forEach(l => { if (byDay.has(l.date)) byDay.get(l.date).push(l); });
+    const all = [...byDay.values()].flat();
+    const HOUR_PX = 48;
+    let startH = 8, endH = 20;
+    if (all.length) {
+      const starts = all.map(l => toMinutes(l.time));
+      const ends = all.map(l => toMinutes(l.time) + (Number(l.duration) || 60));
+      startH = Math.min(startH, Math.max(0, Math.floor(Math.min(...starts) / 60)));
+      endH = Math.max(endH, Math.min(24, Math.ceil(Math.max(...ends) / 60)));
+    }
+    const railH = (endH - startH) * HOUR_PX;
+    const dows = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
+    const heads = days.map(ds => {
+      const d = new Date(ds + "T00:00");
+      const cls = ["wg-head", ds === todayStr() ? "today" : ""].filter(Boolean).join(" ");
+      return `<button type="button" class="${cls}" onclick="App.selectCalDay('${ds}')" aria-label="${escapeHtml(d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" }))}"><span>${dows[d.getDay()]}</span><b>${d.getDate()}</b></button>`;
+    }).join("");
+    let rail = "";
+    for (let hr = startH; hr < endH; hr++) rail += `<div class="wg-hour">${String(hr).padStart(2, "0")}</div>`;
+    const cols = days.map(ds => {
+      const blocks = byDay.get(ds).map(l => {
+        const s = studentById(l.studentId);
+        const top = (toMinutes(l.time) - startH * 60) / 60 * HOUR_PX;
+        const h = Math.max(26, (Number(l.duration) || 60) / 60 * HOUR_PX - 2);
+        const aria = `${fmtTime(l.time)} ${s?.name || "תלמיד"}`;
+        return `<button type="button" class="wg-block ${l.done ? "is-done" : ""}" style="top:${Math.round(top)}px;height:${Math.round(h)}px" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור: ${escapeHtml(aria)}"><b>${fmtTime(l.time)}</b><span>${escapeHtml((s?.name || "תלמיד").split(" ")[0])}</span></button>`;
+      }).join("");
+      return `<div class="wg-col ${ds === todayStr() ? "today" : ""}">
+        <button type="button" class="wg-add" onclick="App.quickAddLesson('${ds}')" aria-label="קביעת שיעור ב-${escapeHtml(fmtDate(ds))}"></button>
+        ${blocks}
+      </div>`;
+    }).join("");
+    const monthLabel = new Date(day + "T00:00").toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+    return calToolbarHtml(monthLabel) + `<div class="week-grid" style="--wg-h:${railH}px">
+      <div class="wg-corner"></div><div class="wg-heads">${heads}</div>
+      <div class="wg-rail">${rail}</div>
+      <div class="wg-cols">${cols}</div>
+    </div>`;
+  }
 
+  function quickAddLesson(dateStr) {
+    selectedDay = dateStr;
+    openLessonForm();
+  }
+
+  function monthGridHtml() {
     const year = calMonth.getFullYear(), month = calMonth.getMonth();
     const first = new Date(year, month, 1);
     const startDow = first.getDay(); // 0=ראשון
@@ -796,7 +843,7 @@ const App = (() => {
       cells += `<button type="button" class="${cls}" aria-label="${escapeHtml(`${day} ${calMonth.toLocaleDateString("he-IL", { month: "long" })}${title ? `, ${title}` : ""}`)}" onclick="App.selectCalDay('${ds}')">${day}${marker}</button>`;
     }
 
-    grid.innerHTML = `
+    return `
       <div class="cal-head">
         <button class="cal-nav" aria-label="חודש קודם" onclick="App.calShift(-1)">‹</button>
         <span>${calMonth.toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</span>
@@ -804,6 +851,24 @@ const App = (() => {
       </div>
       <button class="btn btn-light btn-block cal-today" onclick="App.calToday()">היום</button>
       <div class="cal-grid">${cells}</div>`;
+  }
+
+  function renderMonthGrid() {
+    const grid = document.getElementById("calendarMonth");
+    if (calMode !== "month") { grid.classList.add("hidden"); return; }
+    grid.classList.remove("hidden");
+    grid.innerHTML = monthGridHtml();
+  }
+
+  // פירוט היום הנבחר מתחת ללוח החודשי
+  function monthDayDetailHtml(day) {
+    const h = holidayFor(day);
+    const dayLessons = lessonSorted().filter(l => l.date === day);
+    return (h ? `<div class="holiday-banner">${icon("info")} ${escapeHtml(h.name)}</div>` : "") +
+      (dayLessons.length
+        ? dayGroupHtml(day, dayLessons)
+        : `<div class="empty empty-action">${icon("calendar")}<h3>היום הזה פנוי</h3><p>אין שיעורים ב-${fmtDate(day)}.</p></div>`) +
+      `<button class="btn btn-light btn-block" onclick="App.openLessonForm()">${icon("plus")} קביעת שיעור ב-${fmtDate(day)}</button>`;
   }
 
   function renderCalendar() {
@@ -821,15 +886,7 @@ const App = (() => {
     renderMonthGrid();
 
     if (calMode === "month") {
-      const day = selectedDay || todayStr();
-      const h = holidayFor(day);
-      const dayLessons = lessonSorted().filter(l => l.date === day);
-      const addBtn = `<button class="btn btn-light btn-block" onclick="App.openLessonForm()">${icon("plus")} קביעת שיעור ב-${fmtDate(day)}</button>`;
-      el.innerHTML = (h ? `<div class="holiday-banner">${icon("info")} ${escapeHtml(h.name)}</div>` : "") +
-        (dayLessons.length
-          ? dayGroupHtml(day, dayLessons)
-          : `<div class="empty empty-action">${icon("calendar")}<h3>היום הזה פנוי</h3><p>אין שיעורים ב-${fmtDate(day)}.</p></div>`) +
-        addBtn;
+      el.innerHTML = monthDayDetailHtml(selectedDay || todayStr());
       return;
     }
 
@@ -859,6 +916,12 @@ const App = (() => {
   }
 
   function togglePast() { showPast = !showPast; renderCalendar(); }
+
+  function setHomeCalMode(mode) {
+    homeCalMode = mode;
+    try { localStorage.setItem("mt_home_cal", mode); } catch { /* אין אחסון — המתג פשוט לא יישמר */ }
+    renderHome();
+  }
 
   // ========== מסך בית ==========
   // כרטיס הכוונה — מראה למשתמש מה הצעד הבא
@@ -968,9 +1031,17 @@ const App = (() => {
       </div>
     `;
 
-    // יומן מוטמע בבית — רצועת שבוע + אג'נדת היום שנבחר (כמו ביומן המלא)
+    // יומן מוטמע בבית — יום / שבוע / חודש, כמו יומן גוגל
     const calDay = selectedDay || today;
-    document.getElementById("homeCalendar").innerHTML = renderWeekStrip(calDay) + renderDayAgenda(calDay);
+    const seg = (m, label) =>
+      `<button type="button" class="seg-btn ${homeCalMode === m ? "active" : ""}" aria-pressed="${homeCalMode === m}" onclick="App.setHomeCalMode('${m}')">${label}</button>`;
+    const modeBar = `<div class="seg-toggle home-cal-seg" role="group" aria-label="תצוגת יומן">${seg("day", "יום")}${seg("week", "שבוע")}${seg("month", "חודש")}</div>`;
+    const body = homeCalMode === "week"
+      ? renderWeekGrid(calDay)
+      : homeCalMode === "month"
+        ? monthGridHtml() + monthDayDetailHtml(calDay)
+        : renderWeekStrip(calDay) + renderDayAgenda(calDay);
+    document.getElementById("homeCalendar").innerHTML = modeBar + body;
 
     const dues = students.map(student => {
       const unpaid = lessonIndex.unpaidForStudent(student.id);
@@ -1726,7 +1797,7 @@ const App = (() => {
     confirmLesson, skipLesson,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
-    setCalendarMode, calShift, selectCalDay, calToday,
+    setCalendarMode, calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson,
     setMoneyTab, sendWhatsApp, sendLessonReminder, markAllPaid,
     exportData, importData, exportCalendar,
     changeMonth,
