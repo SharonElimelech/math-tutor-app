@@ -1,10 +1,11 @@
 // Service Worker – מאפשר עבודה גם בלי אינטרנט (offline) והתקנה כאפליקציה
-const CACHE = "morti-v3.3.9";
+const CACHE = "morti-v3.4.0";
 const ASSETS = [
   "index.html",
   "styles.css?v=24",
-  "app.js?v=26",
+  "app.js?v=27",
   "src/data.js",
+  "src/push.js",
   "src/reminders.js",
   "src/calendar.js",
   "src/selectors.js",
@@ -30,6 +31,32 @@ self.addEventListener("activate", e => {
 // הודעה מהדף: החל עדכון מיד
 self.addEventListener("message", e => {
   if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
+});
+
+// Push מהשרת: דחיפה ריקה שמעירה אותנו. פרטי התזכורת נשמרים במטמון
+// mt-push-data על ידי האפליקציה (src/push.js) — קוראים משם ומציגים.
+self.addEventListener("push", e => {
+  e.waitUntil((async () => {
+    let due = [];
+    try {
+      const cache = await caches.open("mt-push-data");
+      const res = await cache.match("reminders");
+      const items = res ? await res.json() : [];
+      const now = Date.now();
+      // חלון 30 דק' אחורה — מכסה איחור של ה-cron בלי להציג תזכורות עתיקות
+      due = items.filter(i => i.t <= now && i.t > now - 30 * 60 * 1000);
+    } catch { /* מטמון חסר/פגום — נציג הודעה כללית */ }
+    if (!due.length) due = [{ title: "המורה שלי", body: "יש תזכורת ממתינה — פתחי את האפליקציה" }];
+    for (const item of due) {
+      await self.registration.showNotification(item.title, {
+        body: item.body,
+        tag: item.tag,
+        icon: "icon-192.png",
+        badge: "icon-192.png",
+        data: { url: "./" }
+      });
+    }
+  })());
 });
 
 // לחיצה על התראה — מביאה את האפליקציה לקדמת המסך (או פותחת אותה)

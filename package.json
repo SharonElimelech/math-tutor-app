@@ -1,11 +1,11 @@
 {
   "name": "my-tutor-manager",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "check": "npm run check:syntax && npm test",
-    "check:syntax": "node --check app.js && node --check service-worker.js && node --check src/calendar.js && node --check src/data.js && node --check src/reminders.js && node --check src/selectors.js && node --check src/storage.js",
+    "check:syntax": "node --check app.js && node --check service-worker.js && node --check src/calendar.js && node --check src/data.js && node --check src/push.js && node --check src/reminders.js && node --check src/selectors.js && node --check src/storage.js && node --check push-server/worker.js",
     "test": "node --test"
   },
   "engines": {

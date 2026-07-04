@@ -24,6 +24,7 @@ import {
   paymentSignature,
   reminderSignature
 } from "./src/reminders.js";
+import { enablePush, pushSupported, syncPush } from "./src/push.js";
 
 /* =========================================================
    "המורה שלי" – אפליקציה לניהול שיעורים פרטיים
@@ -1281,8 +1282,8 @@ const App = (() => {
         <div class="settings-action-stack reminder-actions">
           <button class="btn btn-green btn-block" onclick="App.exportCalendar()">${icon("calendar")} הוספת השיעורים ליומן הטלפון</button>
           ${notifSupported && Notification.permission === "granted"
-            ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה (באפליקציה פתוחה)</button>`
-            : `<button class="btn btn-light btn-block" onclick="App.enableNotifications()">${icon("bell")} הפעלת התראות באפליקציה</button>`}
+            ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה</button>`
+            : `<button class="btn btn-light btn-block" onclick="App.enableNotifications()">${icon("bell")} הפעלת התראות</button>`}
         </div>
       </section>
 
@@ -1382,12 +1383,14 @@ const App = (() => {
   function notifStatusText() {
     if (isIOS() && !isStandalone()) return "כדי לקבל התראות באייפון יש להתקין את האפליקציה למסך הבית";
     if (!notifSupported) return "הדפדפן לא תומך בהתראות";
-    if (Notification.permission === "granted") return "מופעל באפליקציה פתוחה";
+    if (Notification.permission === "granted") return pushSupported() ? "מופעל — גם כשהאפליקציה סגורה" : "מופעל באפליקציה פתוחה";
     if (Notification.permission === "denied") return "חסום — יש לאפשר בהגדרות הדפדפן";
     return "כבוי — לחצי 'הפעלת התראות'";
   }
   function notifHelpText() {
-    return "דפדפן לא מבטיח התראות כשהאפליקציה סגורה. לתזכורת אמינה במסך נעול, הורידי את השיעורים ליומן הטלפון.";
+    if (pushSupported() && Notification.permission === "granted")
+      return "תזכורות שיעור יגיעו לטלפון גם כשהאפליקציה סגורה. אפשר בנוסף להוסיף את השיעורים ליומן.";
+    return "להתראות גם כשהאפליקציה סגורה: התקיני את האפליקציה למסך הבית והפעילי התראות, או הורידי את השיעורים ליומן הטלפון.";
   }
 
   function initReminders() {
@@ -1409,6 +1412,7 @@ const App = (() => {
     setInterval(() => void checkReminders(), 30 * 1000);
     scheduleNextReminder();
     void checkReminders();
+    trySyncPush();
   }
 
   function scheduleNextReminder() {
@@ -1433,8 +1437,18 @@ const App = (() => {
     }
     const p = await Notification.requestPermission();
     if (p === "granted") {
-      toast("התראות הופעלו", "ok");
       startInterval();
+      let pushOk = false;
+      if (pushSupported()) {
+        try {
+          await enablePush();
+          trySyncPush();
+          pushOk = true;
+        } catch (error) {
+          console.warn("Push subscribe failed", error);
+        }
+      }
+      toast(pushOk ? "התראות הופעלו — כולל כשהאפליקציה סגורה" : "התראות הופעלו (באפליקציה פתוחה)", "ok");
       await testNotification();
     } else {
       toast("ההרשאה לא ניתנה", "err");
@@ -1466,7 +1480,15 @@ const App = (() => {
     if (notifSupported && Notification.permission === "granted") {
       scheduleNextReminder();
       void checkReminders();
+      trySyncPush();
     }
+  }
+
+  // סנכרון תזכורות לשרת ה-push — רץ ברקע אחרי כל שמירה, כשלון לא מפריע לאפליקציה
+  function trySyncPush() {
+    if (!pushSupported()) return;
+    syncPush(lessons, lessonIndex.studentsById, reminderLeadMinutes(settings.remindMinutes))
+      .catch(error => console.warn("Push sync failed", error));
   }
 
   const NOTIFIED_KEY = "mt_notified_lessons";
