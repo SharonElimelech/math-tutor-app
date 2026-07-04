@@ -72,7 +72,7 @@ const App = (() => {
   let calMonth  = new Date();      // החודש שמוצג בלוח החודשי
   let selectedDay = null;          // יום נבחר בלוח החודשי
   let calMode = "week";            // week | month | list
-  let homeCalMode = localStorage.getItem("mt_home_cal") || "day"; // day | week | month — תצוגת היומן בבית
+  let homeCalMode = localStorage.getItem("mt_home_cal") || "week"; // day | week | month — תצוגת היומן בבית
   let moneyTab = "payments";       // payments | income
   let showPast = false;
 
@@ -344,7 +344,7 @@ const App = (() => {
     if (!students.length) { toast("צריך קודם להוסיף לפחות תלמיד אחד", "err"); return; }
     const l = id
       ? lessons.find(x => x.id === id)
-      : { studentId: presetStudentId || "", date: selectedDay || todayStr(), time: settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
+      : { studentId: presetStudentId || "", date: selectedDay || todayStr(), time: quickAddTime || settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
     const priceVal = (typeof l.price === "number") ? l.price : "";
     openModal(`
       <div class="modal-title-block">
@@ -760,9 +760,10 @@ const App = (() => {
       </button>`;
     }).join("");
     const railH = (endH - startH + 1) * HOUR_PX;
+    const nowLine = day === todayStr() ? nowLineHtml(startH, endH, HOUR_PX) : "";
     return banner + `<div class="day-agenda" style="--rail-h:${railH}px">
       <div class="hour-rail">${rows.join("")}</div>
-      <div class="agenda-events">${blocks}</div>
+      <div class="agenda-events">${nowLine}${blocks}</div>
     </div>` + addBtn;
   }
 
@@ -781,6 +782,7 @@ const App = (() => {
       startH = Math.min(startH, Math.max(0, Math.floor(Math.min(...starts) / 60)));
       endH = Math.max(endH, Math.min(24, Math.ceil(Math.max(...ends) / 60)));
     }
+    weekGridStartH = startH;
     const railH = (endH - startH) * HOUR_PX;
     const dows = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
     const heads = days.map(ds => {
@@ -798,9 +800,10 @@ const App = (() => {
         const aria = `${fmtTime(l.time)} ${s?.name || "תלמיד"}`;
         return `<button type="button" class="wg-block ${l.done ? "is-done" : ""}" style="top:${Math.round(top)}px;height:${Math.round(h)}px" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור: ${escapeHtml(aria)}"><b>${fmtTime(l.time)}</b><span>${escapeHtml((s?.name || "תלמיד").split(" ")[0])}</span></button>`;
       }).join("");
-      return `<div class="wg-col ${ds === todayStr() ? "today" : ""}">
-        <button type="button" class="wg-add" onclick="App.quickAddLesson('${ds}')" aria-label="קביעת שיעור ב-${escapeHtml(fmtDate(ds))}"></button>
-        ${blocks}
+      const isToday = ds === todayStr();
+      return `<div class="wg-col ${isToday ? "today" : ""}">
+        <button type="button" class="wg-add" onclick="App.quickAddLesson('${ds}', event)" aria-label="קביעת שיעור ב-${escapeHtml(fmtDate(ds))}"></button>
+        ${isToday ? nowLineHtml(startH, endH, HOUR_PX) : ""}${blocks}
       </div>`;
     }).join("");
     const monthLabel = new Date(day + "T00:00").toLocaleDateString("he-IL", { month: "long", year: "numeric" });
@@ -811,9 +814,24 @@ const App = (() => {
     </div>`;
   }
 
-  function quickAddLesson(dateStr) {
+  // לחיצה על משבצת ריקה ברשת השבוע — שיעור חדש באותו יום ובאותה שעה (כמו יומן גוגל)
+  let quickAddTime = "";
+  let weekGridStartH = 8; // ponytail: שעת הפתיחה של הרשת האחרונה שצוירה; מספיק כי יש רשת אחת על המסך
+  function quickAddLesson(dateStr, ev) {
     selectedDay = dateStr;
+    const y = ev && typeof ev.offsetY === "number" ? ev.offsetY : null;
+    quickAddTime = y === null ? "" :
+      `${String(Math.min(23, Math.max(0, weekGridStartH + Math.floor(y / 48)))).padStart(2, "0")}:00`;
     openLessonForm();
+    quickAddTime = "";
+  }
+
+  // קו "עכשיו" אדום — רק על היום הנוכחי, רק כשהשעה בטווח הרשת
+  function nowLineHtml(startH, endH, hourPx) {
+    const now = new Date();
+    const min = now.getHours() * 60 + now.getMinutes();
+    if (min < startH * 60 || min > endH * 60) return "";
+    return `<span class="now-line" style="top:${Math.round((min - startH * 60) / 60 * hourPx)}px" aria-hidden="true"></span>`;
   }
 
   function monthGridHtml() {
@@ -821,8 +839,12 @@ const App = (() => {
     const first = new Date(year, month, 1);
     const startDow = first.getDay(); // 0=ראשון
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const counts = {};
-    lessons.forEach(l => { if (l.date.startsWith(monthKey(calMonth))) counts[l.date] = (counts[l.date] || 0) + 1; });
+    const counts = {}, firstTime = {};
+    lessons.forEach(l => {
+      if (!l.date.startsWith(monthKey(calMonth))) return;
+      counts[l.date] = (counts[l.date] || 0) + 1;
+      if (!firstTime[l.date] || (l.time || "") < firstTime[l.date]) firstTime[l.date] = l.time || "";
+    });
 
     const dows = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
     let cells = dows.map(d => `<div class="cal-dow">${d}</div>`).join("");
@@ -837,8 +859,11 @@ const App = (() => {
         h ? "holiday" : "",
         has ? "has-lessons" : ""].filter(Boolean).join(" ");
       const title = [h ? h.name : "", has ? counts[ds] + " שיעורים" : ""].filter(Boolean).join(" · ");
+      // שיעור בודד — מציגים את השעה שלו (כמו יומן גוגל); כמה שיעורים — מונה
       const marker = has
-        ? `<span class="cal-count">${counts[ds]}</span>`
+        ? (counts[ds] === 1 && firstTime[ds]
+          ? `<span class="cal-time">${fmtTime(firstTime[ds])}</span>`
+          : `<span class="cal-count">${counts[ds]}</span>`)
         : (h ? '<span class="cal-dot holiday-dot"></span>' : "");
       cells += `<button type="button" class="${cls}" aria-label="${escapeHtml(`${day} ${calMonth.toLocaleDateString("he-IL", { month: "long" })}${title ? `, ${title}` : ""}`)}" onclick="App.selectCalDay('${ds}')">${day}${marker}</button>`;
     }
