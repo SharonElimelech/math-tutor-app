@@ -1903,12 +1903,22 @@ const App = (() => {
   function attachLiveSwipe(container, slides, neighborHtml) {
     if (!container) return;
     let sx = 0, sy = 0, active = false, locked = false, pid = 0, neighbors = [];
+    let trail = []; // דגימות אחרונות (t,x) — לזיהוי הטלה מהירה (flick)
 
     const parts = () => [...slides(), ...neighbors];
     const setX = (els, x, transition) => els.forEach(el => {
       el.style.transition = transition;
       el.style.transform = `translateX(${x}px)`;
     });
+
+    // מהירות אופקית (px/ms) על בסיס ~100ms האחרונות — הטלה קצרה ומהירה נספרת כהחלפת שבוע
+    function velocity() {
+      const now = performance.now();
+      const recent = trail.filter(p => now - p.t <= 100);
+      const a = recent[0], b = recent[recent.length - 1];
+      if (!a || !b || b.t - a.t < 15) return 0;
+      return (b.x - a.x) / (b.t - a.t);
+    }
 
     // פנלים שכנים משני הצדדים — רואים לאן גוררים עוד לפני השחרור
     function spawnNeighbors() {
@@ -1933,6 +1943,7 @@ const App = (() => {
       if (e.button !== 0 || !e.isPrimary || lessonDragging) return;
       sx = e.clientX; sy = e.clientY;
       active = true; locked = false; pid = e.pointerId;
+      trail = [{ t: performance.now(), x: e.clientX }];
     });
 
     container.addEventListener("pointermove", e => {
@@ -1944,20 +1955,24 @@ const App = (() => {
         return;
       }
       const dx = e.clientX - sx, dy = e.clientY - sy;
+      trail.push({ t: performance.now(), x: e.clientX });
+      if (trail.length > 12) trail.shift();
       if (!locked) {
-        // נעילה אופקית קפדנית — גלילה אנכית לא מזיזה את היומן לצדדים
-        if (Math.abs(dx) > 14 && Math.abs(dx) > 1.6 * Math.abs(dy)) {
+        // נעילה מוקדמת ורגישה — תופסים את המחווה לפני שהדפדפן לוקח אותה לגלילה
+        if (Math.abs(dx) > 10 && Math.abs(dx) > 1.25 * Math.abs(dy)) {
           locked = true;
+          sx = e.clientX; // איפוס נקודת הייחוס — הלוח לא קופץ בפתיחת הגרירה
           container.classList.add("cal-dragging");
           spawnNeighbors();
           try { container.setPointerCapture(pid); } catch { /* מצביע כבר לא פעיל */ }
-        } else if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) { active = false; return; }
+        } else if (Math.abs(dy) > 12 && Math.abs(dy) > 1.3 * Math.abs(dx)) { active = false; return; }
       }
-      if (locked) setX(parts(), dx, "none");
+      if (locked) setX(parts(), e.clientX - sx, "none");
     });
 
-    container.addEventListener("pointerup", e => {
-      if (!active || e.pointerId !== pid) return;
+    // סיום מחווה — משותף לשחרור אמיתי ול-cancel של הדפדפן, כדי שגרירה
+    // שנקטעת באמצע (למשל כשהדפדפן חוטף את המצביע) עדיין תושלם ולא תיזרק.
+    function finish(endX) {
       active = false;
       container.classList.remove("cal-dragging");
       if (!locked) return;
@@ -1968,9 +1983,12 @@ const App = (() => {
       setTimeout(() => container.removeEventListener("click", swallow, true), 350);
       const els = parts();
       if (!els.length) return;
-      const dx = e.clientX - sx;
+      const dx = endX - sx;
       const width = container.offsetWidth || 320;
-      if (Math.abs(dx) < Math.min(90, width * 0.25)) {
+      const v = velocity();
+      // החלפה: גרירה של 20% מהרוחב, או הטלה מהירה (flick) גם אם קצרה
+      const flick = Math.abs(dx) > 20 && Math.abs(v) > 0.35 && Math.sign(v) === Math.sign(dx);
+      if (Math.abs(dx) < Math.min(72, width * 0.2) && !flick) {
         setX(els, 0, "transform .2s ease-out"); // לא מספיק — קפיצה חזרה
         setTimeout(clearNeighbors, 220);
         return;
@@ -1986,17 +2004,17 @@ const App = (() => {
           requestAnimationFrame(() => setX(next, 0, "transform .22s ease-out"));
         }
       }, 180);
+    }
+
+    container.addEventListener("pointerup", e => {
+      if (!active || e.pointerId !== pid) return;
+      finish(e.clientX);
     });
 
     container.addEventListener("pointercancel", e => {
       if (!active || e.pointerId !== pid) return;
-      active = false;
-      container.classList.remove("cal-dragging");
-      if (locked) {
-        locked = false;
-        setX(parts(), 0, "transform .2s ease-out");
-        setTimeout(clearNeighbors, 220);
-      }
+      // ב-cancel הקואורדינטות לא אמינות — מסיימים לפי הדגימה האחרונה שנרשמה
+      finish(trail.length ? trail[trail.length - 1].x : sx);
     });
   }
 
