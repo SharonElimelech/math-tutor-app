@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Heebo:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=30">
+  <link rel="stylesheet" href="styles.css?v=31">
   <link rel="apple-touch-icon" href="icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -24,18 +24,15 @@
     </div>
     <div class="header-right">
       <div id="reminderBadge" class="reminder-badge hidden" role="status" aria-live="polite"></div>
-      <button class="header-icon-btn" aria-label="הגדרות" onclick="App.go('settings')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      </button>
     </div>
   </header>
 
   <main id="app">
     <!-- מסך: בית / שיעורים קרובים -->
     <section id="view-home" class="view active">
-      <div id="homeCalendar" class="home-calendar"></div>
       <div id="confirmQueue"></div>
       <div id="onboard"></div>
+      <div id="homeCalendar" class="home-calendar"></div>
       <div class="home-dashboard">
         <div class="home-primary">
           <div class="page-intro">
@@ -82,21 +79,6 @@
       <div id="studentsList" class="list"></div>
     </section>
 
-    <!-- מסך: יומן -->
-    <section id="view-calendar" class="view">
-      <div class="view-head">
-        <div class="view-head-copy"><h2>יומן שיעורים</h2><p>תכנון, מעקב וסימון ביצוע.</p></div>
-        <button class="btn-add" onclick="App.openLessonForm()"><span aria-hidden="true">+</span> שיעור חדש</button>
-      </div>
-      <div class="seg-toggle">
-        <button class="seg-btn active" data-cal="week" aria-pressed="true" onclick="App.setCalendarMode('week')">שבוע</button>
-        <button class="seg-btn" data-cal="month" aria-pressed="false" onclick="App.setCalendarMode('month')">חודש</button>
-        <button class="seg-btn" data-cal="list" aria-pressed="false" onclick="App.setCalendarMode('list')">רשימה</button>
-      </div>
-      <div id="calendarMonth" class="calendar-month hidden"></div>
-      <div id="lessonsList" class="list"></div>
-    </section>
-
     <!-- מסך: כספים (תשלומים + סיכום) -->
     <section id="view-money" class="view">
       <div class="page-intro compact"><div><h2>כספים</h2><p>גבייה פתוחה ותמונת הכנסות חודשית.</p></div></div>
@@ -135,8 +117,8 @@
   <nav class="bottom-nav" aria-label="ניווט ראשי">
     <button class="nav-btn active" data-view="home" aria-label="בית" aria-current="page" onclick="App.go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9"/></svg>בית</button>
     <button class="nav-btn" data-view="students" aria-label="תלמידים" onclick="App.go('students')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20"/><circle cx="9.5" cy="8" r="3.5"/><path d="M21 20v-1.5a4 4 0 0 0-3-3.9"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/></svg>תלמידים</button>
-    <button class="nav-btn" data-view="calendar" aria-label="יומן" onclick="App.go('calendar')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M16 2.5v4M8 2.5v4M3 9.5h18"/></svg>יומן</button>
     <button class="nav-btn" data-view="money" aria-label="כספים" onclick="App.go('money')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5.5a1.5 1.5 0 0 0-1.5-1.5H6a3 3 0 0 0 0 6h12a1.5 1.5 0 0 1 1.5 1.5V18a2 2 0 0 1-2 2H6a3 3 0 0 1-3-3V7"/><circle cx="16.5" cy="13.5" r="1.2"/></svg>כספים</button>
+    <button class="nav-btn" data-view="settings" aria-label="הגדרות" onclick="App.go('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>הגדרות</button>
   </nav>
 
   <!-- חלון מודאל כללי -->
@@ -163,6 +145,6 @@
   <!-- הודעות צפות -->
   <div id="toastWrap" class="toast-wrap" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="app.js?v=35"></script>
+  <script type="module" src="app.js?v=36"></script>
 </body>
 </html>

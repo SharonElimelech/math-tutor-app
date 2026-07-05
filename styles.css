@@ -475,6 +475,8 @@ main { width: 100%; padding: 24px 16px; max-width: 760px; margin: 0 auto; }
 .lesson-check svg { width: 18px; height: 18px; }
 .lesson-check:active { transform: scale(.9); }
 .lesson-check.done { background: var(--green); border-color: var(--green); color: #fff; }
+.lesson-wa { color: var(--wa); border-color: var(--wa); }
+.summary-remind { margin-top: 12px; }
 
 .past-toggle {
   width: 100%;

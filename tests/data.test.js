@@ -10,7 +10,7 @@ import {
   reminderLeadMinutes
 } from "../src/data.js";
 
-const student = { id: "student_1", name: "דנה", parentName: "רונית", phone: "0501234567", price: 120 };
+const student = { id: "student_1", name: "דנה", parentName: "רונית", phone: "0501234567", studentPhone: "0521234567", price: 120 };
 const lesson = {
   id: "lesson_1",
   studentId: student.id,

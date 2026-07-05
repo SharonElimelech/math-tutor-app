@@ -76,6 +76,7 @@ function normalizeStudent(input, index) {
     name: text(input.name, `student ${index + 1} name`, 120, { required: true }),
     parentName: text(input.parentName, `student ${index + 1} parentName`, 120),
     phone: text(input.phone, `student ${index + 1} phone`, 32),
+    studentPhone: text(input.studentPhone, `student ${index + 1} studentPhone`, 32),
     price: number(input.price, `student ${index + 1} price`, { max: 1000000 })
   };
 }

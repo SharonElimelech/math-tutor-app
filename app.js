@@ -71,8 +71,7 @@ const App = (() => {
   let viewMonth = new Date();      // החודש שמוצג בסיכום הכנסות
   let calMonth  = new Date();      // החודש שמוצג בלוח החודשי
   let selectedDay = null;          // יום נבחר בלוח החודשי
-  let calMode = "week";            // week | month | list
-  let homeCalMode = localStorage.getItem("mt_home_cal") || "week"; // day | week | month — תצוגת היומן בבית
+  let homeCalMode = localStorage.getItem("mt_home_cal") || "week"; // day | week | month | list — תצוגת היומן בבית
   let moneyTab = "payments";       // payments | income
   let showPast = false;
 
@@ -229,7 +228,7 @@ const App = (() => {
 
   // ========== תלמידים ==========
   function openStudentForm(id) {
-    const s = id ? studentById(id) : { name: "", parentName: "", phone: "", price: settings.defaultPrice };
+    const s = id ? studentById(id) : { name: "", parentName: "", phone: "", studentPhone: "", price: settings.defaultPrice };
     openModal(`
       <div class="modal-title-block">
         <span class="modal-title-icon">${icon("edit")}</span>
@@ -241,8 +240,10 @@ const App = (() => {
         <div id="err-name" class="field-error" style="display:none">נא להזין שם תלמיד</div>
         <div class="row">
           <div><label for="f-parent">שם ההורה</label><input id="f-parent" value="${escapeHtml(s.parentName)}" placeholder="לדוגמה: רונית"></div>
-          <div><label for="f-phone">טלפון לוואטסאפ</label><input id="f-phone" type="tel" inputmode="tel" value="${escapeHtml(s.phone)}" placeholder="05X-XXXXXXX" autocomplete="tel"></div>
+          <div><label for="f-phone">טלפון ההורה (וואטסאפ)</label><input id="f-phone" type="tel" inputmode="tel" value="${escapeHtml(s.phone)}" placeholder="05X-XXXXXXX" autocomplete="tel"></div>
         </div>
+        <label for="f-student-phone">טלפון התלמיד (וואטסאפ) — לתזכורות שיעור</label>
+        <input id="f-student-phone" type="tel" inputmode="tel" value="${escapeHtml(s.studentPhone || "")}" placeholder="05X-XXXXXXX">
         <label for="f-price">מחיר לשיעור (${escapeHtml(settings.currency)})</label>
         <input id="f-price" type="number" inputmode="numeric" min="0" value="${escapeHtml(s.price)}" placeholder="120">
       </div>
@@ -281,13 +282,17 @@ const App = (() => {
       return;
     }
     const phone = document.getElementById("f-phone").value.trim();
-    if (phone && !/[0-9]{6,}/.test(phone.replace(/[^0-9]/g, ""))) {
-      toast("מספר טלפון לא תקין", "err"); return;
+    const studentPhone = document.getElementById("f-student-phone").value.trim();
+    for (const p of [phone, studentPhone]) {
+      if (p && !/[0-9]{6,}/.test(p.replace(/[^0-9]/g, ""))) {
+        toast("מספר טלפון לא תקין", "err"); return;
+      }
     }
     const data = {
       name,
       parentName: document.getElementById("f-parent").value.trim(),
       phone,
+      studentPhone,
       price: Math.max(0, parseFloat(document.getElementById("f-price").value) || 0)
     };
     const successMessage = id ? "התלמיד עודכן" : "תלמיד נוסף";
@@ -397,7 +402,7 @@ const App = (() => {
       </div></div>
       <div class="modal-actions">
       <button class="btn btn-green btn-block" onclick="App.saveLesson('${id || ""}')">${icon("check")} ${id ? "שמירת שינויים" : "קביעת שיעור"}</button>
-      ${id && studentById(l.studentId) && studentById(l.studentId).phone
+      ${id && studentById(l.studentId) && (studentById(l.studentId).studentPhone || studentById(l.studentId).phone)
         ? `<button class="btn btn-wa btn-block" onclick="App.sendLessonReminder('${id}')">${icon("whatsapp")} שליחת תזכורת לתלמיד</button>` : ""}
       </div>
       ${id ? (l.seriesId ? `
@@ -610,6 +615,7 @@ const App = (() => {
   function lessonRow(l) {
     const s = studentById(l.studentId) || { name: "תלמיד שנמחק" };
     const isToday = l.date === todayStr();
+    const canRemind = !l.done && (s.studentPhone || s.phone);
     return `
       <div class="lesson-row ${l.done ? "is-done" : ""} ${isToday ? "is-today" : ""}" data-id="${l.id}">
         <button type="button" class="lesson-open" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור עם ${escapeHtml(s.name)} בשעה ${fmtTime(l.time)}">
@@ -619,6 +625,7 @@ const App = (() => {
             ${l.topic ? `<span class="lesson-topic">${icon("note", "ic-sub")} ${escapeHtml(l.topic)}</span>` : ""}
           </span>
         </button>
+        ${canRemind ? `<button class="lesson-check lesson-wa" onclick="App.sendLessonReminder('${l.id}')" aria-label="שליחת תזכורת וואטסאפ ל-${escapeHtml(s.name)}" title="תזכורת בוואטסאפ">${icon("whatsapp")}</button>` : ""}
         <button class="lesson-check ${l.done ? "done" : ""}" onclick="App.toggleDone('${l.id}')" aria-label="${l.done ? "ביטול סימון שיעור כבוצע" : "סימון שיעור כבוצע"}" aria-pressed="${l.done}" title="${l.done ? "בוצע" : "סמן כבוצע"}">${icon("check")}</button>
       </div>`;
   }
@@ -636,23 +643,9 @@ const App = (() => {
       </section>`;
   }
 
-  // ----- מתג שבוע / חודש / רשימה -----
-  function setCalendarMode(mode) {
-    calMode = mode;
-    if ((mode === "month" || mode === "week") && !selectedDay) selectedDay = todayStr();
-    document.querySelectorAll(".seg-btn[data-cal]").forEach(b => {
-      const active = b.dataset.cal === mode;
-      b.classList.toggle("active", active);
-      b.setAttribute("aria-pressed", String(active));
-    });
-    document.getElementById("calendarMonth").classList.toggle("hidden", mode === "list");
-    renderCalendar();
-  }
-
-  // היומן מוטמע גם בבית; ניווט צריך לרענן את המסך הפעיל
+  // היומן חי רק בבית — כל רענון של הלוח עובר דרך המסך הראשי
   function refreshCalendarSurface() {
-    if (activeViewName() === "home") renderHome();
-    else renderCalendar();
+    renderHome();
   }
 
   // ציר שעות של יממה מלאה נגלל בתוך הרשת; זוכרים את המיקום בין רינדורים.
@@ -665,9 +658,9 @@ const App = (() => {
     el.onscroll = () => { calScroll = el.scrollTop; };
   }
 
-  // ניווט מודע-מצב: בבית לפי מתג הבית; ביומן לפי המתג שלו
+  // ניווט מודע-מצב: שבוע קדימה/אחורה, או חודש במצב חודשי
   function calShift(delta) {
-    const weekMode = activeViewName() === "home" ? homeCalMode !== "month" : calMode === "week";
+    const weekMode = homeCalMode !== "month";
     if (weekMode) {
       const base = new Date((selectedDay || todayStr()) + "T00:00");
       base.setDate(base.getDate() + delta * 7);
@@ -874,13 +867,6 @@ const App = (() => {
       <div class="cal-grid">${cells}</div>`;
   }
 
-  function renderMonthGrid() {
-    const grid = document.getElementById("calendarMonth");
-    if (calMode !== "month") { grid.classList.add("hidden"); return; }
-    grid.classList.remove("hidden");
-    grid.innerHTML = monthGridHtml();
-  }
-
   // פירוט היום הנבחר מתחת ללוח החודשי
   function monthDayDetailHtml(day) {
     const h = holidayFor(day);
@@ -892,31 +878,11 @@ const App = (() => {
       `<button class="btn btn-light btn-block" onclick="App.openLessonForm()">${icon("plus")} קביעת שיעור ב-${fmtDate(day)}</button>`;
   }
 
-  function renderCalendar() {
-    const el = document.getElementById("lessonsList");
-    const top = document.getElementById("calendarMonth");
-
-    if (calMode === "week") {
-      const day = selectedDay || todayStr();
-      top.classList.remove("hidden");
-      top.innerHTML = renderWeekStrip(day);
-      el.innerHTML = renderDayAgenda(day);
-      applyCalScroll();
-      return;
-    }
-
-    renderMonthGrid();
-
-    if (calMode === "month") {
-      el.innerHTML = monthDayDetailHtml(selectedDay || todayStr());
-      return;
-    }
-
-    // מצב רשימה
+  // מצב רשימה בלוח הבית — כל השיעורים הקרובים לפי ימים, ועבר בקיפול
+  function listViewHtml() {
     const list = lessonSorted();
     if (!list.length) {
-      el.innerHTML = `<div class="empty empty-action">${icon("calendar")}<h3>היומן עדיין ריק</h3><p>קבעי שיעור ראשון כדי להתחיל לבנות את השבוע.</p><button class="btn btn-green" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
-      return;
+      return `<div class="empty empty-action">${icon("calendar")}<h3>היומן עדיין ריק</h3><p>קבעי שיעור ראשון כדי להתחיל לבנות את השבוע.</p><button class="btn btn-green" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
     }
     const today = todayStr();
     const upcoming = list.filter(l => l.date >= today);
@@ -934,10 +900,10 @@ const App = (() => {
         groupByDate(past).forEach((ls, date) => { html += dayGroupHtml(date, ls); });
       }
     }
-    el.innerHTML = html;
+    return html;
   }
 
-  function togglePast() { showPast = !showPast; renderCalendar(); }
+  function togglePast() { showPast = !showPast; renderHome(); }
 
   function setHomeCalMode(mode) {
     homeCalMode = mode;
@@ -1047,6 +1013,8 @@ const App = (() => {
         <div><span>${nextLesson ? "השיעור הבא" : "היומן מוכן"}</span><strong>${nextLesson ? escapeHtml(nextStudent?.name || "תלמיד") : "אין שיעורים קרובים"}</strong><p>${nextLesson ? `${dayLabelPlain(nextLesson.date)} בשעה ${fmtTime(nextLesson.time)}${nextLesson.topic ? ` · ${escapeHtml(nextLesson.topic)}` : ""}` : "אפשר לקבוע שיעור חדש בכל רגע."}</p></div>
         ${nextLesson ? `<button class="summary-time" onclick="App.openLessonForm('${nextLesson.id}')" aria-label="פתיחת השיעור הבא בשעה ${fmtTime(nextLesson.time)}">${fmtTime(nextLesson.time)}<span>פתיחת שיעור</span></button>` : `<button class="summary-time summary-add" onclick="App.openLessonForm()" aria-label="קביעת שיעור חדש">${icon("plus")}<span>שיעור חדש</span></button>`}
       </div>
+      ${nextLesson && nextStudent && (nextStudent.studentPhone || nextStudent.phone)
+        ? `<button class="btn btn-wa btn-block summary-remind" onclick="App.sendLessonReminder('${nextLesson.id}')">${icon("whatsapp")} שליחת תזכורת לשיעור הבא</button>` : ""}
       <div class="summary-foot">
         <span><b>${students.length}</b> ${students.length === 1 ? "תלמיד פעיל" : "תלמידים פעילים"}</span>
         <span><b>${openPayments}</b> ${openPayments === 1 ? "תשלום פתוח" : "תשלומים פתוחים"}</span>
@@ -1057,12 +1025,14 @@ const App = (() => {
     const calDay = selectedDay || today;
     const seg = (m, label) =>
       `<button type="button" class="seg-btn ${homeCalMode === m ? "active" : ""}" aria-pressed="${homeCalMode === m}" onclick="App.setHomeCalMode('${m}')">${label}</button>`;
-    const modeBar = `<div class="seg-toggle home-cal-seg" role="group" aria-label="תצוגת יומן">${seg("day", "יום")}${seg("week", "שבוע")}${seg("month", "חודש")}</div>`;
+    const modeBar = `<div class="seg-toggle home-cal-seg" role="group" aria-label="תצוגת יומן">${seg("day", "יום")}${seg("week", "שבוע")}${seg("month", "חודש")}${seg("list", "רשימה")}</div>`;
     const body = homeCalMode === "week"
       ? renderWeekGrid(calDay)
       : homeCalMode === "month"
         ? monthGridHtml() + monthDayDetailHtml(calDay)
-        : renderWeekStrip(calDay) + renderDayAgenda(calDay);
+        : homeCalMode === "list"
+          ? listViewHtml()
+          : renderWeekStrip(calDay) + renderDayAgenda(calDay);
     document.getElementById("homeCalendar").innerHTML = modeBar + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
     applyCalScroll();
 
@@ -1212,9 +1182,9 @@ const App = (() => {
 
   // ----- וואטסאפ: הודעה מוכנה + קישור לשליחה בלחיצה -----
   // פתיחת וואטסאפ עם הודעה מוכנה. מנרמל מספר ישראלי לפורמט בינלאומי.
-  function waOpen(student, msg) {
-    if (!student.phone) { toast("לתלמיד אין מספר טלפון. הוסיפי אותו במסך התלמידים.", "err"); return; }
-    let phone = student.phone.replace(/[^0-9]/g, "");
+  function waOpen(rawPhone, msg) {
+    if (!rawPhone) { toast("לתלמיד אין מספר טלפון. הוסיפי אותו במסך התלמידים.", "err"); return; }
+    let phone = rawPhone.replace(/[^0-9]/g, "");
     if (phone.startsWith("00")) phone = phone.slice(2);
     if (phone.startsWith("0")) phone = "972" + phone.slice(1);
     else if (!phone.startsWith("972")) phone = "972" + phone;
@@ -1233,7 +1203,7 @@ const App = (() => {
       `תזכורת ידידותית לגבי תשלום עבור השיעורים הפרטיים של ${s.name}.\n` +
       `סה"כ ${unpaid.length} שיעורים שטרם שולמו, בסך ${owed} ${settings.currency}.\n` +
       `תודה רבה!`;
-    waOpen(s, msg);
+    waOpen(s.phone, msg);
   }
 
   // תזכורת שיעור מוכנה לשליחה לתלמיד/הורה
@@ -1242,14 +1212,18 @@ const App = (() => {
     if (!l) return;
     const s = studentById(l.studentId);
     if (!s) return;
-    const greet = s.parentName ? `שלום ${s.parentName},` : "שלום,";
+    // תזכורת שיעור נשלחת לטלפון של התלמיד; אם אין — לטלפון ההורה
+    const toStudent = !!s.studentPhone;
+    const greet = toStudent ? `שלום ${s.name},` : (s.parentName ? `שלום ${s.parentName},` : "שלום,");
     const when = dayLabelPlain(l.date);
     const msg =
       `${greet}\n` +
-      `תזכורת לשיעור של ${s.name} ${when} בשעה ${l.time}.` +
+      (toStudent
+        ? `תזכורת לשיעור ${when} בשעה ${l.time}.`
+        : `תזכורת לשיעור של ${s.name} ${when} בשעה ${l.time}.`) +
       (l.topic ? `\nנושא: ${l.topic}.` : "") +
       `\nנתראה!`;
-    waOpen(s, msg);
+    waOpen(s.studentPhone || s.phone, msg);
   }
 
   // ========== גיבוי ושחזור ==========
@@ -1809,7 +1783,6 @@ const App = (() => {
     renderHeader();
     if (view === "home") renderHome();
     else if (view === "students") renderStudents();
-    else if (view === "calendar") renderCalendar();
     else if (view === "money") renderMoney();
     else if (view === "settings") renderSettings();
   }
@@ -1861,10 +1834,6 @@ const App = (() => {
     attachLiveSwipe(document.getElementById("homeCalendar"),
       () => [document.getElementById("homeCalSlide")].filter(Boolean),
       homeNeighborHtml);
-    // בטאב היומן התוכן מפוצל בין שני אלמנטים — מזיזים את שניהם יחד, בלי פנל שכן
-    attachLiveSwipe(document.getElementById("view-calendar"),
-      () => ["calendarMonth", "lessonsList"].map(id => document.getElementById(id))
-        .filter(el => el && !el.classList.contains("hidden")));
   }
 
   // התוכן של התקופה השכנה (dir = 1 קדימה / -1 אחורה) — מוצג בזמן הגרירה
@@ -2126,7 +2095,7 @@ const App = (() => {
     confirmLesson, skipLesson,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
-    setCalendarMode, calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson,
+    calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson,
     setMoneyTab, sendWhatsApp, sendLessonReminder, markAllPaid,
     exportData, importData, exportCalendar,
     changeMonth,
