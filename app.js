@@ -1439,10 +1439,10 @@ const App = (() => {
         </div>
         <div class="settings-action-stack reminder-actions">
           <button class="btn btn-green btn-block" onclick="App.exportCalendar()">${icon("calendar")} הוספת השיעורים ליומן הטלפון</button>
+          <button class="btn btn-light btn-block" onclick="App.testClosedPush()">${icon("bell")} בדיקה: התראה למייל כשהאפליקציה סגורה</button>
           ${notifSupported && Notification.permission === "granted"
-            ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה</button>` +
-              (pushSupported() ? `<button class="btn btn-light btn-block" onclick="App.testClosedPush()">${icon("bell")} בדיקת התראה כשהאפליקציה סגורה</button>` : "")
-            : `<button class="btn btn-light btn-block" onclick="App.enableNotifications()">${icon("bell")} הפעלת התראות</button>`}
+            ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה באפליקציה</button>`
+            : `<button class="btn btn-light btn-block" onclick="App.enableNotifications()">${icon("bell")} הפעלת התראות באפליקציה</button>`}
         </div>
       </section>
 
@@ -1553,21 +1553,20 @@ const App = (() => {
   let reminderTimer = 0;
 
   function notifStatusText() {
-    if (isIOS() && !isStandalone()) return "כדי לקבל התראות באייפון יש להתקין את האפליקציה למסך הבית";
-    if (!notifSupported) return "הדפדפן לא תומך בהתראות";
-    if (Notification.permission === "granted") return pushSupported() ? "מופעל — גם כשהאפליקציה סגורה" : "מופעל באפליקציה פתוחה";
-    if (Notification.permission === "denied") return "חסום — יש לאפשר בהגדרות הדפדפן";
-    return "כבוי — לחצי 'הפעלת התראות'";
+    // המייל הוא ערוץ הרקע האמין — עובד תמיד, גם באייפון שאינו מותקן למסך הבית
+    if (Notification.permission === "granted" && pushSupported()) return "מופעל — תזכורות למייל וגם התראות באפליקציה";
+    return "תזכורות שיעור נשלחות למייל שלך — גם כשהאפליקציה סגורה";
   }
   function notifHelpText() {
-    if (pushSupported() && Notification.permission === "granted")
-      return "תזכורות שיעור יגיעו לטלפון גם כשהאפליקציה סגורה. אפשר בנוסף להוסיף את השיעורים ליומן.";
-    return "להתראות גם כשהאפליקציה סגורה: התקיני את האפליקציה למסך הבית והפעילי התראות, או הורידי את השיעורים ליומן הטלפון.";
+    return "כל תזכורת שיעור נשלחת למייל aruitkh11@gmail.com בזמן, גם כשהטלפון נעול והאפליקציה סגורה. אפשר בנוסף להוסיף את השיעורים ליומן או להפעיל התראות כשהאפליקציה פתוחה.";
   }
 
   function initReminders() {
+    // סנכרון תזכורות לשרת המייל תמיד — לא תלוי בהרשאת התראות (חשוב באייפון)
+    trySyncPush();
     if (notifSupported && Notification.permission === "granted") startInterval();
     const resume = () => {
+      trySyncPush();
       if (!notifSupported || Notification.permission !== "granted") return;
       startInterval();
       void checkReminders();
@@ -1652,10 +1651,10 @@ const App = (() => {
   }
 
   function reschedule() {
+    trySyncPush(); // מייל: תמיד מסנכרן את התזכורות המעודכנות לשרת
     if (notifSupported && Notification.permission === "granted") {
       scheduleNextReminder();
       void checkReminders();
-      trySyncPush();
     }
   }
 
@@ -1670,39 +1669,33 @@ const App = (() => {
     try { return JSON.parse(localStorage.getItem(PUSH_SYNC_KEY)); } catch { return null; }
   }
   function trySyncPush() {
-    if (!pushSupported()) return;
+    // רץ תמיד — המייל לא תלוי בתמיכת push (חשוב באייפון שאינו מותקן למסך הבית)
     syncPush(lessons, lessonIndex.studentsById, reminderLeadMinutes(settings.remindMinutes))
       .then(state => rememberPushSync(state))
       .catch(error => { rememberPushSync("fail"); console.warn("Push sync failed", error); });
   }
 
-  // שורת סטטוס להתראות ברקע במסך ההגדרות
+  // שורת סטטוס לתזכורות רקע (מייל) במסך ההגדרות
   function pushStatusHtml() {
-    if (!pushSupported() || Notification.permission !== "granted") return "";
     const s = lastPushSync();
     if (!s) return "";
     if (s.state === "ok") {
       const when = new Date(s.at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-      return `<p class="push-status ok">✓ התראות ברקע מסונכרנות (עודכן ${when})</p>`;
+      return `<p class="push-status ok">✓ התזכורות מסונכרנות לשרת המייל (עודכן ${when})</p>`;
     }
-    if (s.state === "nosub") return `<p class="push-status warn">התראות ברקע לא הופעלו במכשיר הזה — לחצי "הפעלת התראות"</p>`;
-    return `<p class="push-status err">סנכרון ההתראות נכשל — בדקי חיבור לאינטרנט. ינוסה שוב אוטומטית.</p>`;
+    return `<p class="push-status err">סנכרון התזכורות נכשל — בדקי חיבור לאינטרנט. ינוסה שוב אוטומטית.</p>`;
   }
 
-  // בדיקה אמיתית של התראה כשהאפליקציה סגורה — עוברת דרך השרת, לא דרך הדף
+  // בדיקה אמיתית של תזכורת כשהאפליקציה סגורה — עוברת דרך השרת (מייל + push אם יש)
   async function testClosedPush() {
     try {
       await sendClosedAppTest(lessons, lessonIndex.studentsById, reminderLeadMinutes(settings.remindMinutes));
       rememberPushSync("ok");
-      toast("נשלח! סגרי עכשיו את האפליקציה — ההתראה תגיע תוך 2-7 דקות", "ok");
+      toast("נשלח! סגרי עכשיו את האפליקציה — התזכורת תגיע למייל תוך 2-7 דקות", "ok");
     } catch (error) {
-      console.warn("Closed-app push test failed", error);
-      if (String(error.message) === "no-subscription") {
-        toast("אין מנוי התראות במכשיר — לחצי קודם 'הפעלת התראות'", "err");
-      } else {
-        rememberPushSync("fail");
-        toast("השליחה לשרת נכשלה — בדקי חיבור לאינטרנט", "err");
-      }
+      console.warn("Closed-app reminder test failed", error);
+      rememberPushSync("fail");
+      toast("השליחה לשרת נכשלה — בדקי חיבור לאינטרנט", "err");
       renderSettings();
     }
   }

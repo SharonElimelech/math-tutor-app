@@ -11,3 +11,4 @@ id = "aac4e0266d82477d9b8ad899176f359b"
 
 [vars]
 VAPID_PUBLIC_KEY = "BHhFFPc6qcDFpasSyWrqfsMUdq4-InJTvr-ehC_1EVSSBlfNmG6rprnc0ONBPsqsMxnKuFY6ROfqMqCF9LW-wew"
+EMAIL_TO = "aruitkh11@gmail.com"

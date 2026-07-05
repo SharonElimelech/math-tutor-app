@@ -1,7 +1,8 @@
 // Push server for "המורה שלי".
-// Stores only push subscriptions + fire timestamps (no lesson content — privacy).
-// Cron fires an empty push ("tickle"); the app's service worker reads reminder
-// texts from its local cache and shows the notification.
+// Stores reminder items (time + text) per device. Cron delivers due reminders
+// two ways: email via Resend (reliable on iPhone even when the phone is locked)
+// and an empty web push "tickle" when a push subscription exists.
+// Note: reminder texts now live on the server — required for email delivery.
 
 const enc = new TextEncoder();
 const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf)))
@@ -39,9 +40,6 @@ async function vapidAuth(endpoint, env) {
   return `vapid t=${head}.${payload}.${b64u(sig)}, k=${env.VAPID_PUBLIC_KEY}`;
 }
 
-const subKey = async endpoint =>
-  "sub:" + b64u(await crypto.subtle.digest("SHA-256", enc.encode(endpoint)));
-
 export default {
   async fetch(req, env) {
     const reply = (body, status = 200) => new Response(body, { status, headers: corsFor(req) });
@@ -51,15 +49,17 @@ export default {
 
     let body;
     try { body = await req.json(); } catch { return reply("bad json", 400); }
-    const { sub, times } = body || {};
-    if (!sub || typeof sub.endpoint !== "string" || !sub.endpoint.startsWith("https://") || !Array.isArray(times)) {
+    const { id, sub, items } = body || {};
+    if (typeof id !== "string" || !/^[\w-]{8,64}$/.test(id) || !Array.isArray(items)) {
       return reply("bad request", 400);
     }
-    const clean = times.map(Number)
-      .filter(t => Number.isFinite(t) && t > Date.now() - 3600e3)
-      .sort((a, b) => a - b)
+    const okSub = sub && typeof sub.endpoint === "string" && sub.endpoint.startsWith("https://") ? sub : null;
+    const clean = items
+      .filter(i => i && Number.isFinite(Number(i.t)) && Number(i.t) > Date.now() - 3600e3)
+      .map(i => ({ t: Number(i.t), title: String(i.title || "").slice(0, 120), body: String(i.body || "").slice(0, 400) }))
+      .sort((a, b) => a.t - b.t)
       .slice(0, 500);
-    await env.SUBS.put(await subKey(sub.endpoint), JSON.stringify({ sub, times: clean }));
+    await env.SUBS.put("sub:" + id, JSON.stringify({ sub: okSub, items: clean }));
     return reply("ok");
   },
 
@@ -73,16 +73,36 @@ async function deliverDue(env) {
   const list = await env.SUBS.list({ prefix: "sub:" });
   for (const { name } of list.keys) {
     const rec = await env.SUBS.get(name, "json");
-    if (!rec || !Array.isArray(rec.times)) continue;
-    const due = rec.times.some(t => t <= now);
-    if (!due) continue;
-    // Prune before sending so a failed push never re-fires forever.
-    await env.SUBS.put(name, JSON.stringify({ ...rec, times: rec.times.filter(t => t > now) }));
-    // One empty push wakes the SW; it shows every due reminder from its cache.
-    const res = await fetch(rec.sub.endpoint, {
-      method: "POST",
-      headers: { TTL: "3600", Urgency: "high", Authorization: await vapidAuth(rec.sub.endpoint, env) }
-    });
-    if (res.status === 404 || res.status === 410) await env.SUBS.delete(name);
+    if (!rec) continue;
+    // Legacy record (times only, keyed by endpoint hash) — delete; app re-syncs in the new format.
+    if (!Array.isArray(rec.items)) { await env.SUBS.delete(name); continue; }
+    const due = rec.items.filter(i => i.t <= now);
+    if (!due.length) continue;
+    // Prune before sending so a failed delivery never re-fires forever.
+    await env.SUBS.put(name, JSON.stringify({ sub: rec.sub, items: rec.items.filter(i => i.t > now) }));
+
+    if (env.RESEND_API_KEY && env.EMAIL_TO) {
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: "המורה שלי <onboarding@resend.dev>",
+          to: env.EMAIL_TO,
+          subject: due[0].title || "תזכורת שיעור",
+          text: due.map(i => i.body || i.title || "תזכורת").join("\n")
+        })
+      });
+    }
+
+    if (rec.sub) {
+      // One empty push wakes the SW; it shows every due reminder from its cache.
+      const res = await fetch(rec.sub.endpoint, {
+        method: "POST",
+        headers: { TTL: "3600", Urgency: "high", Authorization: await vapidAuth(rec.sub.endpoint, env) }
+      });
+      if (res.status === 404 || res.status === 410) {
+        await env.SUBS.put(name, JSON.stringify({ sub: null, items: rec.items.filter(i => i.t > now) }));
+      }
+    }
   }
 }

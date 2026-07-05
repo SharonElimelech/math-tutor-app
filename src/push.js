@@ -1,6 +1,6 @@
-// Web Push — התראות גם כשהאפליקציה סגורה (iOS 16.4+ מותקנת למסך הבית).
-// השרת שומר רק זמני שליחה; טקסט ההתראה נשמר במטמון המקומי וה-service worker
-// קורא אותו כשמגיע push. ככה אין שמות תלמידים בענן ואין קריפטו של payload.
+// התראות כשהאפליקציה סגורה: השרת שולח מייל בזמן התזכורת (אמין באייפון גם
+// כשהטלפון נעול) + web push כשיש מנוי. טקסט התזכורת נשלח לשרת כדי שהמייל
+// יכיל את פרטי השיעור.
 
 export const PUSH_SERVER = "https://mytutor-push.aruitkh11.workers.dev";
 export const VAPID_PUBLIC_KEY = "BHhFFPc6qcDFpasSyWrqfsMUdq4-InJTvr-ehC_1EVSSBlfNmG6rprnc0ONBPsqsMxnKuFY6ROfqMqCF9LW-wew";
@@ -49,16 +49,33 @@ export async function enablePush() {
   });
 }
 
-// כתיבה למטמון (בשביל ה-SW) ושליחת הזמנים לשרת. זורק על כשל HTTP.
+// מזהה מכשיר קבוע — מפתח הרשומה בשרת, כדי שמייל יעבוד גם בלי מנוי push
+const CLIENT_ID_KEY = "mt_push_client";
+function clientId() {
+  let id = localStorage.getItem(CLIENT_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(CLIENT_ID_KEY, id);
+  }
+  return id;
+}
+
+// כתיבה למטמון (בשביל ה-SW) ושליחת התזכורות לשרת. זורק על כשל HTTP.
 async function writeAndSync(sub, items) {
-  const cache = await caches.open(PUSH_CACHE);
-  await cache.put("reminders", new Response(JSON.stringify(items), {
-    headers: { "Content-Type": "application/json" }
-  }));
+  try {
+    const cache = await caches.open(PUSH_CACHE);
+    await cache.put("reminders", new Response(JSON.stringify(items), {
+      headers: { "Content-Type": "application/json" }
+    }));
+  } catch { /* אין Cache API — המייל עדיין יעבוד */ }
   const res = await fetch(`${PUSH_SERVER}/sync`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sub: sub.toJSON(), times: items.map(i => i.t) })
+    body: JSON.stringify({
+      id: clientId(),
+      sub: sub ? sub.toJSON() : null,
+      items: items.map(({ t, title, body }) => ({ t, title, body }))
+    })
   });
   if (!res.ok) throw new Error(`sync-failed-${res.status}`);
 }
@@ -74,28 +91,32 @@ export async function pushSubscribed() {
   }
 }
 
-// סנכרון: תזכורות למטמון + זמנים לשרת. רץ אחרי כל שמירה.
-// מחזיר "ok" / "nosub" (אין מנוי או אין תמיכה); זורק על כשל רשת/שרת.
+// המנוי הנוכחי אם קיים — נכשל בשקט, מייל לא תלוי במנוי.
+async function currentSub() {
+  if (!pushSupported()) return null;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    return await reg.pushManager.getSubscription();
+  } catch {
+    return null;
+  }
+}
+
+// סנכרון: תזכורות למטמון + לשרת (מייל תמיד, push אם יש מנוי). רץ אחרי כל שמירה.
+// מחזיר "ok"; זורק על כשל רשת/שרת.
 export async function syncPush(lessons, studentsById, leadMinutes) {
-  if (!pushSupported()) return "nosub";
-  const reg = await navigator.serviceWorker.ready;
-  const sub = await reg.pushManager.getSubscription();
-  if (!sub) return "nosub";
-  await writeAndSync(sub, upcomingPushReminders(lessons, studentsById, leadMinutes));
+  await writeAndSync(await currentSub(), upcomingPushReminders(lessons, studentsById, leadMinutes));
   return "ok";
 }
 
 // בדיקת "אפליקציה סגורה": תזכורת בדיקה בעוד 2 דק' + סנכרון לשרת.
-// ה-cron רץ כל 5 דק' — ההתראה תגיע תוך 2-7 דקות. מחזיר את זמן הבדיקה.
+// ה-cron רץ כל 5 דק' — ההתראה/מייל יגיעו תוך 2-7 דקות. מחזיר את זמן הבדיקה.
 // ponytail: סנכרון רגיל שירוץ לפני שהבדיקה נורתה ידרוס אותה — זניח, המשתמשת מתבקשת לסגור את האפליקציה.
 export async function sendClosedAppTest(lessons, studentsById, leadMinutes) {
-  const reg = await navigator.serviceWorker.ready;
-  const sub = await reg.pushManager.getSubscription();
-  if (!sub) throw new Error("no-subscription");
   const items = upcomingPushReminders(lessons, studentsById, leadMinutes);
   const t = Date.now() + 2 * MINUTE;
-  items.push({ t, title: "בדיקת התראות ✓", body: "מצוין — ההתראות מגיעות גם כשהאפליקציה סגורה", tag: "push-test" });
+  items.push({ t, title: "בדיקת התראות ✓", body: "מצוין — התזכורות מגיעות גם כשהאפליקציה סגורה", tag: "push-test" });
   items.sort((a, b) => a.t - b.t);
-  await writeAndSync(sub, items);
+  await writeAndSync(await currentSub(), items);
   return t;
 }
