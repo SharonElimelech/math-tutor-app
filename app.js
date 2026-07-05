@@ -351,6 +351,10 @@ const App = (() => {
       ? lessons.find(x => x.id === id)
       : { studentId: presetStudentId || "", date: selectedDay || todayStr(), time: quickAddTime || settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
     const priceVal = (typeof l.price === "number") ? l.price : "";
+    // כמה שיעורים עתידיים יש לתלמיד הזה — לכפתור "מחיקת כל העתידיים"
+    const futureCount = id
+      ? lessons.filter(x => x.studentId === l.studentId && x.date >= todayStr() && !x.done).length
+      : 0;
     openModal(`
       <div class="modal-title-block">
         <span class="modal-title-icon">${icon("calendar")}</span>
@@ -411,6 +415,9 @@ const App = (() => {
       ` : `
         <div class="danger-zone"><div><strong>מחיקת שיעור</strong><span>השיעור יוסר מהיומן</span></div><button class="btn btn-danger" onclick="App.deleteLesson('${id}')">מחיקה</button></div>
       `) : ""}
+      ${id && futureCount > 1 ? `
+        <div class="danger-zone"><div><strong>כל השיעורים העתידיים של התלמיד</strong><span>${futureCount} שיעורים שטרם התקיימו יימחקו מהיומן</span></div><button class="btn btn-danger" onclick="App.deleteStudentFuture('${id}')">מחיקת הכל</button></div>
+      ` : ""}
     `);
     renderStudentPicker();
   }
@@ -531,6 +538,26 @@ const App = (() => {
     if (!save()) { render(); return; }
     closeModal(); render();
     toast(`נמחקו ${removed} שיעורים`);
+  }
+
+  // מחיקת כל השיעורים העתידיים של התלמיד — מכל הסדרות והמועדים הבודדים יחד
+  async function deleteStudentFuture(lessonId) {
+    const l = lessons.find(x => x.id === lessonId);
+    if (!l) return;
+    const s = studentById(l.studentId);
+    const today = todayStr();
+    const future = lessons.filter(x => x.studentId === l.studentId && x.date >= today && !x.done);
+    if (!future.length) return;
+    if (!await askConfirmation(
+      `${future.length} השיעורים העתידיים של ${s?.name || "התלמיד"} יימחקו מהיומן. שיעורים שכבר התקיימו יישארו במעקב התשלומים.`,
+      "מחיקת כל העתידיים")) return;
+    const ids = new Set(future.map(x => x.id));
+    lessons = lessons.filter(x => !ids.has(x.id));
+    // עצירת סדרות פתוחות של התלמיד — שלא ייווצרו שיעורים חדשים אוטומטית
+    lessons.forEach(x => { if (x.studentId === l.studentId) x.openEnded = false; });
+    if (!save()) { render(); return; }
+    closeModal(); render();
+    toast(`נמחקו ${ids.size} שיעורים עתידיים`);
   }
 
   // הארכה אוטומטית של סדרות "כל שבוע" כדי שתמיד יהיו שיעורים עתידיים (תחושת אינסוף)
@@ -2112,7 +2139,7 @@ const App = (() => {
   return {
     go, closeModal, renderStudents,
     openStudentForm, saveStudent, deleteStudent,
-    openLessonForm, saveLesson, deleteLesson, deleteSeriesFuture, toggleDone,
+    openLessonForm, saveLesson, deleteLesson, deleteSeriesFuture, deleteStudentFuture, toggleDone,
     confirmLesson, skipLesson,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
