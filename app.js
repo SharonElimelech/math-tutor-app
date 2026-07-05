@@ -25,7 +25,7 @@ import {
   paymentSignature,
   reminderSignature
 } from "./src/reminders.js";
-import { enablePush, pushSupported, syncPush, sendClosedAppTest } from "./src/push.js";
+import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest } from "./src/push.js";
 
 /* =========================================================
    "המורה שלי" – אפליקציה לניהול שיעורים פרטיים
@@ -1403,6 +1403,7 @@ const App = (() => {
             <h4>תזכורת ${settings.remindMinutes} דקות לפני שיעור</h4>
             <p>${notifHelpText()}</p>
             ${pushStatusHtml()}
+            <p id="pushDiag" class="push-diag" aria-live="polite"></p>
           </div>
           <input type="number" inputmode="numeric" min="0" value="${settings.remindMinutes}" onchange="App.updateSetting('remindMinutes', this.value)" aria-label="דקות לפני שיעור">
         </div>
@@ -1450,6 +1451,19 @@ const App = (() => {
         <div class="app-version">המורה שלי · גרסה ${APP_VERSION}</div>
       </section>
     `;
+    fillPushDiag();
+  }
+
+  // שורת אבחון התראות — עוזרת להבין למה התראות רקע לא נרשמות במכשיר
+  function fillPushDiag() {
+    const el = document.getElementById("pushDiag");
+    if (!el) return;
+    const perm = !notifSupported ? "אין תמיכה"
+      : Notification.permission === "granted" ? "אושרה"
+      : Notification.permission === "denied" ? "חסומה" : "טרם נשאלה";
+    pushSubscribed().then(sub => {
+      el.textContent = `אבחון: הרשאה: ${perm} · מותקנת למסך הבית: ${isStandalone() ? "כן" : "לא"} · תמיכת רקע: ${pushSupported() ? "כן" : "לא"} · רישום בשרת: ${sub ? "כן" : "לא"}`;
+    });
   }
 
   function updateSetting(key, value) {
@@ -1566,7 +1580,7 @@ const App = (() => {
     const p = await Notification.requestPermission();
     if (p === "granted") {
       startInterval();
-      let pushOk = false;
+      let pushOk = false, pushErr = "";
       if (pushSupported()) {
         try {
           await enablePush();
@@ -1574,9 +1588,12 @@ const App = (() => {
           pushOk = true;
         } catch (error) {
           console.warn("Push subscribe failed", error);
+          pushErr = `${error?.name || ""}: ${error?.message || error}`;
         }
       }
-      toast(pushOk ? "התראות הופעלו — כולל כשהאפליקציה סגורה" : "התראות הופעלו (באפליקציה פתוחה)", "ok");
+      if (pushOk) toast("התראות הופעלו — כולל כשהאפליקציה סגורה", "ok");
+      else if (pushErr) toast(`ההתראות פועלות רק כשהאפליקציה פתוחה — רישום ברקע נכשל (${pushErr})`, "err");
+      else toast("התראות הופעלו (באפליקציה פתוחה)", "ok");
       await testNotification();
     } else {
       toast("ההרשאה לא ניתנה", "err");

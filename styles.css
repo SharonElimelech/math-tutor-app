@@ -1589,6 +1589,7 @@ input, select { min-height: 48px; }
 .push-status.ok { color: var(--green); }
 .push-status.warn { color: var(--muted); }
 .push-status.err { color: var(--red); }
+.push-diag { margin-top: 8px; font-size: .72rem; color: var(--faint); direction: rtl; }
 
 /* היומן בכיוון LTR כמו יומן גוגל — ראשון משמאל, ציר שעות משמאל */
 .week-grid, .week-strip, .cal-grid, .cal-head, .day-agenda, .cal-toolbar-nav { direction: ltr; }
