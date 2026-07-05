@@ -993,7 +993,25 @@ const App = (() => {
     </div>`;
   }
 
+  // בית = יומן בלבד; כל השאר עבר למסך "סיכום"
   function renderHome() {
+    const calDay = selectedDay || todayStr();
+    const seg = (m, label) =>
+      `<button type="button" class="seg-btn ${homeCalMode === m ? "active" : ""}" aria-pressed="${homeCalMode === m}" onclick="App.setHomeCalMode('${m}')">${label}</button>`;
+    const modeBar = `<div class="seg-toggle home-cal-seg" role="group" aria-label="תצוגת יומן">${seg("day", "יום")}${seg("week", "שבוע")}${seg("month", "חודש")}${seg("list", "רשימה")}</div>`;
+    const body = homeCalMode === "week"
+      ? renderWeekGrid(calDay)
+      : homeCalMode === "month"
+        ? monthGridHtml() + monthDayDetailHtml(calDay)
+        : homeCalMode === "list"
+          ? listViewHtml()
+          : renderWeekStrip(calDay) + renderDayAgenda(calDay);
+    document.getElementById("homeCalendar").innerHTML = modeBar + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
+    applyCalScroll();
+  }
+
+  // מסך סיכום — השיעור הבא, קיצורי דרך, אישורי שיעורים וגבייה פתוחה
+  function renderOverview() {
     document.getElementById("homeGreeting").textContent =
       settings.teacherName ? `שלום ${settings.teacherName}` : "שלום";
 
@@ -1020,21 +1038,6 @@ const App = (() => {
         <span><b>${openPayments}</b> ${openPayments === 1 ? "תשלום פתוח" : "תשלומים פתוחים"}</span>
       </div>
     `;
-
-    // יומן מוטמע בבית — יום / שבוע / חודש, כמו יומן גוגל
-    const calDay = selectedDay || today;
-    const seg = (m, label) =>
-      `<button type="button" class="seg-btn ${homeCalMode === m ? "active" : ""}" aria-pressed="${homeCalMode === m}" onclick="App.setHomeCalMode('${m}')">${label}</button>`;
-    const modeBar = `<div class="seg-toggle home-cal-seg" role="group" aria-label="תצוגת יומן">${seg("day", "יום")}${seg("week", "שבוע")}${seg("month", "חודש")}${seg("list", "רשימה")}</div>`;
-    const body = homeCalMode === "week"
-      ? renderWeekGrid(calDay)
-      : homeCalMode === "month"
-        ? monthGridHtml() + monthDayDetailHtml(calDay)
-        : homeCalMode === "list"
-          ? listViewHtml()
-          : renderWeekStrip(calDay) + renderDayAgenda(calDay);
-    document.getElementById("homeCalendar").innerHTML = modeBar + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
-    applyCalScroll();
 
     const dues = students.map(student => {
       const unpaid = lessonIndex.unpaidForStudent(student.id);
@@ -1799,6 +1802,7 @@ const App = (() => {
   function render(view = activeViewName()) {
     renderHeader();
     if (view === "home") renderHome();
+    else if (view === "overview") renderOverview();
     else if (view === "students") renderStudents();
     else if (view === "money") renderMoney();
     else if (view === "settings") renderSettings();
