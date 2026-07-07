@@ -25,7 +25,7 @@ const corsFor = req => {
 
 async function vapidAuth(endpoint, env) {
   const key = await crypto.subtle.importKey(
-    "jwk", JSON.parse(env.VAPID_PRIVATE_JWK),
+    "jwk", JSON.parse(env.VAPID_PRIVATE_JWK.replace(/^\uFEFF/, "")), // strip BOM: secret was stored with a UTF-8 BOM that broke JSON.parse
     { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]
   );
   const head = b64u(enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
@@ -82,16 +82,19 @@ async function deliverDue(env) {
     await env.SUBS.put(name, JSON.stringify({ sub: rec.sub, items: rec.items.filter(i => i.t > now) }));
 
     if (env.RESEND_API_KEY && env.EMAIL_TO) {
-      await fetch("https://api.resend.com/emails", {
+      const r = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: "המורה שלי <onboarding@resend.dev>",
+          from: env.EMAIL_FROM || "המורה שלי <onboarding@resend.dev>",
           to: env.EMAIL_TO,
           subject: due[0].title || "תזכורת שיעור",
           text: due.map(i => i.body || i.title || "תזכורת").join("\n")
         })
       });
+      // Resend rejects silently otherwise (e.g. sandbox sender can only mail the account owner).
+      if (!r.ok) console.error("resend send failed", r.status, await r.text());
+      else console.log("resend sent", due.length, "reminder(s) to", env.EMAIL_TO);
     }
 
     if (rec.sub) {
