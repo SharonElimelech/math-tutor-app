@@ -1,9 +1,9 @@
 // Service Worker – מאפשר עבודה גם בלי אינטרנט (offline) והתקנה כאפליקציה
-const CACHE = "morti-v3.7.1";
+const CACHE = "morti-v3.7.2";
 const ASSETS = [
   "index.html",
-  "styles.css?v=32",
-  "app.js?v=42",
+  "styles.css?v=33",
+  "app.js?v=43",
   "src/data.js",
   "src/push.js",
   "src/reminders.js",

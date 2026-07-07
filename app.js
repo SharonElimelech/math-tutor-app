@@ -275,6 +275,66 @@ const App = (() => {
     openLessonForm(null, id);
   }
 
+  // פרופיל תלמיד: תמונת מצב, נושא הבא, הערות פרטיות והיסטוריית שיעורים
+  function openStudentProfile(id) {
+    const s = studentById(id);
+    if (!s) return openStudentForm(id);
+    const today = todayStr();
+    const all = lessonIndex.forStudent(id);
+    const upcoming = all.filter(l => l.date >= today && !l.done)
+      .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+    const next = upcoming[0];
+    const done = all.filter(l => l.done)
+      .sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`));
+    const owed = lessonIndex.unpaidForStudent(id).reduce((sum, l) => sum + lessonPrice(l), 0);
+    const totalPaid = done.filter(l => l.paid).reduce((sum, l) => sum + lessonPrice(l), 0);
+    const contact = escapeHtml(s.parentName) + (s.phone ? ` · ${escapeHtml(s.phone)}` : "");
+
+    const history = done.length ? `<ul class="profile-lessons" aria-label="היסטוריית שיעורים">
+      ${done.slice(0, 15).map(l => `<li class="profile-lesson">
+        <span class="profile-lesson-date">${fmtDate(l.date)}</span>
+        <span class="profile-lesson-topic">${l.topic ? escapeHtml(l.topic) : '<i class="muted-note">ללא נושא</i>'}</span>
+        <span class="profile-pill ${l.paid ? "paid" : "due"}">${l.paid ? "שולם" : "חוב"}</span>
+      </li>`).join("")}
+    </ul>${done.length > 15 ? `<p class="muted-note profile-more">מוצגים 15 מתוך ${done.length} שיעורים</p>` : ""}`
+      : `<p class="muted-note">עדיין לא התקיימו שיעורים.</p>`;
+
+    openModal(`
+      <div class="modal-title-block">
+        <span class="student-avatar profile-avatar" aria-hidden="true">${escapeHtml(initials(s.name))}</span>
+        <div><h3 id="modalTitle">${escapeHtml(s.name)}</h3><p>${contact || "לא הוגדר איש קשר"} · ${cur(s.price)} לשיעור</p></div>
+      </div>
+      <div class="profile-summary" aria-label="סיכום תלמיד">
+        <span><b>${upcoming.length}</b> שיעורים קרובים</span>
+        <span class="${owed > 0 ? "has-debt" : ""}"><b>${cur(owed)}</b> יתרה פתוחה</span>
+        <span><b>${cur(totalPaid)}</b> נגבה בסך הכול</span>
+      </div>
+      ${next ? `<div class="profile-next">${icon("calendar", "ic-sub")} <span>נושא הבא · ${dayLabelPlain(next.date)} ${fmtTime(next.time)}</span><strong>${next.topic ? escapeHtml(next.topic) : "טרם נקבע נושא"}</strong></div>` : ""}
+      <div class="modal-actions profile-quick">
+        <button class="btn btn-green btn-block" onclick="App.scheduleForStudent('${id}')">${icon("calendar")} קביעת שיעור</button>
+        <button class="btn btn-light btn-block" onclick="App.openStudentForm('${id}')">${icon("edit")} עריכת פרטים</button>
+      </div>
+      ${owed > 0 && s.phone ? `<button class="btn btn-wa btn-block" onclick="App.sendWhatsApp('${id}')">${icon("whatsapp")} תזכורת תשלום (${cur(owed)})</button>` : ""}
+      ${s.phone ? `<button class="btn btn-light btn-block" onclick="App.sendReceipt('${id}')">${icon("note")} שליחת ריכוז חודשי להורה</button>` : ""}
+      <div class="form-section profile-notes">
+        <label for="f-notes">הערות פרטיות</label>
+        <textarea id="f-notes" rows="3" placeholder="חוזקות, קשיים, סגנון למידה, מה לתרגל בפעם הבאה...">${escapeHtml(s.notes || "")}</textarea>
+        <button class="btn btn-light" onclick="App.saveStudentNotes('${id}')">${icon("check")} שמירת הערה</button>
+      </div>
+      <div class="profile-section-head">${icon("note", "ic-sub")} היסטוריית שיעורים</div>
+      ${history}
+    `);
+  }
+
+  function saveStudentNotes(id) {
+    const s = studentById(id);
+    const el = document.getElementById("f-notes");
+    if (!s || !el) return;
+    s.notes = el.value.trim().slice(0, 2000);
+    if (!save()) { render(); return; }
+    toast("ההערה נשמרה", "ok");
+  }
+
   function saveStudent(id) {
     const name = document.getElementById("f-name").value.trim();
     if (!name) {
@@ -329,7 +389,7 @@ const App = (() => {
       const unpaid = lessonIndex.unpaidForStudent(s.id);
       const owed = unpaid.reduce((sum, lesson) => sum + lessonPrice(lesson), 0);
       return `
-        <button type="button" class="student-card" onclick="App.openStudentForm('${s.id}')" aria-label="פתיחת הפרופיל של ${escapeHtml(s.name)}">
+        <button type="button" class="student-card" onclick="App.openStudentProfile('${s.id}')" aria-label="פתיחת הפרופיל של ${escapeHtml(s.name)}">
           <span class="student-avatar" aria-hidden="true">${escapeHtml(initials(s.name))}</span>
           <span class="student-card-main">
             <span class="student-card-top"><strong>${escapeHtml(s.name)}</strong><span>${cur(s.price)} לשיעור</span></span>
@@ -1066,6 +1126,8 @@ const App = (() => {
       </div>
     `;
 
+    renderInsights();
+
     const dues = students.map(student => {
       const unpaid = lessonIndex.unpaidForStudent(student.id);
       return {
@@ -1086,6 +1148,28 @@ const App = (() => {
       </article>`;
     }).join("") : `<div class="debt-clear">${icon("checkCircle")}<div><strong>הכול מעודכן</strong><span>אין כרגע תשלומים פתוחים.</span></div></div>`;
 
+  }
+
+  // פס תובנות בדף הסיכום: מחזור החודש, שעות הוראה, שיעורי השבוע
+  function renderInsights() {
+    const el = document.getElementById("homeInsights");
+    if (!el) return;
+    const mkey = monthKey(new Date());
+    const monthDone = lessons.filter(l => l.done && l.date.startsWith(mkey));
+    const revenue = monthDone.reduce((sum, l) => sum + lessonPrice(l), 0);
+    const minutes = monthDone.reduce((sum, l) => sum + (Number(l.duration) || 0), 0);
+    const hours = Math.round(minutes / 6) / 10; // שעה אחת אחרי הנקודה
+    const now = new Date();
+    const start = new Date(now); start.setDate(now.getDate() - now.getDay()); // ראשון
+    const end = new Date(start); end.setDate(start.getDate() + 6);
+    const from = ymd(start), to = ymd(end);
+    const weekCount = lessons.filter(l => l.date >= from && l.date <= to).length;
+    const tile = (label, value, sub) =>
+      `<div class="insight-tile"><span class="insight-label">${label}</span><strong class="insight-value">${value}</strong><span class="insight-sub">${sub}</span></div>`;
+    el.innerHTML =
+      tile("מחזור החודש", cur(revenue), `${monthDone.length} ${monthDone.length === 1 ? "שיעור בוצע" : "שיעורים בוצעו"}`) +
+      tile("שעות הוראה", hours.toLocaleString("he-IL"), "החודש") +
+      tile("השבוע", weekCount, weekCount === 1 ? "שיעור מתוכנן" : "שיעורים מתוכננים");
   }
 
   // ========== כספים: מעבר בין תשלומים לסיכום ==========
@@ -1236,6 +1320,29 @@ const App = (() => {
     waOpen(s.phone, msg);
   }
 
+  // קבלה/ריכוז חודשי לשליחה להורה: שיעורים שבוצעו החודש + סכום ומצב תשלום
+  function sendReceipt(studentId) {
+    const s = studentById(studentId);
+    if (!s) return;
+    const mkey = monthKey(new Date());
+    const monthLessons = lessonIndex.forStudent(studentId)
+      .filter(l => l.done && l.date.startsWith(mkey))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (!monthLessons.length) { toast("אין שיעורים שבוצעו החודש", "err"); return; }
+    const total = monthLessons.reduce((sum, l) => sum + lessonPrice(l), 0);
+    const paid = monthLessons.filter(l => l.paid).reduce((sum, l) => sum + lessonPrice(l), 0);
+    const monthName = new Date().toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+    const lines = monthLessons.map(l => `• ${fmtDate(l.date)}${l.topic ? ` – ${l.topic}` : ""} (${cur(lessonPrice(l))})`);
+    const greet = s.parentName ? `שלום ${s.parentName},` : "שלום,";
+    const msg =
+      `${greet}\n` +
+      `ריכוז שיעורים של ${s.name} – ${monthName}:\n` +
+      `${lines.join("\n")}\n\n` +
+      `סה"כ ${monthLessons.length} ${monthLessons.length === 1 ? "שיעור" : "שיעורים"} · ${cur(total)}` +
+      (paid < total ? `\nשולם ${cur(paid)} · נותר לתשלום ${cur(total - paid)}` : `\nהכול שולם — תודה רבה!`);
+    waOpen(s.phone, msg);
+  }
+
   // תזכורת שיעור מוכנה לשליחה לתלמיד/הורה
   function sendLessonReminder(lessonId) {
     const l = lessons.find(x => x.id === lessonId);
@@ -1313,11 +1420,11 @@ const App = (() => {
         <div class="income-section-head"><div><h3 id="incomeBreakdownTitle">פירוט לפי תלמיד</h3><p>${perStudent.length} ${perStudent.length === 1 ? "תלמיד" : "תלמידים"} החודש</p></div></div>
         <div class="income-students">
           ${perStudent.map(x => `
-            <div class="income-student">
+            <button type="button" class="income-student" onclick="App.openStudentProfile('${x.student.id}')" aria-label="פתיחת הפרופיל של ${escapeHtml(x.student.name)}">
               <span class="student-avatar" aria-hidden="true">${escapeHtml(initials(x.student.name))}</span>
               <div><strong>${escapeHtml(x.student.name)}</strong><span>${x.count} ${x.count === 1 ? "שיעור" : "שיעורים"} · התקבל ${cur(x.earned)}</span></div>
               <div class="income-student-total"><b>${cur(x.earned + x.pending)}</b>${x.pending > 0 ? `<span>ממתין ${cur(x.pending)}</span>` : `<span class="paid">שולם</span>`}</div>
-            </div>`).join("")}
+            </button>`).join("")}
         </div>
       </section>` : `<div class="empty empty-action"><h3>אין הכנסות בחודש הזה</h3><p>שיעורים שסומנו כבוצעו יופיעו כאן.</p></div>`;
 
@@ -2148,13 +2255,13 @@ const App = (() => {
   // ----- חשיפת פונקציות לממשק -----
   return {
     go, closeModal, renderStudents,
-    openStudentForm, saveStudent, deleteStudent,
+    openStudentForm, openStudentProfile, saveStudentNotes, saveStudent, deleteStudent,
     openLessonForm, saveLesson, deleteLesson, deleteSeriesFuture, deleteStudentFuture, toggleDone,
     confirmLesson, skipLesson,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
     calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson,
-    setMoneyTab, sendWhatsApp, sendLessonReminder, markAllPaid,
+    setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, markAllPaid,
     exportData, importData, exportCalendar,
     changeMonth,
     updateSetting, setTheme, clearAll,
