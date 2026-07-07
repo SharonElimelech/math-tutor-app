@@ -1439,7 +1439,7 @@ const App = (() => {
         </div>
         <div class="settings-action-stack reminder-actions">
           <button class="btn btn-green btn-block" onclick="App.exportCalendar()">${icon("calendar")} הוספת השיעורים ליומן הטלפון</button>
-          <button class="btn btn-light btn-block" onclick="App.testClosedPush()">${icon("bell")} בדיקה: התראה למייל כשהאפליקציה סגורה</button>
+          <button class="btn btn-light btn-block" onclick="App.testClosedPush()">${icon("bell")} בדיקה: התראה כשהאפליקציה סגורה</button>
           ${notifSupported && Notification.permission === "granted"
             ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה באפליקציה</button>`
             : `<button class="btn btn-light btn-block" onclick="App.enableNotifications()">${icon("bell")} הפעלת התראות באפליקציה</button>`}
@@ -1553,12 +1553,11 @@ const App = (() => {
   let reminderTimer = 0;
 
   function notifStatusText() {
-    // המייל הוא ערוץ הרקע האמין — עובד תמיד, גם באייפון שאינו מותקן למסך הבית
-    if (Notification.permission === "granted" && pushSupported()) return "מופעל — תזכורות למייל וגם התראות באפליקציה";
-    return "תזכורות שיעור נשלחות למייל שלך — גם כשהאפליקציה סגורה";
+    if (Notification.permission === "granted" && pushSupported()) return "מופעל — התראות מגיעות גם כשהאפליקציה סגורה";
+    return "הפעילי התראות כדי לקבל תזכורות גם כשהאפליקציה סגורה";
   }
   function notifHelpText() {
-    return "כל תזכורת שיעור נשלחת למייל aruitkh11@gmail.com בזמן, גם כשהטלפון נעול והאפליקציה סגורה. אפשר בנוסף להוסיף את השיעורים ליומן או להפעיל התראות כשהאפליקציה פתוחה.";
+    return "כל תזכורת שיעור מופיעה כהתראה בזמן, גם כשהטלפון נעול והאפליקציה סגורה. לשם כך צריך שהאפליקציה תותקן למסך הבית ושההתראות יאושרו. אפשר בנוסף להוסיף את השיעורים ליומן.";
   }
 
   function initReminders() {
@@ -1681,7 +1680,7 @@ const App = (() => {
     if (!s) return "";
     if (s.state === "ok") {
       const when = new Date(s.at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-      return `<p class="push-status ok">✓ התזכורות מסונכרנות לשרת המייל (עודכן ${when})</p>`;
+      return `<p class="push-status ok">✓ התזכורות מסונכרנות לשרת ההתראות (עודכן ${when})</p>`;
     }
     return `<p class="push-status err">סנכרון התזכורות נכשל — בדקי חיבור לאינטרנט. ינוסה שוב אוטומטית.</p>`;
   }
@@ -1691,7 +1690,7 @@ const App = (() => {
     try {
       await sendClosedAppTest(lessons, lessonIndex.studentsById, reminderLeadMinutes(settings.remindMinutes));
       rememberPushSync("ok");
-      toast("נשלח! סגרי עכשיו את האפליקציה — התזכורת תגיע למייל תוך 2-7 דקות", "ok");
+      toast("נשלח! סגרי עכשיו את האפליקציה — ההתראה תגיע תוך 2-7 דקות", "ok");
     } catch (error) {
       console.warn("Closed-app reminder test failed", error);
       rememberPushSync("fail");

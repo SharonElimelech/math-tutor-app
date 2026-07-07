@@ -1,6 +1,5 @@
-// התראות כשהאפליקציה סגורה: השרת שולח מייל בזמן התזכורת (אמין באייפון גם
-// כשהטלפון נעול) + web push כשיש מנוי. טקסט התזכורת נשלח לשרת כדי שהמייל
-// יכיל את פרטי השיעור.
+// התראות כשהאפליקציה סגורה: ה-cron בשרת שולח web push בזמן התזכורת, וה-service
+// worker מציג את ההתראה מהמטמון המקומי. טקסט התזכורת מסונכרן לשרת ולמטמון.
 
 export const PUSH_SERVER = "https://mytutor-push.aruitkh11.workers.dev";
 export const VAPID_PUBLIC_KEY = "BHhFFPc6qcDFpasSyWrqfsMUdq4-InJTvr-ehC_1EVSSBlfNmG6rprnc0ONBPsqsMxnKuFY6ROfqMqCF9LW-wew";

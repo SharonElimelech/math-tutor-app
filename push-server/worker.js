@@ -1,8 +1,7 @@
 // Push server for "המורה שלי".
-// Stores reminder items (time + text) per device. Cron delivers due reminders
-// two ways: email via Resend (reliable on iPhone even when the phone is locked)
-// and an empty web push "tickle" when a push subscription exists.
-// Note: reminder texts now live on the server — required for email delivery.
+// Stores reminder items (time + text) per device. Cron sends an empty web push
+// "tickle" for each due reminder; the service worker then shows the notification
+// from its cached copy. (Email delivery via Resend was removed — push works.)
 
 const enc = new TextEncoder();
 const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf)))
@@ -80,22 +79,6 @@ async function deliverDue(env) {
     if (!due.length) continue;
     // Prune before sending so a failed delivery never re-fires forever.
     await env.SUBS.put(name, JSON.stringify({ sub: rec.sub, items: rec.items.filter(i => i.t > now) }));
-
-    if (env.RESEND_API_KEY && env.EMAIL_TO) {
-      const r = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: env.EMAIL_FROM || "המורה שלי <onboarding@resend.dev>",
-          to: env.EMAIL_TO,
-          subject: due[0].title || "תזכורת שיעור",
-          text: due.map(i => i.body || i.title || "תזכורת").join("\n")
-        })
-      });
-      // Resend rejects silently otherwise (e.g. sandbox sender can only mail the account owner).
-      if (!r.ok) console.error("resend send failed", r.status, await r.text());
-      else console.log("resend sent", due.length, "reminder(s) to", env.EMAIL_TO);
-    }
 
     if (rec.sub) {
       // One empty push wakes the SW; it shows every due reminder from its cache.
