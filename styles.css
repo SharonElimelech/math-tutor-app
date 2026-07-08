@@ -1626,6 +1626,15 @@ input, select { min-height: 48px; }
 .debt-clear strong { color: var(--text); font-size: .9rem; }
 .debt-clear span { font-size: .74rem; }
 
+.home-add-student { margin-bottom: 12px; }
+.reminders-card { margin-top: 16px; }
+.remind-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+.remind-row:last-child { border-bottom: 0; }
+.remind-row strong { display: block; font-size: .9rem; }
+.remind-row span { display: block; color: var(--muted); font-size: .72rem; }
+.remind-row button { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 11px; padding: 8px 12px; background: color-mix(in srgb, var(--wa) 12%, var(--surface)); color: var(--wa); font-family: inherit; font-weight: 700; font-size: .8rem; cursor: pointer; white-space: nowrap; }
+.remind-row button .ic { width: 16px; height: 16px; }
+
 /* ---------- בית: תצוגת שבוע מלאה (כמו יומן גוגל) ---------- */
 .home-cal-seg { margin-bottom: 12px; }
 .week-grid {

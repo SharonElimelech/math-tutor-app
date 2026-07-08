@@ -248,8 +248,11 @@ const App = (() => {
         <input id="f-price" type="number" inputmode="numeric" min="0" value="${escapeHtml(s.price)}" placeholder="120">
       </div>
       <div class="modal-actions">
-        <button class="btn btn-green btn-block" onclick="App.saveStudent('${id || ""}')">${icon("check")} ${id ? "שמירת שינויים" : "הוספת תלמיד"}</button>
-        ${id ? `<button class="btn btn-light btn-block" onclick="App.scheduleForStudent('${id}')">${icon("calendar")} קביעת שיעור</button>` : ""}
+        ${id
+          ? `<button class="btn btn-green btn-block" onclick="App.saveStudent('${id}')">${icon("check")} שמירת שינויים</button>
+             <button class="btn btn-light btn-block" onclick="App.scheduleForStudent('${id}')">${icon("calendar")} קביעת שיעור</button>`
+          : `<button class="btn btn-green btn-block" onclick="App.saveStudent('', true)">${icon("calendar")} הוספה וקביעת שיעור</button>
+             <button class="btn btn-light btn-block" onclick="App.saveStudent('')">${icon("check")} הוספה בלבד</button>`}
       </div>
       ${id ? `
         ${studentSummaryLine(id)}
@@ -335,7 +338,7 @@ const App = (() => {
     toast("ההערה נשמרה", "ok");
   }
 
-  function saveStudent(id) {
+  function saveStudent(id, andSchedule) {
     const name = document.getElementById("f-name").value.trim();
     if (!name) {
       document.getElementById("err-name").style.display = "block";
@@ -355,14 +358,19 @@ const App = (() => {
       studentPhone,
       price: Math.max(0, parseFloat(document.getElementById("f-price").value) || 0)
     };
-    const successMessage = id ? "התלמיד עודכן" : "תלמיד נוסף";
+    let newId = null;
     if (id) {
       Object.assign(studentById(id), data);
     } else {
-      students.push({ id: uid(), ...data });
+      newId = uid();
+      students.push({ id: newId, ...data });
     }
     if (!save()) { render(); return; }
-    closeModal(); render(); toast(successMessage, "ok");
+    render();
+    toast(id ? "התלמיד עודכן" : "תלמיד נוסף", "ok");
+    // ליד חדש → ישר לקביעת שיעור, בלי לחפש שוב את התלמיד. אחרת סוגרים.
+    if (newId && andSchedule) openLessonForm(null, newId);
+    else closeModal();
   }
 
   async function deleteStudent(id) {
@@ -468,6 +476,8 @@ const App = (() => {
       <button class="btn btn-green btn-block" onclick="App.saveLesson('${id || ""}')">${icon("check")} ${id ? "שמירת שינויים" : "קביעת שיעור"}</button>
       ${id && studentById(l.studentId) && (studentById(l.studentId).studentPhone || studentById(l.studentId).phone)
         ? `<button class="btn btn-wa btn-block" onclick="App.sendLessonReminder('${id}')">${icon("whatsapp")} שליחת תזכורת לתלמיד</button>` : ""}
+      ${id && studentById(l.studentId)
+        ? `<button class="btn btn-light btn-block" onclick="App.openStudentForm('${l.studentId}')">${icon("edit")} עריכת פרטי התלמיד</button>` : ""}
       </div>
       ${id ? (l.seriesId ? `
         <div class="series-note">${icon("repeat", "ic-sub")} שיעור חוזר שבועי</div>
@@ -1086,6 +1096,7 @@ const App = (() => {
     const seg = (m, label) =>
       `<button type="button" class="seg-btn ${homeCalMode === m ? "active" : ""}" aria-pressed="${homeCalMode === m}" onclick="App.setHomeCalMode('${m}')">${label}</button>`;
     const modeBar = `<div class="seg-toggle home-cal-seg" role="group" aria-label="תצוגת יומן">${seg("day", "יום")}${seg("week", "שבוע")}${seg("month", "חודש")}${seg("list", "רשימה")}</div>`;
+    const addStudentBtn = `<button type="button" class="btn btn-light btn-block home-add-student" onclick="App.openStudentForm()">${icon("plus")} תלמיד חדש</button>`;
     const body = homeCalMode === "week"
       ? renderWeekGrid(calDay)
       : homeCalMode === "month"
@@ -1093,7 +1104,7 @@ const App = (() => {
         : homeCalMode === "list"
           ? listViewHtml()
           : renderWeekStrip(calDay) + renderDayAgenda(calDay);
-    document.getElementById("homeCalendar").innerHTML = modeBar + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
+    document.getElementById("homeCalendar").innerHTML = modeBar + addStudentBtn + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
     applyCalScroll();
   }
 
@@ -1127,6 +1138,7 @@ const App = (() => {
     `;
 
     renderInsights();
+    renderReminders();
 
     const dues = students.map(student => {
       const unpaid = lessonIndex.unpaidForStudent(student.id);
@@ -1148,6 +1160,27 @@ const App = (() => {
       </article>`;
     }).join("") : `<div class="debt-clear">${icon("checkCircle")}<div><strong>הכול מעודכן</strong><span>אין כרגע תשלומים פתוחים.</span></div></div>`;
 
+  }
+
+  // תזכורות לכל השיעורים הקרובים — לא רק לקרוב ביותר. כפתור נפרד לכל תלמיד.
+  function renderReminders() {
+    const el = document.getElementById("reminderList");
+    if (!el) return;
+    const today = todayStr();
+    const upcoming = lessonSorted()
+      .filter(l => l.date >= today && !l.done)
+      .filter(l => { const s = studentById(l.studentId); return s && (s.studentPhone || s.phone); })
+      .slice(0, 12); // ponytail: מגבילים ל-12 הקרובים; רשימה ארוכה יותר מיותרת במסך אחד
+    if (!upcoming.length) { el.innerHTML = ""; return; }
+    el.innerHTML =
+      `<div class="section-heading"><h3>תזכורות שיעור</h3><span>שליחה נפרדת לכל תלמיד</span></div>` +
+      upcoming.map(l => {
+        const s = studentById(l.studentId);
+        return `<article class="remind-row">
+          <div><strong>${escapeHtml(s.name)}</strong><span>${dayLabelPlain(l.date)} · ${fmtTime(l.time)}${l.topic ? ` · ${escapeHtml(l.topic)}` : ""}</span></div>
+          <button onclick="App.sendLessonReminder('${l.id}')" aria-label="שליחת תזכורת ל-${escapeHtml(s.name)}">${icon("whatsapp")} תזכורת</button>
+        </article>`;
+      }).join("");
   }
 
   // פס תובנות בדף הסיכום: מחזור החודש, שעות הוראה, שיעורי השבוע
