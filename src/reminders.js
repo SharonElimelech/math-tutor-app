@@ -3,6 +3,13 @@ const MINUTE = 60 * 1000;
 export const reminderSignature = lesson => `${lesson.id}:${lesson.date}:${lesson.time}`;
 export const paymentSignature = lesson => `pay:${lesson.id}:${lesson.date}:${lesson.time}`;
 
+// מועמדים ל"שליחה לכולם": שיעורים בתאריכים הנתונים שלא בוצעו וטרם נשלחה להם תזכורת.
+// החתימה כוללת תאריך ושעה — שיעור שהוזז נחשב אוטומטית כ"לא נשלח" ונכנס שוב לתור.
+export function bulkReminderLessons(lessons, dates, sent = new Set()) {
+  const wanted = new Set(dates);
+  return lessons.filter(l => !l.done && wanted.has(l.date) && !sent.has(reminderSignature(l)));
+}
+
 // Lessons that are done but still unpaid and already finished — i.e. money you
 // likely forgot to collect. now/grace let it fire shortly after the lesson ends.
 export function duePaymentReminders(lessons, now = Date.now(), notified = new Set()) {

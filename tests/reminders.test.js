@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  bulkReminderLessons,
   createLessonsCalendar,
   dueLessonReminders,
   duePaymentReminders,
@@ -26,6 +27,19 @@ test("finds reminders inside lead window and ignores delivered or done lessons",
   assert.deepEqual(dueLessonReminders([lesson], now, 30), [lesson]);
   assert.deepEqual(dueLessonReminders([lesson], now, 30, new Set([reminderSignature(lesson)])), []);
   assert.deepEqual(dueLessonReminders([{ ...lesson, done: true }], now, 30), []);
+});
+
+test("bulk reminders cover given dates, skip done and already-sent lessons", () => {
+  const tomorrow = { ...lesson, id: "lesson_2", date: "2026-06-21" };
+  const farAway = { ...lesson, id: "lesson_3", date: "2026-07-01" };
+  const all = [lesson, tomorrow, farAway];
+  const dates = ["2026-06-20", "2026-06-21"];
+  assert.deepEqual(bulkReminderLessons(all, dates), [lesson, tomorrow]);
+  assert.deepEqual(bulkReminderLessons(all, dates, new Set([reminderSignature(lesson)])), [tomorrow]);
+  assert.deepEqual(bulkReminderLessons([{ ...lesson, done: true }], dates), []);
+  // שיעור שהוזז מקבל חתימה חדשה — חוזר לתור השליחה
+  const moved = { ...lesson, time: "18:00" };
+  assert.deepEqual(bulkReminderLessons([moved], dates, new Set([reminderSignature(lesson)])), [moved]);
 });
 
 test("payment reminders flag finished, done, unpaid lessons only once", () => {
