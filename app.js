@@ -125,7 +125,7 @@ const App = (() => {
   };
 
   // ----- הודעות צפות (toast) -----
-  function toast(msg, type = "", action = null) {
+  function toast(msg, type = "", action = null, duration = 3000) {
     const wrap = document.getElementById("toastWrap");
     if (!wrap) return alert(msg);
     const el = document.createElement("div");
@@ -148,7 +148,7 @@ const App = (() => {
     const timer = setTimeout(() => {
       el.classList.add("out");
       setTimeout(() => el.remove(), 260);
-    }, 3000);
+    }, duration);
   }
 
   // ----- ניווט -----
@@ -443,7 +443,6 @@ const App = (() => {
 
   // ========== שיעורים / יומן ==========
   function openLessonForm(id, presetStudentId) {
-    if (!students.length) { toast("צריך קודם להוסיף לפחות תלמיד אחד", "err"); return; }
     const l = id
       ? lessons.find(x => x.id === id)
       : { studentId: presetStudentId || "", date: selectedDay || todayStr(), time: quickAddTime || settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
@@ -529,12 +528,29 @@ const App = (() => {
     const term = (searchEl ? searchEl.value : "").trim().toLowerCase();
     const selId = document.getElementById("f-student").value;
     const matches = students.filter(s => s.name.toLowerCase().includes(term));
-    if (!matches.length) { pick.innerHTML = `<div class="picker-empty">לא נמצא תלמיד</div>`; return; }
+    // הוספה מהירה: אם השם שהוקלד לא קיים בדיוק — מציעים ליצור תלמיד חדש מתוך הטופס
+    const exact = matches.some(s => s.name.toLowerCase() === term);
+    const addRow = term && !exact
+      ? `<button type="button" class="picker-row picker-add" onclick="App.quickAddStudent()">+ הוספת "${escapeHtml(searchEl.value.trim())}" כתלמיד חדש</button>`
+      : "";
+    if (!matches.length && !addRow) { pick.innerHTML = `<div class="picker-empty">לא נמצא תלמיד</div>`; return; }
     pick.innerHTML = matches.map(s => `
       <button type="button" class="picker-row ${s.id === selId ? "sel" : ""}" onclick="App.pickStudent('${s.id}')" aria-pressed="${s.id === selId}">
         <span>${escapeHtml(s.name)}</span>
         ${s.id === selId ? icon("check") : ""}
-      </button>`).join("");
+      </button>`).join("") + addRow;
+  }
+
+  // יצירת תלמיד חדש מתוך טופס השיעור, בלי לצאת מהטופס
+  function quickAddStudent() {
+    const searchEl = document.getElementById("f-student-search");
+    const name = (searchEl ? searchEl.value : "").trim();
+    if (!name) return;
+    const s = { id: uid(), name, parentName: "", phone: "", studentPhone: "", price: settings.defaultPrice };
+    students.push(s);
+    if (!save()) { students.pop(); renderStudentPicker(); return; }
+    pickStudent(s.id);
+    toast(`${name} נוסף — אפשר להשלים טלפון ומחיר דרך כרטיס התלמיד`, "ok");
   }
 
   function pickStudent(id) {
@@ -1132,7 +1148,7 @@ const App = (() => {
         : homeCalMode === "list"
           ? listViewHtml()
           : renderWeekStrip(calDay) + renderDayAgenda(calDay);
-    document.getElementById("homeCalendar").innerHTML = modeBar + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
+    document.getElementById("homeCalendar").innerHTML = modeBar + bulkReminderButtonHtml() + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
     applyCalScroll();
   }
 
@@ -1189,15 +1205,11 @@ const App = (() => {
       .filter(l => { const s = studentById(l.studentId); return s && (s.studentPhone || s.phone); })
       .slice(0, 12); // ponytail: מגבילים ל-12 הקרובים; רשימה ארוכה יותר מיותרת במסך אחד
     if (!upcoming.length) { el.innerHTML = ""; return; }
-    const pending = bulkPendingReminders();
     const now = new Date();
     const tomorrow = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
     const inWindow = upcoming.some(l => l.date === today || l.date === tomorrow);
-    const bulkBtn = pending.length
-      ? `<button class="btn btn-wa btn-block remind-all" onclick="App.sendAllReminders()">${icon("send")} שליחה לכולם — היום ומחר (${pending.length})</button>`
-      : inWindow
-        ? `<div class="remind-all-done">${icon("checkCircle")} כל תזכורות היום ומחר נשלחו</div>`
-        : "";
+    const bulkBtn = bulkReminderButtonHtml() ||
+      (inWindow ? `<div class="remind-all-done">${icon("checkCircle")} כל תזכורות היום ומחר נשלחו</div>` : "");
     el.innerHTML =
       `<div class="section-heading"><h3>תזכורות שיעור</h3><span>מה שנשלח מסומן, בלי שליחות כפולות</span></div>` +
       bulkBtn +
@@ -1406,13 +1418,23 @@ const App = (() => {
       .filter(l => { const s = studentById(l.studentId); return s && (s.studentPhone || s.phone); });
   }
 
-  // שליחה לכולם: כל לחיצה פותחת וואטסאפ לתזכורת הבאה שטרם נשלחה, והכפתור סופר את הנותרים.
-  // ponytail: טאב אחד בכל לחיצה — דפדפנים חוסמים פתיחת כמה טאבים בבת אחת
+  // כפתור "שליחה לכולם" — מוצג גם במסך סיכום וגם ביומן
+  function bulkReminderButtonHtml() {
+    const pending = bulkPendingReminders();
+    return pending.length
+      ? `<button class="btn btn-wa btn-block remind-all" onclick="App.sendAllReminders()">${icon("send")} שליחה לכולם — היום ומחר (${pending.length})</button>`
+      : "";
+  }
+
+  // שליחה לכולם: וואטסאפ מחייב אישור ידני לכל הודעה, לכן כל שליחה פותחת צ'אט אחד.
+  // הודעה צפה עם "שליחת הבא" מלווה את השרשרת עד שכולן נשלחו — בלי לחפש את הכפתור מחדש.
   function sendAllReminders() {
     const pending = bulkPendingReminders();
     if (!pending.length) { toast("כל תזכורות היום ומחר כבר נשלחו", "ok"); return; }
     sendLessonReminder(pending[0].id);
-    if (pending.length > 1) toast(`נותרו עוד ${pending.length - 1} — לחצי שוב על הכפתור`, "ok");
+    const left = bulkPendingReminders().length;
+    if (left) toast(`נשלח. נותרו עוד ${left}`, "ok", { label: `שליחת הבא (${left})`, run: sendAllReminders }, 60000);
+    else toast("זהו — כל תזכורות היום ומחר נשלחו", "ok");
   }
 
   // חייבים עם טלפון שטרם נשלחה להם תזכורת על החוב הנוכחי
@@ -1424,12 +1446,14 @@ const App = (() => {
     });
   }
 
-  // תזכורת תשלום לכל החייבים — לחיצה לכל הודעה, כמו בתזכורות השיעור
+  // תזכורת תשלום לכל החייבים — אותה שרשרת "שליחת הבא" כמו בתזכורות השיעור
   function sendAllPaymentReminders() {
     const pending = pendingPaymentReminders();
     if (!pending.length) { toast("נשלחה תזכורת לכל החייבים על החוב הנוכחי", "ok"); return; }
     sendWhatsApp(pending[0].id);
-    if (pending.length > 1) toast(`נותרו עוד ${pending.length - 1} — לחצי שוב על הכפתור`, "ok");
+    const left = pendingPaymentReminders().length;
+    if (left) toast(`נשלח. נותרו עוד ${left}`, "ok", { label: `שליחת הבא (${left})`, run: sendAllPaymentReminders }, 60000);
+    else toast("זהו — נשלחה תזכורת לכל החייבים", "ok");
   }
 
   // תזכורת תשלום מוכנה לשליחה
@@ -2402,7 +2426,7 @@ const App = (() => {
     openStudentForm, openStudentProfile, saveStudentNotes, saveStudent, deleteStudent,
     openLessonForm, saveLesson, deleteLesson, deleteSeriesFuture, deleteStudentFuture, toggleDone,
     confirmLesson, skipLesson,
-    setLessonDate, togglePast, renderStudentPicker, pickStudent, toggleAdvanced,
+    setLessonDate, togglePast, renderStudentPicker, pickStudent, quickAddStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
     calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson,
     setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, sendAllReminders, sendAllPaymentReminders, repeatLastLesson, markAllPaid,
