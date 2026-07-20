@@ -228,6 +228,8 @@ main { width: 100%; padding: 24px 16px; max-width: 760px; margin: 0 auto; }
    animation can't leave the view invisible (white screen). */
 @keyframes fadeUp { from { transform: translateY(8px); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .view.active { animation: none; } }
+/* מעבר בין מסכים (View Transitions API) — נפילה שקטה בדפדפנים בלי תמיכה */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .24s; }
 
 .view > h2 {
   font-family: "Heebo", "Assistant", sans-serif;
@@ -1415,6 +1417,9 @@ html[data-theme="dark"] .holiday-banner { color: #c4b5fd; background: rgba(167, 
 }
 .payment-account-head h3 { font-family: "Heebo", "Assistant", sans-serif; font-size: 1.08rem; line-height: 1.25; }
 .payment-account-head p { margin-top: 3px; color: var(--muted); font-size: .82rem; }
+/* גיל חוב: טקסט תמיד, צבע רק כתוספת (לא מסתמכים על צבע בלבד) */
+.debt-age { font-weight: 600; }
+.debt-age-old { color: var(--orange); }
 .payment-account-total { min-width: 92px; text-align: left; }
 .payment-account-total span { display: block; color: var(--muted); font-size: .72rem; font-weight: 600; }
 .payment-account-total strong {
@@ -1717,8 +1722,8 @@ input, select { min-height: 48px; }
 .confirm-row:last-child { border-bottom: 0; padding-bottom: 2px; }
 .confirm-info strong { font-size: .95rem; }
 .confirm-info span { margin-inline-start: 8px; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
-.confirm-actions { display: flex; gap: 8px; margin-top: 9px; }
-.confirm-actions .btn { flex: 1; min-height: 42px; padding: 0 8px; font-size: .8rem; white-space: nowrap; }
+.confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+.confirm-actions .btn { flex: 1 1 auto; min-height: 42px; padding: 0 8px; font-size: .8rem; white-space: nowrap; }
 .confirm-actions .btn .ic { width: 15px; height: 15px; }
 .confirm-skip { color: var(--red); }
 

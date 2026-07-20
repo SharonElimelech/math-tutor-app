@@ -20,6 +20,11 @@ export function buildLessonIndex(students, lessons) {
     `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)
   );
 
+  // רשימות פר-תלמיד ממוינות כרונולוגית — כל הצרכנים מסתמכים על זה במקום למיין שוב
+  for (const list of lessonsByStudent.values()) {
+    list.sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+  }
+
   return {
     studentsById,
     lessonsByStudent,
@@ -37,6 +42,31 @@ export function buildLessonIndex(students, lessons) {
 function append(map, key, value) {
   if (!map.has(key)) map.set(key, []);
   map.get(key).push(value);
+}
+
+// חפיפות ביומן: שיעור שטרם בוצע, באחד התאריכים המבוקשים, שטווח הדקות שלו נחתך עם המבוקש.
+export function findConflicts(lessons, { dates, time, duration, excludeId }) {
+  if (!time) return [];
+  const start = toMinutes(time);
+  const end = start + Math.max(duration || 0, 1); // ponytail: משך 0 עדיין מתנגש על אותה דקה
+  const wanted = new Set(dates);
+  return lessons.filter(lesson =>
+    lesson.id !== excludeId && !lesson.done && lesson.time && wanted.has(lesson.date) &&
+    toMinutes(lesson.time) < end &&
+    toMinutes(lesson.time) + Math.max(lesson.duration || 0, 1) > start
+  );
+}
+
+// גיל חוב בשבועות שלמים — נמדד מהשיעור הוותיק ביותר שלא שולם
+export function debtAgeWeeks(unpaidLessons, today) {
+  if (!unpaidLessons.length) return 0;
+  const oldest = unpaidLessons.reduce((min, lesson) => lesson.date < min ? lesson.date : min, unpaidLessons[0].date);
+  return Math.max(0, Math.floor((new Date(today + "T00:00") - new Date(oldest + "T00:00")) / (7 * 86400000)));
+}
+
+function toMinutes(time) {
+  const [hours, mins] = time.split(":").map(Number);
+  return hours * 60 + (mins || 0);
 }
 
 export function summarizeMonth(lessons, studentsById, priceForLesson) {

@@ -14,7 +14,7 @@ import {
   todayString as todayStr,
   ymd
 } from "./src/calendar.js";
-import { buildLessonIndex, summarizeMonth } from "./src/selectors.js";
+import { buildLessonIndex, debtAgeWeeks, findConflicts, summarizeMonth } from "./src/selectors.js";
 import { AppStorage } from "./src/storage.js";
 import {
   bulkReminderLessons,
@@ -155,19 +155,28 @@ const App = (() => {
   function go(view) {
     const target = document.getElementById("view-" + view);
     if (!target) return;
-    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-    target.classList.add("active");
-    document.querySelectorAll(".nav-btn").forEach(b => {
-      const active = b.dataset.view === view;
-      b.classList.toggle("active", active);
-      if (active) b.setAttribute("aria-current", "page");
-      else b.removeAttribute("aria-current");
-    });
-    render(view);
-    window.scrollTo(0, 0);
-    // Move focus to the new view's heading so screen readers announce the change.
-    const heading = target.querySelector("h2");
-    if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }
+    const apply = () => {
+      document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+      target.classList.add("active");
+      document.querySelectorAll(".nav-btn").forEach(b => {
+        const active = b.dataset.view === view;
+        b.classList.toggle("active", active);
+        if (active) b.setAttribute("aria-current", "page");
+        else b.removeAttribute("aria-current");
+      });
+      render(view);
+      window.scrollTo(0, 0);
+      // Move focus to the new view's heading so screen readers announce the change.
+      const heading = target.querySelector("h2");
+      if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }
+    };
+    // מעבר מסך חלק דרך View Transitions API — רק כשנתמך, כשבאמת מחליפים מסך, ובלי תנועה מופחתת
+    if (document.startViewTransition && !target.classList.contains("active") &&
+        !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      document.startViewTransition(apply);
+    } else {
+      apply();
+    }
   }
 
   // ----- מודאל -----
@@ -281,8 +290,7 @@ const App = (() => {
 
   // "עוד שיעור כמו הקודם": משכפל את השיעור האחרון של התלמיד שבוע קדימה (לשבוע הקרוב), בלי טופס
   function repeatLastLesson(studentId) {
-    const all = lessonIndex.forStudent(studentId)
-      .slice().sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+    const all = lessonIndex.forStudent(studentId); // ממוין כרונולוגית באינדקס
     const last = all[all.length - 1];
     if (!last) { scheduleForStudent(studentId); return; }
     const today = todayStr();
@@ -312,8 +320,7 @@ const App = (() => {
     if (!s) return openStudentForm(id);
     const today = todayStr();
     const all = lessonIndex.forStudent(id);
-    const upcoming = all.filter(l => l.date >= today && !l.done)
-      .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+    const upcoming = all.filter(l => l.date >= today && !l.done); // כבר ממוין באינדקס
     const next = upcoming[0];
     const done = all.filter(l => l.done)
       .sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`));
@@ -579,7 +586,7 @@ const App = (() => {
     document.getElementById("weeksWrap").style.display = mode === "count" ? "block" : "none";
   }
 
-  function saveLesson(id) {
+  async function saveLesson(id) {
     const priceRaw = document.getElementById("f-price").value.trim();
     const durRaw = document.getElementById("f-duration").value.trim();
     const data = {
@@ -592,11 +599,10 @@ const App = (() => {
     };
     if (!data.studentId) { toast("נא לבחור תלמיד", "err"); return; }
     if (!data.date) { toast("נא לבחור תאריך", "err"); return; }
-    let successMessage = "";
-    if (id) {
-      Object.assign(lessons.find(x => x.id === id), data);
-      successMessage = "השיעור עודכן";
-    } else {
+    // אילו תאריכים השמירה תופסת — מועד בודד או סדרה שבועית
+    let dates = [data.date];
+    let repeatInfo = null;
+    if (!id) {
       const repeat = document.getElementById("f-repeat");
       if (repeat && repeat.checked) {
         const mode = document.getElementById("f-recur-mode").value;
@@ -604,17 +610,39 @@ const App = (() => {
         const weeks = openEnded
           ? HORIZON_WEEKS
           : Math.max(1, parseInt(document.getElementById("f-weeks").value) || 1);
-        const seriesId = uid();
-        for (let i = 0; i < weeks; i++) {
+        repeatInfo = { openEnded };
+        dates = Array.from({ length: weeks }, (_, i) => {
           const d = new Date(data.date + "T00:00");
           d.setDate(d.getDate() + i * 7);
-          lessons.push({ id: uid(), paid: false, done: false, seriesId, recur: "weekly", openEnded, ...data, date: ymd(d) });
-        }
-        successMessage = openEnded ? "נקבע שיעור שבועי קבוע" : `נקבעו ${weeks} שיעורים`;
-      } else {
-        lessons.push({ id: uid(), paid: false, done: false, ...data });
-        successMessage = "השיעור נקבע";
+          return ymd(d);
+        });
       }
+    }
+    // התרעה על חפיפה ביומן לפני שמירה — המורה מחליטה אם לקבוע בכל זאת
+    const conflicts = findConflicts(lessons, { dates, time: data.time, duration: data.duration, excludeId: id });
+    if (conflicts.length) {
+      const first = conflicts[0];
+      const who = studentById(first.studentId)?.name || "שיעור אחר";
+      const more = conflicts.length > 1 ? ` ועוד ${conflicts.length - 1}` : "";
+      const proceed = await askConfirmation(
+        `חופף לשיעור של ${who} ${dayLabelPlain(first.date)} בשעה ${first.time}${more}. לקבוע בכל זאת?`,
+        "קביעה בכל זאת"
+      );
+      if (!proceed) return;
+    }
+    let successMessage = "";
+    if (id) {
+      Object.assign(lessons.find(x => x.id === id), data);
+      successMessage = "השיעור עודכן";
+    } else if (repeatInfo) {
+      const seriesId = uid();
+      for (const date of dates) {
+        lessons.push({ id: uid(), paid: false, done: false, seriesId, recur: "weekly", openEnded: repeatInfo.openEnded, ...data, date });
+      }
+      successMessage = repeatInfo.openEnded ? "נקבע שיעור שבועי קבוע" : `נקבעו ${dates.length} שיעורים`;
+    } else {
+      lessons.push({ id: uid(), paid: false, done: false, ...data });
+      successMessage = "השיעור נקבע";
     }
     if (!save()) { render(); return; }
     closeModal(); render();
@@ -1095,6 +1123,29 @@ const App = (() => {
     });
   }
 
+  // דחייה מהירה בשבוע: אותו יום ושעה, שבוע קדימה. אם המועד תפוס — נפתח הטופס לבחירה ידנית.
+  function postponeLesson(id) {
+    const l = lessons.find(x => x.id === id);
+    if (!l) return;
+    const d = new Date(`${l.date}T00:00:00`);
+    d.setDate(d.getDate() + 7);
+    const date = ymd(d);
+    const conflicts = findConflicts(lessons, { dates: [date], time: l.time, duration: l.duration, excludeId: id });
+    if (conflicts.length) {
+      openLessonForm(id);
+      toast("המועד בעוד שבוע תפוס — בחרי מועד אחר", "err");
+      return;
+    }
+    const prev = l.date;
+    l.date = date;
+    if (!save()) { l.date = prev; render(); return; }
+    render();
+    toast(`השיעור נדחה — ${dayLabelPlain(date)} בשעה ${fmtTime(l.time)}`, "ok", {
+      label: "ביטול",
+      run: () => { l.date = prev; save(); render(); }
+    });
+  }
+
   // "לא התקיים" — מסירים מהיומן, עם ביטול מיידי בטוסט (בלי חלון אישור)
   function skipLesson(id) {
     const idx = lessons.findIndex(x => x.id === id);
@@ -1125,6 +1176,7 @@ const App = (() => {
         <div class="confirm-actions">
           <button class="btn btn-green" onclick="App.confirmLesson('${l.id}', true)">${icon("check")} התקיים ושולם</button>
           <button class="btn btn-light" onclick="App.confirmLesson('${l.id}', false)">התקיים</button>
+          <button class="btn btn-light" onclick="App.postponeLesson('${l.id}')" aria-label="דחיית השיעור בשבוע, לאותו יום ושעה">${icon("repeat")} לשבוע הבא</button>
           <button class="btn btn-light confirm-skip" onclick="App.skipLesson('${l.id}')" aria-label="השיעור לא התקיים — הסרה מהיומן">לא התקיים</button>
         </div>
       </article>`;
@@ -1185,11 +1237,15 @@ const App = (() => {
 
     // גבייה מטופלת במקום אחד — מסך כספים. כאן רק סיכום וקישור, בלי רשימה כפולה.
     const debtorCount = students.filter(s => lessonIndex.unpaidForStudent(s.id).length).length;
-    const totalOwed = lessons.filter(l => l.done && !l.paid).reduce((sum, l) => sum + lessonPrice(l), 0);
+    const unpaidAll = lessons.filter(l => l.done && !l.paid);
+    const totalOwed = unpaidAll.reduce((sum, l) => sum + lessonPrice(l), 0);
+    // גיל החוב הוותיק ביותר — מוצג רק כשהוא כבר מדאיג (שבועיים ומעלה)
+    const oldestAge = debtAgeWeeks(unpaidAll, today);
+    const agePart = oldestAge >= 2 ? ` · הוותיק מחכה ${debtAgeLabel(oldestAge)}` : "";
     const pa = document.getElementById("paymentAlerts");
     pa.innerHTML = debtorCount
       ? `<button type="button" class="debt-summary" onclick="App.go('money')" aria-label="מעבר למסך כספים לטיפול בגבייה">
-          <div><strong>${cur(totalOwed)} ממתינים לגבייה</strong><span>${debtorCount === 1 ? "תלמיד אחד" : `${debtorCount} תלמידים`} · לטיפול במסך כספים</span></div>
+          <div><strong>${cur(totalOwed)} ממתינים לגבייה</strong><span>${debtorCount === 1 ? "תלמיד אחד" : `${debtorCount} תלמידים`}${agePart} · לטיפול במסך כספים</span></div>
           <span class="debt-summary-go" aria-hidden="true">‹</span>
         </button>`
       : `<div class="debt-clear">${icon("checkCircle")}<div><strong>הכול מעודכן</strong><span>אין כרגע תשלומים פתוחים.</span></div></div>`;
@@ -1278,15 +1334,15 @@ const App = (() => {
     const debtors = students.map(s => {
       const unpaid = lessonIndex.unpaidForStudent(s.id);
       const owed = unpaid.reduce((sum, l) => sum + lessonPrice(l), 0);
-      return { student: s, unpaid, owed };
+      return { student: s, unpaid, owed, age: debtAgeWeeks(unpaid, todayStr()) };
     }).filter(item => item.unpaid.length).sort((a, b) => b.owed - a.owed);
 
-    const queue = debtors.length ? debtors.map(({ student, unpaid, owed }) => `
+    const queue = debtors.length ? debtors.map(({ student, unpaid, owed, age }) => `
       <article class="payment-account" aria-labelledby="payment-student-${student.id}">
         <header class="payment-account-head">
           <div>
             <h3 id="payment-student-${student.id}">${escapeHtml(student.name)}</h3>
-            <p>${unpaid.length === 1 ? "שיעור אחד ממתין לתשלום" : `${unpaid.length} שיעורים ממתינים לתשלום`}</p>
+            <p>${unpaid.length === 1 ? "שיעור אחד ממתין לתשלום" : `${unpaid.length} שיעורים ממתינים לתשלום`}${debtAgeLabel(age) ? ` · <span class="debt-age${age >= 3 ? " debt-age-old" : ""}">מחכה כבר ${debtAgeLabel(age)}</span>` : ""}</p>
           </div>
           <div class="payment-account-total" aria-label="יתרת חוב ${cur(owed)}">
             <span>לתשלום</span>
@@ -1339,6 +1395,12 @@ const App = (() => {
       </div>
       ${pendingPaymentReminders().length ? `<button class="btn btn-wa btn-block remind-all" onclick="App.sendAllPaymentReminders()">${icon("send")} תזכורת תשלום לכל החייבים (${pendingPaymentReminders().length})</button>` : ""}
       <div class="payment-queue">${queue}</div>`;
+  }
+
+  // "שבוע" / "שבועיים" / "X שבועות" — תווית גיל חוב; ריק כשהחוב בן פחות משבוע
+  function debtAgeLabel(weeks) {
+    if (weeks < 1) return "";
+    return weeks === 1 ? "שבוע" : weeks === 2 ? "שבועיים" : `${weeks} שבועות`;
   }
 
   function togglePaid(id, showUndo = true) {
@@ -2429,7 +2491,7 @@ const App = (() => {
     setLessonDate, togglePast, renderStudentPicker, pickStudent, quickAddStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
     calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson,
-    setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, sendAllReminders, sendAllPaymentReminders, repeatLastLesson, markAllPaid,
+    setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, sendAllReminders, sendAllPaymentReminders, repeatLastLesson, markAllPaid, postponeLesson,
     exportData, importData, exportCalendar,
     changeMonth,
     updateSetting, setTheme, clearAll,
