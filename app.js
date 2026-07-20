@@ -210,8 +210,29 @@ const App = (() => {
     dialog.querySelector(".confirm-submit").textContent = confirmLabel;
     dialog.returnValue = "cancel";
     dialog.showModal();
+    // לא מסתמכים על אירוע close בלבד — יש סביבות שבהן הוא לא נורה (הדיאלוג נסגר
+    // אבל ה-Promise נתקע). מאזינים לכל מקורות הסגירה וסוגרים ידנית.
     return new Promise(resolve => {
-      dialog.addEventListener("close", () => resolve(dialog.returnValue === "confirm"), { once: true });
+      const form = dialog.querySelector("form");
+      let settled = false;
+      const finish = confirmed => {
+        if (settled) return;
+        settled = true;
+        form.removeEventListener("submit", onSubmit);
+        dialog.removeEventListener("cancel", onCancel);
+        dialog.removeEventListener("close", onClose);
+        dialog.removeEventListener("keydown", onKey);
+        if (dialog.open) dialog.close();
+        resolve(confirmed);
+      };
+      const onSubmit = e => { e.preventDefault(); finish(e.submitter?.value === "confirm"); };
+      const onCancel = () => finish(false);
+      const onClose = () => finish(dialog.returnValue === "confirm");
+      const onKey = e => { if (e.key === "Escape") finish(false); };
+      form.addEventListener("submit", onSubmit);
+      dialog.addEventListener("cancel", onCancel);
+      dialog.addEventListener("close", onClose);
+      dialog.addEventListener("keydown", onKey);
     });
   }
   // סגירה בלחיצה על הרקע, ב-Esc, ושמירה ב-Enter
