@@ -17,7 +17,6 @@ import {
 import { buildLessonIndex, debtAgeWeeks, findConflicts, summarizeMonth } from "./src/selectors.js";
 import { AppStorage } from "./src/storage.js";
 import {
-  bulkReminderLessons,
   createLessonsCalendar,
   dueLessonReminders,
   duePaymentReminders,
@@ -1221,7 +1220,7 @@ const App = (() => {
         : homeCalMode === "list"
           ? listViewHtml()
           : renderWeekStrip(calDay) + renderDayAgenda(calDay);
-    document.getElementById("homeCalendar").innerHTML = modeBar + bulkReminderButtonHtml() + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
+    document.getElementById("homeCalendar").innerHTML = modeBar + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
     applyCalScroll();
   }
 
@@ -1287,7 +1286,7 @@ const App = (() => {
     }
   }
 
-  // תזכורות שיעור — המקום היחיד לתזכורות בוואטסאפ: שליחה לכולם + שליחה פרטנית, עם סימון "נשלח"
+  // תזכורות שיעור — שליחה פרטנית לכל תלמיד/הורה, עם סימון "נשלח"
   function renderReminders() {
     const el = document.getElementById("reminderList");
     if (!el) return;
@@ -1297,14 +1296,8 @@ const App = (() => {
       .filter(l => { const s = studentById(l.studentId); return s && (s.studentPhone || s.phone); })
       .slice(0, 12); // ponytail: מגבילים ל-12 הקרובים; רשימה ארוכה יותר מיותרת במסך אחד
     if (!upcoming.length) { el.innerHTML = ""; return; }
-    const now = new Date();
-    const tomorrow = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
-    const inWindow = upcoming.some(l => l.date === today || l.date === tomorrow);
-    const bulkBtn = bulkReminderButtonHtml() ||
-      (inWindow ? `<div class="remind-all-done">${icon("checkCircle")} כל תזכורות היום ומחר נשלחו</div>` : "");
     el.innerHTML =
       `<div class="section-heading"><h3>תזכורות שיעור</h3><span>מה שנשלח מסומן, בלי שליחות כפולות</span></div>` +
-      bulkBtn +
       upcoming.map(l => {
         const s = studentById(l.studentId);
         const sent = waSent.has(reminderSignature(l));
@@ -1506,34 +1499,6 @@ const App = (() => {
     try { localStorage.setItem(WA_SENT_KEY, JSON.stringify([...waSent])); }
     catch (error) { console.warn("Could not persist WhatsApp reminder history", error); }
   }
-
-  // תזכורות שטרם נשלחו לשיעורים של היום ומחר — הבסיס ל"שליחה לכולם"
-  function bulkPendingReminders() {
-    const now = new Date();
-    const tomorrow = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
-    return bulkReminderLessons(lessonSorted(), [todayStr(), tomorrow], waSent)
-      .filter(l => { const s = studentById(l.studentId); return s && (s.studentPhone || s.phone); });
-  }
-
-  // כפתור "שליחה לכולם" — מוצג גם במסך סיכום וגם ביומן
-  function bulkReminderButtonHtml() {
-    const pending = bulkPendingReminders();
-    return pending.length
-      ? `<button class="btn btn-wa btn-block remind-all" onclick="App.sendAllReminders()">${icon("send")} שליחה לכולם — היום ומחר (${pending.length})</button>`
-      : "";
-  }
-
-  // שליחה לכולם: וואטסאפ מחייב אישור ידני לכל הודעה, לכן כל שליחה פותחת צ'אט אחד.
-  // הודעה צפה עם "שליחת הבא" מלווה את השרשרת עד שכולן נשלחו — בלי לחפש את הכפתור מחדש.
-  function sendAllReminders() {
-    const pending = bulkPendingReminders();
-    if (!pending.length) { toast("כל תזכורות היום ומחר כבר נשלחו", "ok"); return; }
-    sendLessonReminder(pending[0].id);
-    const left = bulkPendingReminders().length;
-    if (left) toast(`נשלח. נותרו עוד ${left}`, "ok", { label: `שליחת הבא (${left})`, run: sendAllReminders }, 60000);
-    else toast("זהו — כל תזכורות היום ומחר נשלחו", "ok");
-  }
-
 
   // תזכורת תשלום מוכנה לשליחה
   function sendWhatsApp(studentId) {
@@ -2508,7 +2473,7 @@ const App = (() => {
     setLessonDate, togglePast, renderStudentPicker, pickStudent, quickAddStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
     calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson,
-    setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, sendAllReminders, repeatLastLesson, markAllPaid, postponeLesson,
+    setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, repeatLastLesson, markAllPaid, postponeLesson,
     exportData, importData, exportCalendar,
     changeMonth,
     updateSetting, setTheme, clearAll,
