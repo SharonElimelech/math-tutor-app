@@ -1271,13 +1271,8 @@ const App = (() => {
     if (!debtors.length) {
       pa.innerHTML = `<div class="debt-clear">${icon("checkCircle")}<div><strong>הכול מעודכן</strong><span>אין כרגע תשלומים פתוחים.</span></div></div>`;
     } else {
-      const pendingCount = pendingPaymentReminders().length;
-      const allBtn = pendingCount
-        ? `<button class="btn btn-wa btn-block remind-all" onclick="App.sendAllPaymentReminders()">${icon("send")} תזכורת תשלום לכל החייבים (${pendingCount})</button>`
-        : `<div class="remind-all-done">${icon("checkCircle")} נשלחה תזכורת לכל החייבים</div>`;
       pa.innerHTML =
         `<div class="debt-summary-line"><strong>${cur(totalOwed)} ממתינים לגבייה</strong><span>${debtors.length === 1 ? "תלמיד אחד" : `${debtors.length} תלמידים`}${agePart}</span></div>` +
-        allBtn +
         debtors.map(({ s, unpaid, owed }) => {
           const sent = s.phone && waSent.has(debtSignature(s.id, unpaid));
           const btn = s.phone
@@ -1434,7 +1429,6 @@ const App = (() => {
         <h3>ממתינים לטיפול</h3>
         <span>${debtors.length === 0 ? "הכול מעודכן" : debtors.length === 1 ? "תלמיד אחד" : `${debtors.length} תלמידים`}</span>
       </div>
-      ${pendingPaymentReminders().length ? `<button class="btn btn-wa btn-block remind-all" onclick="App.sendAllPaymentReminders()">${icon("send")} תזכורת תשלום לכל החייבים (${pendingPaymentReminders().length})</button>` : ""}
       <div class="payment-queue">${queue}</div>`;
   }
 
@@ -1540,24 +1534,6 @@ const App = (() => {
     else toast("זהו — כל תזכורות היום ומחר נשלחו", "ok");
   }
 
-  // חייבים עם טלפון שטרם נשלחה להם תזכורת על החוב הנוכחי
-  function pendingPaymentReminders() {
-    return students.filter(s => {
-      if (!s.phone) return false;
-      const unpaid = lessonIndex.unpaidForStudent(s.id);
-      return unpaid.length && !waSent.has(debtSignature(s.id, unpaid));
-    });
-  }
-
-  // תזכורת תשלום לכל החייבים — אותה שרשרת "שליחת הבא" כמו בתזכורות השיעור
-  function sendAllPaymentReminders() {
-    const pending = pendingPaymentReminders();
-    if (!pending.length) { toast("נשלחה תזכורת לכל החייבים על החוב הנוכחי", "ok"); return; }
-    sendWhatsApp(pending[0].id);
-    const left = pendingPaymentReminders().length;
-    if (left) toast(`נשלח. נותרו עוד ${left}`, "ok", { label: `שליחת הבא (${left})`, run: sendAllPaymentReminders }, 60000);
-    else toast("זהו — נשלחה תזכורת לכל החייבים", "ok");
-  }
 
   // תזכורת תשלום מוכנה לשליחה
   function sendWhatsApp(studentId) {
@@ -2532,7 +2508,7 @@ const App = (() => {
     setLessonDate, togglePast, renderStudentPicker, pickStudent, quickAddStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
     calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson,
-    setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, sendAllReminders, sendAllPaymentReminders, repeatLastLesson, markAllPaid, postponeLesson,
+    setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, sendAllReminders, repeatLastLesson, markAllPaid, postponeLesson,
     exportData, importData, exportCalendar,
     changeMonth,
     updateSetting, setTheme, clearAll,
