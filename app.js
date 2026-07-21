@@ -1256,20 +1256,40 @@ const App = (() => {
     renderReminders();
     renderBackupNudge();
 
-    // גבייה מטופלת במקום אחד — מסך כספים. כאן רק סיכום וקישור, בלי רשימה כפולה.
-    const debtorCount = students.filter(s => lessonIndex.unpaidForStudent(s.id).length).length;
+    // גבייה: תזכורת תשלום נשלחת ישירות מכאן — כפתור לכל חייב + שליחה לכולם. מסך כספים למעקב מלא.
+    const debtors = students
+      .map(s => ({ s, unpaid: [...lessonIndex.unpaidForStudent(s.id)] }))
+      .filter(d => d.unpaid.length)
+      .map(d => ({ ...d, owed: d.unpaid.reduce((t, l) => t + lessonPrice(l), 0) }))
+      .sort((a, b) => b.owed - a.owed);
     const unpaidAll = lessons.filter(l => l.done && !l.paid);
     const totalOwed = unpaidAll.reduce((sum, l) => sum + lessonPrice(l), 0);
     // גיל החוב הוותיק ביותר — מוצג רק כשהוא כבר מדאיג (שבועיים ומעלה)
     const oldestAge = debtAgeWeeks(unpaidAll, today);
     const agePart = oldestAge >= 2 ? ` · הוותיק מחכה ${debtAgeLabel(oldestAge)}` : "";
     const pa = document.getElementById("paymentAlerts");
-    pa.innerHTML = debtorCount
-      ? `<button type="button" class="debt-summary" onclick="App.go('money')" aria-label="מעבר למסך כספים לטיפול בגבייה">
-          <div><strong>${cur(totalOwed)} ממתינים לגבייה</strong><span>${debtorCount === 1 ? "תלמיד אחד" : `${debtorCount} תלמידים`}${agePart} · לטיפול במסך כספים</span></div>
-          <span class="debt-summary-go" aria-hidden="true">‹</span>
-        </button>`
-      : `<div class="debt-clear">${icon("checkCircle")}<div><strong>הכול מעודכן</strong><span>אין כרגע תשלומים פתוחים.</span></div></div>`;
+    if (!debtors.length) {
+      pa.innerHTML = `<div class="debt-clear">${icon("checkCircle")}<div><strong>הכול מעודכן</strong><span>אין כרגע תשלומים פתוחים.</span></div></div>`;
+    } else {
+      const pendingCount = pendingPaymentReminders().length;
+      const allBtn = pendingCount
+        ? `<button class="btn btn-wa btn-block remind-all" onclick="App.sendAllPaymentReminders()">${icon("send")} תזכורת תשלום לכל החייבים (${pendingCount})</button>`
+        : `<div class="remind-all-done">${icon("checkCircle")} נשלחה תזכורת לכל החייבים</div>`;
+      pa.innerHTML =
+        `<div class="debt-summary-line"><strong>${cur(totalOwed)} ממתינים לגבייה</strong><span>${debtors.length === 1 ? "תלמיד אחד" : `${debtors.length} תלמידים`}${agePart}</span></div>` +
+        allBtn +
+        debtors.map(({ s, unpaid, owed }) => {
+          const sent = s.phone && waSent.has(debtSignature(s.id, unpaid));
+          const btn = s.phone
+            ? `<button class="${sent ? "is-sent" : ""}" onclick="App.sendWhatsApp('${s.id}')" aria-label="${sent ? `שליחה חוזרת של תזכורת תשלום ל-${escapeHtml(s.name)}` : `שליחת תזכורת תשלום ל-${escapeHtml(s.name)}`}">${icon("whatsapp")} ${sent ? "שוב" : "תזכורת"}</button>`
+            : `<button onclick="App.openStudentForm('${s.id}')" aria-label="הוספת טלפון להורה של ${escapeHtml(s.name)}">הוספת טלפון</button>`;
+          return `<article class="remind-row">
+            <div><strong>${escapeHtml(s.name)}</strong><span>${unpaid.length === 1 ? "שיעור אחד" : `${unpaid.length} שיעורים`} · ${cur(owed)}${sent ? ` · <b class="remind-sent">${icon("check", "ic-sub")} נשלח</b>` : ""}</span></div>
+            ${btn}
+          </article>`;
+        }).join("") +
+        `<button type="button" class="debt-summary-link" onclick="App.go('money')" aria-label="מעבר למסך כספים למעקב מלא">מעקב מלא במסך כספים ‹</button>`;
+    }
   }
 
   // תזכורות שיעור — המקום היחיד לתזכורות בוואטסאפ: שליחה לכולם + שליחה פרטנית, עם סימון "נשלח"

@@ -1625,6 +1625,10 @@ input, select { min-height: 48px; }
 .debt-clear strong, .debt-clear span { display: block; }
 .debt-clear strong { color: var(--text); font-size: .9rem; }
 .debt-clear span { font-size: .74rem; }
+.debt-summary-line { padding: 2px 2px 8px; }
+.debt-summary-line strong { display: block; color: var(--red); font-size: .95rem; }
+.debt-summary-line span { display: block; margin-top: 2px; color: var(--muted); font-size: .74rem; }
+.debt-summary-link { width: 100%; min-height: 44px; margin-top: 4px; padding: 8px; border: none; background: none; color: var(--muted); font-family: inherit; font-size: .78rem; text-align: center; cursor: pointer; }
 
 .reminders-card { margin-top: 16px; }
 .remind-all { margin-bottom: 6px; }
