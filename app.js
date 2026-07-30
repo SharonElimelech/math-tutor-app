@@ -14,7 +14,7 @@ import {
   todayString as todayStr,
   ymd
 } from "./src/calendar.js";
-import { buildLessonIndex, debtAgeWeeks, findConflicts, summarizeMonth } from "./src/selectors.js";
+import { buildLessonIndex, debtAgeWeeks, findConflicts, nextDebtorToRemind, summarizeMonth } from "./src/selectors.js";
 import { AppStorage } from "./src/storage.js";
 import {
   createLessonsCalendar,
@@ -1207,12 +1207,35 @@ const App = (() => {
     </div>`;
   }
 
+  // רצועת גבייה ביומן: הכסף הפתוח נראה במסך שבו המורה נמצאת רוב הזמן,
+  // ולחיצה אחת שולחת תזכורת לתלמיד הבא בתור (הגדול ביותר שטרם קיבל).
+  function debtStripHtml() {
+    const debtors = debtorList();
+    if (!debtors.length) return "";
+    const total = debtors.reduce((sum, d) => sum + d.owed, 0);
+    const next = nextDebtorToRemind(debtors, d => waSent.has(debtSignature(d.student.id, d.unpaid)));
+    const sent = waSent.has(debtSignature(next.student.id, next.unpaid));
+    const name = escapeHtml(next.student.name);
+    const action = next.student.phone
+      ? `<button type="button" class="btn btn-wa" onclick="App.sendWhatsApp('${next.student.id}')" aria-label="${sent ? `שליחה חוזרת של תזכורת תשלום ל-${name}` : `שליחת תזכורת תשלום ל-${name}`}">${icon("whatsapp")} ${sent ? "שוב ל" : "תזכורת ל"}${name}</button>`
+      : `<button type="button" class="btn btn-light" onclick="App.openStudentForm('${next.student.id}')" aria-label="הוספת טלפון ל-${name}">הוספת טלפון ל${name}</button>`;
+    return `<section class="cal-debt" aria-label="גבייה פתוחה">
+      <div class="cal-debt-sum"><strong>${cur(total)} לגבייה</strong><span>${debtors.length === 1 ? "תלמיד אחד" : `${debtors.length} תלמידים`}</span></div>
+      ${action}
+      <button type="button" class="cal-debt-more" onclick="App.go('money')" aria-label="מעבר למסך כספים">הכול ‹</button>
+    </section>`;
+  }
+
   // בית = יומן בלבד; כל השאר עבר למסך "סיכום"
   function renderHome() {
     const calDay = selectedDay || todayStr();
     const seg = (m, label) =>
       `<button type="button" class="seg-btn ${homeCalMode === m ? "active" : ""}" aria-pressed="${homeCalMode === m}" onclick="App.setHomeCalMode('${m}')">${label}</button>`;
-    const modeBar = `<div class="seg-toggle home-cal-seg" role="group" aria-label="תצוגת יומן">${seg("day", "יום")}${seg("week", "שבוע")}${seg("month", "חודש")}${seg("list", "רשימה")}</div>`;
+    // סרגל היומן: תצוגה + הוספת תלמיד ישירות מהיומן (בלי לעבור למסך התלמידים)
+    const modeBar = `<div class="home-cal-bar">
+      <div class="seg-toggle home-cal-seg" role="group" aria-label="תצוגת יומן">${seg("day", "יום")}${seg("week", "שבוע")}${seg("month", "חודש")}${seg("list", "רשימה")}</div>
+      <button type="button" class="btn btn-light cal-add-student" onclick="App.openStudentForm()" aria-label="הוספת תלמיד חדש">${icon("plus")} תלמיד</button>
+    </div>`;
     const body = homeCalMode === "week"
       ? renderWeekGrid(calDay)
       : homeCalMode === "month"
@@ -1220,7 +1243,7 @@ const App = (() => {
         : homeCalMode === "list"
           ? listViewHtml()
           : renderWeekStrip(calDay) + renderDayAgenda(calDay);
-    document.getElementById("homeCalendar").innerHTML = modeBar + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
+    document.getElementById("homeCalendar").innerHTML = debtStripHtml() + modeBar + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
     applyCalScroll();
   }
 
@@ -1256,11 +1279,7 @@ const App = (() => {
     renderBackupNudge();
 
     // גבייה: תזכורת תשלום נשלחת ישירות מכאן — כפתור לכל חייב + שליחה לכולם. מסך כספים למעקב מלא.
-    const debtors = students
-      .map(s => ({ s, unpaid: [...lessonIndex.unpaidForStudent(s.id)] }))
-      .filter(d => d.unpaid.length)
-      .map(d => ({ ...d, owed: d.unpaid.reduce((t, l) => t + lessonPrice(l), 0) }))
-      .sort((a, b) => b.owed - a.owed);
+    const debtors = debtorList();
     const unpaidAll = lessons.filter(l => l.done && !l.paid);
     const totalOwed = unpaidAll.reduce((sum, l) => sum + lessonPrice(l), 0);
     // גיל החוב הוותיק ביותר — מוצג רק כשהוא כבר מדאיג (שבועיים ומעלה)
@@ -1272,7 +1291,7 @@ const App = (() => {
     } else {
       pa.innerHTML =
         `<div class="debt-summary-line"><strong>${cur(totalOwed)} ממתינים לגבייה</strong><span>${debtors.length === 1 ? "תלמיד אחד" : `${debtors.length} תלמידים`}${agePart}</span></div>` +
-        debtors.map(({ s, unpaid, owed }) => {
+        debtors.map(({ student: s, unpaid, owed }) => {
           const sent = s.phone && waSent.has(debtSignature(s.id, unpaid));
           const btn = s.phone
             ? `<button class="${sent ? "is-sent" : ""}" onclick="App.sendWhatsApp('${s.id}')" aria-label="${sent ? `שליחה חוזרת של תזכורת תשלום ל-${escapeHtml(s.name)}` : `שליחת תזכורת תשלום ל-${escapeHtml(s.name)}`}">${icon("whatsapp")} ${sent ? "שוב" : "תזכורת"}</button>`
@@ -1352,6 +1371,20 @@ const App = (() => {
   }
 
   // ========== תשלומים ==========
+  // כל החייבים, מהחוב הגדול לקטן — מקור אחד ליומן, לסיכום ולמסך כספים
+  function debtorList() {
+    const today = todayStr();
+    return students.map(student => {
+      const unpaid = lessonIndex.unpaidForStudent(student.id);
+      return {
+        student,
+        unpaid,
+        owed: unpaid.reduce((sum, l) => sum + lessonPrice(l), 0),
+        age: debtAgeWeeks(unpaid, today)
+      };
+    }).filter(item => item.unpaid.length).sort((a, b) => b.owed - a.owed);
+  }
+
   function renderPayments() {
     const el = document.getElementById("paymentsList");
     if (!students.length) {
@@ -1360,11 +1393,7 @@ const App = (() => {
     }
     const totalUnpaid = lessons.filter(lesson => lesson.done && !lesson.paid);
     const totalOwed = totalUnpaid.reduce((sum, lesson) => sum + lessonPrice(lesson), 0);
-    const debtors = students.map(s => {
-      const unpaid = lessonIndex.unpaidForStudent(s.id);
-      const owed = unpaid.reduce((sum, l) => sum + lessonPrice(l), 0);
-      return { student: s, unpaid, owed, age: debtAgeWeeks(unpaid, todayStr()) };
-    }).filter(item => item.unpaid.length).sort((a, b) => b.owed - a.owed);
+    const debtors = debtorList();
 
     const queue = debtors.length ? debtors.map(({ student, unpaid, owed, age }) => `
       <article class="payment-account" aria-labelledby="payment-student-${student.id}">

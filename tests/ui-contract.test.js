@@ -60,6 +60,8 @@ test("high-end redesign keeps every product surface structured", () => {
   // Home embeds the calendar (week strip + day agenda), like Google Calendar.
   assert.match(html, /id="homeCalendar"/);
   assert.match(source, /class="week-strip"/);
+  // הוספת תלמיד זמינה ישירות מהיומן, לא רק ממסך התלמידים
+  assert.match(source, /class="btn btn-light cal-add-student"[^>]+App\.openStudentForm\(\)/);
   assert.match(source, /class="agenda-block /);
   assert.match(source, /class="student-card"/);
   assert.match(source, /class="income-overview"/);

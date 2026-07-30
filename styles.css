@@ -1654,6 +1654,24 @@ input, select { min-height: 48px; }
 
 /* ---------- בית: תצוגת שבוע מלאה (כמו יומן גוגל) ---------- */
 .home-cal-seg { margin-bottom: 12px; }
+.cal-debt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--red) 22%, var(--border));
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--red) 5%, var(--surface));
+}
+.cal-debt-sum { flex: 1; min-width: 120px; display: flex; flex-direction: column; }
+.cal-debt-sum strong { font-size: .95rem; }
+.cal-debt-sum span { font-size: .78rem; color: var(--muted); }
+.cal-debt-more { background: none; border: 0; padding: 6px 4px; font: inherit; font-size: .82rem; font-weight: 700; color: var(--brand-1); cursor: pointer; min-height: 44px; }
+.home-cal-bar { display: flex; align-items: center; gap: 8px; }
+.home-cal-bar .home-cal-seg { flex: 1; min-width: 0; }
+.cal-add-student { margin-bottom: 12px; flex: none; }
 .week-grid {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);

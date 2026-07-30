@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildLessonIndex, debtAgeWeeks, findConflicts, summarizeMonth } from "../src/selectors.js";
+import { buildLessonIndex, debtAgeWeeks, findConflicts, nextDebtorToRemind, summarizeMonth } from "../src/selectors.js";
 
 const students = [
   { id: "s1", name: "דנה" },
@@ -69,4 +69,20 @@ test("debtAgeWeeks counts whole weeks from the oldest unpaid lesson", () => {
   assert.equal(debtAgeWeeks([{ date: "2026-07-13" }], "2026-07-19"), 0); // 6 ימים — עוד לא שבוע
   assert.equal(debtAgeWeeks([{ date: "2026-07-12" }], "2026-07-19"), 1); // בדיוק שבוע
   assert.equal(debtAgeWeeks([], "2026-07-19"), 0);
+});
+
+test("payment reminder queue skips students already reminded and those without a phone", () => {
+  const debtors = [
+    { student: { id: "a", phone: "" }, owed: 500 },
+    { student: { id: "b", phone: "0501234567" }, owed: 300 },
+    { student: { id: "c", phone: "0507654321" }, owed: 100 }
+  ];
+  const sent = new Set();
+  assert.equal(nextDebtorToRemind(debtors, d => sent.has(d.student.id)).student.id, "b");
+  sent.add("b");
+  assert.equal(nextDebtorToRemind(debtors, d => sent.has(d.student.id)).student.id, "c");
+  sent.add("c");
+  // כולם קיבלו — חוזרים לבעל החוב הגדול ביותר שיש לו טלפון, לשליחה חוזרת
+  assert.equal(nextDebtorToRemind(debtors, d => sent.has(d.student.id)).student.id, "b");
+  assert.equal(nextDebtorToRemind([]), null);
 });
