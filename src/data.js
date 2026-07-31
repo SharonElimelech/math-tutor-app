@@ -1,4 +1,4 @@
-export const APP_VERSION = "3.8.9";
+export const APP_VERSION = "3.9.0";
 export const DATA_VERSION = 3;
 
 export const DEFAULT_SETTINGS = Object.freeze({
@@ -8,7 +8,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   defaultTime: "16:00",
   defaultDuration: 60,
   theme: "auto",
-  remindMinutes: 30
+  remindMinutes: 30,
+  payInfo: ""
 });
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
@@ -65,7 +66,8 @@ export function normalizeSettings(input = {}) {
     defaultTime: source.defaultTime ? time(source.defaultTime, "defaultTime") : DEFAULT_SETTINGS.defaultTime,
     defaultDuration: number(source.defaultDuration, "defaultDuration", { fallback: DEFAULT_SETTINGS.defaultDuration, max: 1440 }),
     theme,
-    remindMinutes: number(source.remindMinutes, "remindMinutes", { fallback: DEFAULT_SETTINGS.remindMinutes, max: 10080 })
+    remindMinutes: number(source.remindMinutes, "remindMinutes", { fallback: DEFAULT_SETTINGS.remindMinutes, max: 10080 }),
+    payInfo: text(source.payInfo, "payInfo", 300)
   };
 }
 
@@ -103,7 +105,11 @@ function normalizeLesson(input, index, studentIds) {
   }
   if (input.seriesId) lesson.seriesId = id(input.seriesId, `lesson ${index + 1} seriesId`);
   if (input.recur === "weekly") lesson.recur = "weekly";
+  // מרווח סדרה בימים — 7 (שבועי) או 14 (דו-שבועי); כל שאר הערכים חוזרים ל-7
+  if (Number(input.intervalDays) === 14) lesson.intervalDays = 14;
   if (input.openEnded === true) lesson.openEnded = true;
+  // מתי שולם בפועל — לדוח הכנסות לפי מועד תשלום ולא מועד השיעור
+  if (lesson.paid && input.paidAt) lesson.paidAt = date(input.paidAt, `lesson ${index + 1} paidAt`);
 
   return lesson;
 }

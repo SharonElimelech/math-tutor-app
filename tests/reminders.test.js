@@ -53,6 +53,14 @@ test("payment reminders flag finished, done, unpaid lessons only once", () => {
   assert.deepEqual(duePaymentReminders([ended], after, new Set([paymentSignature(ended)])), []); // already reminded
 });
 
+test("payment reminders can wait a grace period so they are not instant", () => {
+  const ended = { ...lesson, done: true, paid: false }; // 16:00–17:00
+  const soon = new Date("2026-06-20T17:30:00"); // חצי שעה אחרי הסיום
+  const nextDay = new Date("2026-06-21T05:30:00"); // למחרת
+  assert.deepEqual(duePaymentReminders([ended], soon, new Set(), 12 * 60), []); // עוד לא, יש חלון חסד
+  assert.deepEqual(duePaymentReminders([ended], nextDay, new Set(), 12 * 60), [ended]); // אחרי חלון החסד
+});
+
 test("zero-minute reminder gets a short polling grace window", () => {
   assert.deepEqual(dueLessonReminders([lesson], new Date("2026-06-20T16:01:00"), 0), [lesson]);
   assert.deepEqual(dueLessonReminders([lesson], new Date("2026-06-20T16:06:00"), 0), []);

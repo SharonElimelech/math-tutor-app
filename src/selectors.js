@@ -57,6 +57,24 @@ export function findConflicts(lessons, { dates, time, duration, excludeId }) {
   );
 }
 
+// מועדים פנויים ביום נתון: זמני התחלה בטווח השעות שבהם שיעור באורך duration לא חופף לשום שיעור פעיל.
+// מחזיר עד `limit` זמנים "HH:MM". preferHours מקדם שעות סבירות (16:00–20:00) לראש הרשימה.
+export function findFreeSlots(lessons, { date, duration = 60, from = 8, to = 21, step = 30, limit = 3 } = {}) {
+  const dur = Math.max(step, duration || step);
+  const busy = lessons
+    .filter(l => !l.done && l.date === date && l.time)
+    .map(l => [toMinutes(l.time), toMinutes(l.time) + Math.max(l.duration || 0, 1)]);
+  const fits = start => busy.every(([bs, be]) => start + dur <= bs || start >= be);
+  const slots = [];
+  for (let m = from * 60; m + dur <= to * 60; m += step) {
+    if (fits(m)) slots.push(m);
+  }
+  // עדיפות לשעות אחר הצהריים/ערב — שם רוב השיעורים הפרטיים
+  slots.sort((a, b) => score(a) - score(b) || a - b);
+  return slots.slice(0, limit).map(m => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
+}
+const score = min => (min >= 16 * 60 && min <= 20 * 60 ? 0 : 1);
+
 // גיל חוב בשבועות שלמים — נמדד מהשיעור הוותיק ביותר שלא שולם
 export function debtAgeWeeks(unpaidLessons, today) {
   if (!unpaidLessons.length) return 0;

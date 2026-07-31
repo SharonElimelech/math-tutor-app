@@ -23,7 +23,24 @@ const lesson = {
 };
 
 test("release exposes the expected app version", () => {
-  assert.equal(APP_VERSION, "3.8.9");
+  assert.equal(APP_VERSION, "3.9.0");
+});
+
+test("settings keep payment info within bounds", () => {
+  assert.equal(normalizeSettings({ payInfo: "  bit.ly/pay  " }).payInfo, "bit.ly/pay");
+  assert.equal(normalizeSettings({}).payInfo, "");
+  assert.throws(() => normalizeSettings({ payInfo: "x".repeat(301) }), /payInfo is too long/);
+});
+
+test("lesson keeps biweekly interval and payment date only when valid", () => {
+  const [weekly] = parseBackup({ students: [student], lessons: [{ ...lesson, intervalDays: 7 }], settings: {} }).lessons;
+  assert.equal(weekly.intervalDays, undefined); // 7 הוא ברירת מחדל — לא נשמר
+  const [biweekly] = parseBackup({ students: [student], lessons: [{ ...lesson, intervalDays: 14 }], settings: {} }).lessons;
+  assert.equal(biweekly.intervalDays, 14);
+  const [paid] = parseBackup({ students: [student], lessons: [{ ...lesson, paid: true, paidAt: "2026-06-25" }], settings: {} }).lessons;
+  assert.equal(paid.paidAt, "2026-06-25");
+  const [unpaid] = parseBackup({ students: [student], lessons: [{ ...lesson, paid: false, paidAt: "2026-06-25" }], settings: {} }).lessons;
+  assert.equal(unpaid.paidAt, undefined); // paidAt חסר משמעות בלי paid
 });
 
 test("backup parser normalizes a valid snapshot", () => {

@@ -14,9 +14,10 @@ import {
   todayString as todayStr,
   ymd
 } from "./src/calendar.js";
-import { buildLessonIndex, debtAgeWeeks, findConflicts, nextDebtorToRemind, summarizeMonth } from "./src/selectors.js";
+import { buildLessonIndex, debtAgeWeeks, findConflicts, findFreeSlots, nextDebtorToRemind, summarizeMonth } from "./src/selectors.js";
 import { AppStorage } from "./src/storage.js";
 import {
+  bulkReminderLessons,
   createLessonsCalendar,
   dueLessonReminders,
   duePaymentReminders,
@@ -469,7 +470,9 @@ const App = (() => {
   }
 
   // ========== שיעורים / יומן ==========
+  let lessonFormEditing = false; // בעריכה לא ממלאים אוטומטית לפי התלמיד
   function openLessonForm(id, presetStudentId) {
+    lessonFormEditing = !!id;
     const l = id
       ? lessons.find(x => x.id === id)
       : { studentId: presetStudentId || "", date: selectedDay || todayStr(), time: quickAddTime || settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
@@ -495,9 +498,10 @@ const App = (() => {
         <button type="button" class="quick-date" onclick="App.setLessonDate(7,this)">בעוד שבוע</button>
       </div>
       <div class="row">
-        <div><label for="f-date">תאריך</label><input id="f-date" type="date" value="${l.date}"></div>
+        <div><label for="f-date">תאריך</label><input id="f-date" type="date" value="${l.date}" onchange="App.renderFreeSlots()"></div>
         <div><label for="f-time">שעה</label><input id="f-time" type="time" value="${l.time}"></div>
       </div>
+      <div id="freeSlots" class="free-slots"></div>
       <label for="f-topic">נושא / הערות (לא חובה)</label>
       <input id="f-topic" value="${escapeHtml(l.topic || "")}" placeholder="לדוגמה: גיאומטריה - משפט פיתגורס">
 
@@ -515,13 +519,20 @@ const App = (() => {
             <label for="f-repeat">שיעור חוזר כל שבוע</label>
           </div>
           <div id="repeatWrap" style="display:none">
-            <input type="hidden" id="f-recur-mode" value="open">
+            <input type="hidden" id="f-interval" value="7">
+            <label>תדירות</label>
             <div class="seg-toggle">
-              <button type="button" class="seg-btn active" data-recur="open" aria-pressed="true" onclick="App.setRecurMode('open')">כל שבוע, קבוע</button>
-              <button type="button" class="seg-btn" data-recur="count" aria-pressed="false" onclick="App.setRecurMode('count')">מספר שבועות</button>
+              <button type="button" class="seg-btn active" data-interval="7" aria-pressed="true" onclick="App.setRecurInterval(7)">כל שבוע</button>
+              <button type="button" class="seg-btn" data-interval="14" aria-pressed="false" onclick="App.setRecurInterval(14)">כל שבועיים</button>
+            </div>
+            <input type="hidden" id="f-recur-mode" value="open">
+            <label>עד מתי</label>
+            <div class="seg-toggle">
+              <button type="button" class="seg-btn active" data-recur="open" aria-pressed="true" onclick="App.setRecurMode('open')">קבוע, ללא סיום</button>
+              <button type="button" class="seg-btn" data-recur="count" aria-pressed="false" onclick="App.setRecurMode('count')">מספר מוגדר</button>
             </div>
             <div id="weeksWrap" style="display:none">
-              <label for="f-weeks">למשך כמה שבועות?</label>
+              <label for="f-weeks">כמה פעמים?</label>
               <input id="f-weeks" type="number" value="8" min="2" max="52">
             </div>
           </div>
@@ -535,7 +546,7 @@ const App = (() => {
         ? `<button class="btn btn-light btn-block" onclick="App.openStudentForm('${l.studentId}')">${icon("edit")} עריכת פרטי התלמיד</button>` : ""}
       </div>
       ${id ? (l.seriesId ? `
-        <div class="series-note">${icon("repeat", "ic-sub")} שיעור חוזר שבועי</div>
+        <div class="series-note">${icon("repeat", "ic-sub")} שיעור חוזר ${Number(l.intervalDays) === 14 ? "דו-שבועי" : "שבועי"}</div>
         <div class="danger-zone lesson-danger"><div><strong>מחיקת שיעור</strong><span>אפשר למחוק רק את המועד הזה או את כל ההמשך</span></div><div><button class="btn btn-danger" onclick="App.deleteLesson('${id}')">מועד זה</button><button class="btn btn-danger" onclick="App.deleteSeriesFuture('${id}')">כל ההמשך</button></div></div>
       ` : `
         <div class="danger-zone"><div><strong>מחיקת שיעור</strong><span>השיעור יוסר מהיומן</span></div><button class="btn btn-danger" onclick="App.deleteLesson('${id}')">מחיקה</button></div>
@@ -545,6 +556,35 @@ const App = (() => {
       ` : ""}
     `);
     renderStudentPicker();
+    renderFreeSlots();
+  }
+
+  // מועדים פנויים ביום הנבחר — לחיצה ממלאת את השעה. חוסך תיאום ידני מול הורה.
+  function renderFreeSlots() {
+    const box = document.getElementById("freeSlots");
+    if (!box) return;
+    const date = document.getElementById("f-date")?.value;
+    const durEl = document.getElementById("f-duration");
+    const dur = durEl && durEl.value ? Math.max(0, parseInt(durEl.value) || 0) : settings.defaultDuration;
+    if (!date) { box.innerHTML = ""; return; }
+    const slots = findFreeSlots(lessons, { date, duration: dur, limit: 3 });
+    box.innerHTML = slots.length
+      ? `<label>מועדים פנויים ביום זה</label><div class="quick-dates">${slots.map(t => `<button type="button" class="quick-date" onclick="App.pickFreeSlot('${t}',this)">${t}</button>`).join("")}</div>`
+      : "";
+  }
+  function pickFreeSlot(t, btn) {
+    const e = document.getElementById("f-time");
+    if (e) e.value = t;
+    document.querySelectorAll("#freeSlots .quick-date").forEach(b => b.classList.remove("sel"));
+    if (btn) btn.classList.add("sel");
+  }
+  function setRecurInterval(days) {
+    document.getElementById("f-interval").value = days;
+    document.querySelectorAll("[data-interval]").forEach(b => {
+      const active = Number(b.dataset.interval) === days;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-pressed", String(active));
+    });
   }
 
   // בורר תלמיד עם חיפוש (בתוך טופס שיעור)
@@ -583,7 +623,20 @@ const App = (() => {
   function pickStudent(id) {
     const h = document.getElementById("f-student");
     if (h) h.value = id;
+    if (!lessonFormEditing) applyStudentDefaults(id);
     renderStudentPicker();
+  }
+
+  // מילוי אוטומטי לפי השיעור האחרון של התלמיד — שעה/משך/מחיר חוזרים על עצמם
+  function applyStudentDefaults(id) {
+    const all = lessonIndex.forStudent(id); // ממוין כרונולוגית
+    const last = all[all.length - 1];
+    if (!last) return;
+    const set = (elId, val) => { const e = document.getElementById(elId); if (e && val != null && val !== "") e.value = val; };
+    set("f-time", last.time);
+    set("f-duration", last.duration);
+    if (typeof last.price === "number") set("f-price", last.price);
+    renderFreeSlots();
   }
 
   function toggleAdvanced(btn) {
@@ -627,13 +680,14 @@ const App = (() => {
       if (repeat && repeat.checked) {
         const mode = document.getElementById("f-recur-mode").value;
         const openEnded = mode === "open";
-        const weeks = openEnded
-          ? HORIZON_WEEKS
+        const interval = Number(document.getElementById("f-interval")?.value) === 14 ? 14 : 7;
+        const count = openEnded
+          ? Math.ceil(HORIZON_WEEKS * 7 / interval) // ממלאים עד אופק קבוע, ללא קשר לתדירות
           : Math.max(1, parseInt(document.getElementById("f-weeks").value) || 1);
-        repeatInfo = { openEnded };
-        dates = Array.from({ length: weeks }, (_, i) => {
+        repeatInfo = { openEnded, interval };
+        dates = Array.from({ length: count }, (_, i) => {
           const d = new Date(data.date + "T00:00");
-          d.setDate(d.getDate() + i * 7);
+          d.setDate(d.getDate() + i * interval);
           return ymd(d);
         });
       }
@@ -657,9 +711,10 @@ const App = (() => {
     } else if (repeatInfo) {
       const seriesId = uid();
       for (const date of dates) {
-        lessons.push({ id: uid(), paid: false, done: false, seriesId, recur: "weekly", openEnded: repeatInfo.openEnded, ...data, date });
+        lessons.push({ id: uid(), paid: false, done: false, seriesId, recur: "weekly", intervalDays: repeatInfo.interval, openEnded: repeatInfo.openEnded, ...data, date });
       }
-      successMessage = repeatInfo.openEnded ? "נקבע שיעור שבועי קבוע" : `נקבעו ${dates.length} שיעורים`;
+      const freq = repeatInfo.interval === 14 ? "דו-שבועי" : "שבועי";
+      successMessage = repeatInfo.openEnded ? `נקבע שיעור ${freq} קבוע` : `נקבעו ${dates.length} שיעורים`;
     } else {
       lessons.push({ id: uid(), paid: false, done: false, ...data });
       successMessage = "השיעור נקבע";
@@ -677,8 +732,9 @@ const App = (() => {
     d.setDate(d.getDate() + offset);
     const el = document.getElementById("f-date");
     if (el) el.value = ymd(d);
-    document.querySelectorAll(".quick-date").forEach(b => b.classList.remove("sel"));
+    document.querySelectorAll(".quick-dates .quick-date").forEach(b => b.classList.remove("sel"));
     if (btn) btn.classList.add("sel");
+    renderFreeSlots();
   }
 
   async function deleteLesson(id) {
@@ -732,14 +788,15 @@ const App = (() => {
     Object.values(groups).forEach(arr => {
       arr.sort((a, b) => a.date.localeCompare(b.date));
       const last = arr[arr.length - 1];
+      const step = Number(last.intervalDays) === 14 ? 14 : 7;
       const d = new Date(last.date + "T00:00");
       while (true) {
-        d.setDate(d.getDate() + 7);
+        d.setDate(d.getDate() + step);
         const ds = ymd(d);
         if (ds > horizon) break;
         lessons.push({
           id: uid(), paid: false, done: false,
-          seriesId: last.seriesId, recur: "weekly", openEnded: true,
+          seriesId: last.seriesId, recur: "weekly", intervalDays: step, openEnded: true,
           studentId: last.studentId, time: last.time, topic: last.topic,
           duration: last.duration, price: last.price, date: ds
         });
@@ -999,8 +1056,14 @@ const App = (() => {
   function quickAddLesson(dateStr, ev) {
     selectedDay = dateStr;
     const y = ev && typeof ev.offsetY === "number" ? ev.offsetY : null;
-    quickAddTime = y === null ? "" :
-      `${String(Math.min(23, Math.max(0, weekGridStartH + Math.floor(y / 48)))).padStart(2, "0")}:00`;
+    // קפיצה ל-15 דק' לפי מיקום הלחיצה — לא רק שעות עגולות
+    if (y === null) {
+      quickAddTime = "";
+    } else {
+      const raw = weekGridStartH * 60 + (y / 48) * 60;
+      const m = Math.max(0, Math.min(23 * 60 + 45, Math.round(raw / 15) * 15));
+      quickAddTime = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    }
     openLessonForm();
     quickAddTime = "";
   }
@@ -1134,13 +1197,23 @@ const App = (() => {
     const l = lessons.find(x => x.id === id);
     if (!l) return;
     l.done = true;
-    if (paid) l.paid = true;
+    if (paid) { l.paid = true; l.paidAt = todayStr(); }
     if (!save()) { render(); return; }
     render();
     toast(paid ? "סומן: התקיים ושולם" : "סומן: השיעור התקיים", "ok", {
       label: "ביטול",
-      run: () => { l.done = false; if (paid) l.paid = false; save(); render(); }
+      run: () => { l.done = false; if (paid) { l.paid = false; delete l.paidAt; } save(); render(); }
     });
+  }
+
+  // "בוצע + עוד אחד": מסמן שבוצע ושולם, ומיד קובע שיעור המשך בשבוע הבא לפי האחרון
+  function confirmAndRepeat(id) {
+    const l = lessons.find(x => x.id === id);
+    if (!l) return;
+    const studentId = l.studentId;
+    l.done = true; l.paid = true; l.paidAt = todayStr();
+    if (!save()) { render(); return; }
+    repeatLastLesson(studentId);
   }
 
   // דחייה מהירה בשבוע: אותו יום ושעה, שבוע קדימה. אם המועד תפוס — נפתח הטופס לבחירה ידנית.
@@ -1196,7 +1269,8 @@ const App = (() => {
         <div class="confirm-actions">
           <button class="btn btn-green" onclick="App.confirmLesson('${l.id}', true)">${icon("check")} התקיים ושולם</button>
           <button class="btn btn-light" onclick="App.confirmLesson('${l.id}', false)">התקיים</button>
-          <button class="btn btn-light" onclick="App.postponeLesson('${l.id}')" aria-label="דחיית השיעור בשבוע, לאותו יום ושעה">${icon("repeat")} לשבוע הבא</button>
+          <button class="btn btn-light" onclick="App.confirmAndRepeat('${l.id}')" aria-label="סימון שבוצע ושולם וקביעת עוד שיעור בשבוע הבא">${icon("repeat")} בוצע + עוד אחד</button>
+          <button class="btn btn-light" onclick="App.postponeLesson('${l.id}')" aria-label="דחיית השיעור בשבוע, לאותו יום ושעה">לשבוע הבא</button>
           <button class="btn btn-light confirm-skip" onclick="App.skipLesson('${l.id}')" aria-label="השיעור לא התקיים — הסרה מהיומן">לא התקיים</button>
         </div>
       </article>`;
@@ -1296,8 +1370,9 @@ const App = (() => {
           const btn = s.phone
             ? `<button class="${sent ? "is-sent" : ""}" onclick="App.sendWhatsApp('${s.id}')" aria-label="${sent ? `שליחה חוזרת של תזכורת תשלום ל-${escapeHtml(s.name)}` : `שליחת תזכורת תשלום ל-${escapeHtml(s.name)}`}">${icon("whatsapp")} ${sent ? "שוב" : "תזכורת"}</button>`
             : `<button onclick="App.openStudentForm('${s.id}')" aria-label="הוספת טלפון להורה של ${escapeHtml(s.name)}">הוספת טלפון</button>`;
+          const stale = sent && (Date.now() - (waSent.get(debtSignature(s.id, unpaid)) || 0)) > 6 * 86400000;
           return `<article class="remind-row">
-            <div><strong>${escapeHtml(s.name)}</strong><span>${unpaid.length === 1 ? "שיעור אחד" : `${unpaid.length} שיעורים`} · ${cur(owed)}${sent ? ` · <b class="remind-sent">${icon("check", "ic-sub")} נשלח</b>` : ""}</span></div>
+            <div><strong>${escapeHtml(s.name)}</strong><span>${unpaid.length === 1 ? "שיעור אחד" : `${unpaid.length} שיעורים`} · ${cur(owed)}${sent ? ` · <b class="remind-sent${stale ? " remind-stale" : ""}">${icon(stale ? "warn" : "check", "ic-sub")} ${sentAgoLabel(debtSignature(s.id, unpaid))}</b>` : ""}</span></div>
             ${btn}
           </article>`;
         }).join("") +
@@ -1310,18 +1385,24 @@ const App = (() => {
     const el = document.getElementById("reminderList");
     if (!el) return;
     const today = todayStr();
+    const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return ymd(d); })();
+    // רק היום ומחר — התזכורות הרלוונטיות לשליחה עכשיו; רחוק יותר סתם רעש
     const upcoming = lessonSorted()
-      .filter(l => l.date >= today && !l.done)
-      .filter(l => { const s = studentById(l.studentId); return s && (s.studentPhone || s.phone); })
-      .slice(0, 12); // ponytail: מגבילים ל-12 הקרובים; רשימה ארוכה יותר מיותרת במסך אחד
-    if (!upcoming.length) { el.innerHTML = ""; return; }
+      .filter(l => (l.date === today || l.date === tomorrow) && !l.done)
+      .filter(l => { const s = studentById(l.studentId); return s && (s.studentPhone || s.phone); });
+    const pendingCount = tomorrowPending().length;
+    const bulkBtn = pendingCount > 1
+      ? `<button type="button" class="btn btn-wa reminders-bulk" onclick="App.startTomorrowReminders()">${icon("send")} תזכורת לכל שיעורי מחר (${pendingCount})</button>`
+      : "";
+    if (!upcoming.length && !bulkBtn) { el.innerHTML = ""; return; }
     el.innerHTML =
       `<div class="section-heading"><h3>תזכורות שיעור</h3><span>מה שנשלח מסומן, בלי שליחות כפולות</span></div>` +
+      bulkBtn +
       upcoming.map(l => {
         const s = studentById(l.studentId);
         const sent = waSent.has(reminderSignature(l));
         return `<article class="remind-row">
-          <div><strong>${escapeHtml(s.name)}</strong><span>${dayLabelPlain(l.date)} · ${fmtTime(l.time)}${l.topic ? ` · ${escapeHtml(l.topic)}` : ""}${sent ? ` · <b class="remind-sent">${icon("check", "ic-sub")} נשלח</b>` : ""}</span></div>
+          <div><strong>${escapeHtml(s.name)}</strong><span>${dayLabelPlain(l.date)} · ${fmtTime(l.time)}${l.topic ? ` · ${escapeHtml(l.topic)}` : ""}${sent ? ` · <b class="remind-sent">${icon("check", "ic-sub")} ${sentAgoLabel(reminderSignature(l))}</b>` : ""}</span></div>
           <button class="${sent ? "is-sent" : ""}" onclick="App.sendLessonReminder('${l.id}')" aria-label="${sent ? `שליחה חוזרת של תזכורת ל-${escapeHtml(s.name)}` : `שליחת תזכורת ל-${escapeHtml(s.name)}`}">${icon("whatsapp")} ${sent ? "שוב" : "תזכורת"}</button>
         </article>`;
       }).join("");
@@ -1423,7 +1504,7 @@ const App = (() => {
         <footer class="payment-actions">
           ${student.phone
             ? (waSent.has(debtSignature(student.id, unpaid))
-              ? `<button class="btn btn-light" onclick="App.sendWhatsApp('${student.id}')">${icon("check")} נשלחה תזכורת · שוב?</button>`
+              ? `<button class="btn btn-light" onclick="App.sendWhatsApp('${student.id}')">${icon("check")} ${sentAgoLabel(debtSignature(student.id, unpaid))} · שוב?</button>`
               : `<button class="btn btn-wa" onclick="App.sendWhatsApp('${student.id}')">${icon("whatsapp")} שליחת תזכורת</button>`)
             : `<button class="btn btn-light" onclick="App.openStudentForm('${student.id}')">הוספת מספר טלפון</button>`}
           <button class="btn btn-green" onclick="App.markAllPaid('${student.id}')">${icon("check")} סימון ${unpaid.length === 1 ? "השיעור" : "הכול"} כשולם</button>
@@ -1464,6 +1545,7 @@ const App = (() => {
     const l = lessons.find(x => x.id === id);
     if (!l) return;
     l.paid = !l.paid;
+    if (l.paid) l.paidAt = todayStr(); else delete l.paidAt;
     if (!save()) { render(); return; }
     render();
     toast(l.paid ? "סומן כשולם" : "בוטל סימון התשלום", "ok", showUndo ? {
@@ -1476,20 +1558,24 @@ const App = (() => {
     const unpaid = [...lessonIndex.unpaidForStudent(studentId)];
     if (!unpaid.length) return;
     if (!await askConfirmation(`לסמן ${unpaid.length} ${unpaid.length === 1 ? "שיעור" : "שיעורים"} כשולמו?`, "סימון כשולם")) return;
-    unpaid.forEach(l => l.paid = true);
+    const paidAt = todayStr();
+    unpaid.forEach(l => { l.paid = true; l.paidAt = paidAt; });
     if (!save()) { render(); return; }
     render();
     toast("כל השיעורים סומנו כשולמו", "ok", {
       label: "ביטול",
       run: () => {
         const ids = new Set(unpaid.map(lesson => lesson.id));
-        lessons.filter(lesson => ids.has(lesson.id)).forEach(lesson => { lesson.paid = false; });
+        lessons.filter(lesson => ids.has(lesson.id)).forEach(lesson => { lesson.paid = false; delete lesson.paidAt; });
         if (save()) render();
       }
     });
   }
 
   // ----- וואטסאפ: הודעה מוכנה + קישור לשליחה בלחיצה -----
+  // פרטי תשלום (קישור ביט/פייבוקס או מספר להעברה) שנדבקים לסוף הודעת גבייה
+  const payInfoLine = () => settings.payInfo ? `\n\nלתשלום: ${settings.payInfo}` : "";
+
   // פתיחת וואטסאפ עם הודעה מוכנה. מנרמל מספר ישראלי לפורמט בינלאומי.
   function waOpen(rawPhone, msg) {
     if (!rawPhone) { toast("לתלמיד אין מספר טלפון. הוסיפי אותו במסך התלמידים.", "err"); return false; }
@@ -1501,29 +1587,40 @@ const App = (() => {
     return true;
   }
 
-  // ----- מעקב "נשלח": איזו תזכורת וואטסאפ כבר יצאה (נשמר מקומית) -----
+  // ----- מעקב "נשלח": איזו תזכורת וואטסאפ כבר יצאה ומתי (נשמר מקומית) -----
+  // Map<חתימה, חותמת-זמן>. תמיכה לאחור: מערך חתימות ישן נטען עם זמן 0 (לא ידוע).
   const WA_SENT_KEY = "mt_wa_sent";
   function loadWaSent() {
     try {
-      const values = JSON.parse(localStorage.getItem(WA_SENT_KEY) || "[]");
-      return new Set(Array.isArray(values) ? values : []);
+      const raw = JSON.parse(localStorage.getItem(WA_SENT_KEY) || "[]");
+      if (!Array.isArray(raw)) return new Map();
+      return new Map(raw.map(v => Array.isArray(v) ? v : [v, 0]));
     } catch {
-      return new Set();
+      return new Map();
     }
   }
   const waSent = loadWaSent();
+  // "נשלח לפני N ימים" — לתת למורה לדעת אם כדאי לשלוח שוב
+  function sentAgoLabel(signature) {
+    const ts = waSent.get(signature);
+    if (!ts) return "נשלח";
+    const days = Math.floor((Date.now() - ts) / 86400000);
+    if (days <= 0) return "נשלח היום";
+    if (days === 1) return "נשלח אתמול";
+    return `נשלח לפני ${days} ימים`;
+  }
   // חתימת חוב: משתנה כשהחוב משתנה — תזכורת שנשלחה על חוב ישן לא חוסמת חוב חדש
   const debtSignature = (studentId, unpaid) =>
     `paydebt:${studentId}:${unpaid.length}:${unpaid.reduce((sum, l) => sum + lessonPrice(l), 0)}`;
   function rememberWaSent(signature) {
-    waSent.add(signature);
+    waSent.set(signature, Date.now());
     const activeSignatures = new Set(lessons.map(reminderSignature));
     for (const s of students) {
       const unpaid = lessonIndex.unpaidForStudent(s.id);
       if (unpaid.length) activeSignatures.add(debtSignature(s.id, unpaid));
     }
-    for (const value of waSent) {
-      if (!activeSignatures.has(value)) waSent.delete(value);
+    for (const key of [...waSent.keys()]) {
+      if (!activeSignatures.has(key)) waSent.delete(key);
     }
     try { localStorage.setItem(WA_SENT_KEY, JSON.stringify([...waSent])); }
     catch (error) { console.warn("Could not persist WhatsApp reminder history", error); }
@@ -1540,7 +1637,8 @@ const App = (() => {
       `${greet}\n` +
       `תזכורת ידידותית לגבי תשלום עבור השיעורים הפרטיים של ${s.name}.\n` +
       `סה"כ ${unpaid.length} שיעורים שטרם שולמו, בסך ${owed} ${settings.currency}.\n` +
-      `תודה רבה!`;
+      `תודה רבה!` +
+      payInfoLine();
     if (waOpen(s.phone, msg) && unpaid.length) { rememberWaSent(debtSignature(studentId, unpaid)); render(); }
   }
 
@@ -1563,7 +1661,7 @@ const App = (() => {
       `ריכוז שיעורים של ${s.name} – ${monthName}:\n` +
       `${lines.join("\n")}\n\n` +
       `סה"כ ${monthLessons.length} ${monthLessons.length === 1 ? "שיעור" : "שיעורים"} · ${cur(total)}` +
-      (paid < total ? `\nשולם ${cur(paid)} · נותר לתשלום ${cur(total - paid)}` : `\nהכול שולם — תודה רבה!`);
+      (paid < total ? `\nשולם ${cur(paid)} · נותר לתשלום ${cur(total - paid)}` + payInfoLine() : `\nהכול שולם — תודה רבה!`);
     waOpen(s.phone, msg);
   }
 
@@ -1585,6 +1683,32 @@ const App = (() => {
       (l.topic ? `\nנושא: ${l.topic}.` : "") +
       `\nנתראה!`;
     if (waOpen(s.studentPhone || s.phone, msg)) { rememberWaSent(reminderSignature(l)); render(); }
+  }
+
+  // ----- תזכורת לכל שיעורי מחר בתור אחד -----
+  // כל פתיחת וואטסאפ צריכה לחיצת משתמש, לכן זה תור: לוחצים → נשלח → "הבא".
+  let reminderQueue = [];
+  // שיעורי מחר עם טלפון שטרם קיבלו תזכורת — הבסיס לכפתור ולתור
+  function tomorrowPending() {
+    const d = new Date(); d.setDate(d.getDate() + 1);
+    return bulkReminderLessons(lessonSorted(), [ymd(d)], new Set(waSent.keys()))
+      .filter(l => { const s = studentById(l.studentId); return s && (s.studentPhone || s.phone); });
+  }
+  function startTomorrowReminders() {
+    reminderQueue = tomorrowPending();
+    if (!reminderQueue.length) { toast("אין תזכורות למחר לשליחה", "info"); return; }
+    sendNextReminder();
+  }
+  function sendNextReminder() {
+    const l = reminderQueue.shift();
+    if (!l) return;
+    sendLessonReminder(l.id); // פותח וואטסאפ, מסמן נשלח, מרנדר
+    if (reminderQueue.length) {
+      toast(`נשלח. נותרו ${reminderQueue.length}`, "ok",
+        { label: `הבא (${reminderQueue.length})`, run: sendNextReminder }, 8000);
+    } else {
+      toast("כל התזכורות למחר נשלחו 🎉", "ok");
+    }
   }
 
   // ========== גיבוי ושחזור ==========
@@ -1752,6 +1876,10 @@ const App = (() => {
           <div><label class="setting-label" for="set-cur">מטבע</label></div>
           <input type="text" id="set-cur" value="${escapeHtml(settings.currency)}" maxlength="3" onchange="App.updateSetting('currency', this.value)">
         </div>
+        <div class="setting-row setting-row-wide">
+          <div><label class="setting-label" for="set-payinfo">פרטים לתשלום</label><div class="setting-sub">קישור ביט/פייבוקס או מספר להעברה — יתווסף לתזכורות התשלום בוואטסאפ</div></div>
+          <input type="text" id="set-payinfo" value="${escapeHtml(settings.payInfo || "")}" placeholder="לדוגמה: bit.ly/pay או העברה ל-050..." onchange="App.updateSetting('payInfo', this.value)">
+        </div>
         </div>
       </section>
 
@@ -1851,6 +1979,7 @@ const App = (() => {
       value = String(value).trim();
     }
     if (key === "currency" && !value) value = "₪";
+    if (key === "payInfo") value = value.slice(0, 300); // גבול האימות ב-normalizeSettings
     settings[key] = value;
     if (!saveSettings()) { render(); return; }
     if (key === "remindMinutes") reschedule();
@@ -2082,8 +2211,8 @@ const App = (() => {
         });
         rememberNotification(reminderSignature(l));
       }
-      // תזכורת גבייה: שיעור שהסתיים, סומן כבוצע, אך טרם שולם
-      const duePay = duePaymentReminders(lessons, new Date(), notified);
+      // תזכורת גבייה: שיעור שהסתיים, סומן כבוצע, אך טרם שולם — רק למחרת ואילך (לא מיד בתום השיעור)
+      const duePay = duePaymentReminders(lessons, new Date(), notified, 12 * 60);
       for (const l of duePay) {
         const price = lessonPrice(l);
         if (price > 0) {
@@ -2180,6 +2309,9 @@ const App = (() => {
     const p = new URLSearchParams(location.search);
     if (p.get("view")) go(p.get("view"));
     if (p.get("action") === "new-lesson") openLessonForm();
+    // הגעה מהתראת שיעור — פתיחת אותו שיעור (אם עדיין קיים)
+    const lessonId = p.get("lesson");
+    if (lessonId && lessons.some(l => l.id === lessonId)) openLessonForm(lessonId);
   }
 
   function registerSW() {
@@ -2498,11 +2630,11 @@ const App = (() => {
     go, closeModal, renderStudents,
     openStudentForm, openStudentProfile, saveStudentNotes, saveStudent, deleteStudent,
     openLessonForm, saveLesson, deleteLesson, deleteSeriesFuture, deleteStudentFuture, toggleDone,
-    confirmLesson, skipLesson,
+    confirmLesson, confirmAndRepeat, skipLesson,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, quickAddStudent, toggleAdvanced,
-    toggleRepeat, setRecurMode, scheduleForStudent, togglePaid,
+    toggleRepeat, setRecurMode, setRecurInterval, renderFreeSlots, pickFreeSlot, scheduleForStudent, togglePaid,
     calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson,
-    setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, repeatLastLesson, markAllPaid, postponeLesson,
+    setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, startTomorrowReminders, repeatLastLesson, markAllPaid, postponeLesson,
     exportData, importData, exportCalendar,
     changeMonth,
     updateSetting, setTheme, clearAll,

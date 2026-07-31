@@ -11,14 +11,16 @@ export function bulkReminderLessons(lessons, dates, sent = new Set()) {
 }
 
 // Lessons that are done but still unpaid and already finished — i.e. money you
-// likely forgot to collect. now/grace let it fire shortly after the lesson ends.
-export function duePaymentReminders(lessons, now = Date.now(), notified = new Set()) {
+// likely forgot to collect. graceMinutes delays the nudge past the lesson end
+// (e.g. next morning) so it is a calm digest, not a ping the second class ends.
+export function duePaymentReminders(lessons, now = Date.now(), notified = new Set(), graceMinutes = 0) {
   const nowTime = now instanceof Date ? now.getTime() : Number(now);
+  const grace = Math.max(0, Number(graceMinutes) || 0) * MINUTE;
   return lessons.filter(lesson => {
     if (!lesson.done || lesson.paid) return false;
     if (notified.has(paymentSignature(lesson))) return false;
     const start = lessonStartTimestamp(lesson);
-    return Number.isFinite(start) && nowTime >= start;
+    return Number.isFinite(start) && nowTime >= start + grace;
   });
 }
 

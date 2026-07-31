@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildLessonIndex, debtAgeWeeks, findConflicts, nextDebtorToRemind, summarizeMonth } from "../src/selectors.js";
+import { buildLessonIndex, debtAgeWeeks, findConflicts, findFreeSlots, nextDebtorToRemind, summarizeMonth } from "../src/selectors.js";
 
 const students = [
   { id: "s1", name: "דנה" },
@@ -57,6 +57,19 @@ test("findConflicts flags overlapping lessons on requested dates", () => {
   assert.equal(findConflicts(existing, { dates: ["2026-07-20"], time: "16:00", duration: 60, excludeId: "a" }).length, 0);
   // בלי שעה — אין מה לבדוק
   assert.equal(findConflicts(existing, { dates: ["2026-07-20"], time: "", duration: 60 }).length, 0);
+});
+
+test("findFreeSlots returns open times that avoid active lessons", () => {
+  const day = [
+    { id: "a", date: "2026-07-20", time: "16:00", duration: 60, done: false },
+    { id: "b", date: "2026-07-20", time: "18:00", duration: 60, done: false },
+    { id: "old", date: "2026-07-20", time: "17:00", duration: 60, done: true } // בוצע — לא חוסם
+  ];
+  const slots = findFreeSlots(day, { date: "2026-07-20", duration: 60, from: 16, to: 20, step: 60, limit: 5 });
+  // 16 ו-18 תפוסים; 17 ו-19 פנויים (הבוצע לא נחשב). עדיפות אחה"צ שומרת על סדר עולה כאן.
+  assert.deepEqual(slots, ["17:00", "19:00"]);
+  // יום ריק — הצעות מלאות עד הגבול
+  assert.deepEqual(findFreeSlots([], { date: "2026-07-20", duration: 60, from: 16, to: 19, step: 60, limit: 2 }), ["16:00", "17:00"]);
 });
 
 test("debtAgeWeeks counts whole weeks from the oldest unpaid lesson", () => {

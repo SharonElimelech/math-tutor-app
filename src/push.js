@@ -23,7 +23,8 @@ export function upcomingPushReminders(lessons, studentsById, leadMinutes = 30, n
       t,
       title: "תזכורת שיעור",
       body: `שיעור עם ${name} בשעה ${lesson.time}`,
-      tag: `lesson-${lesson.id}`
+      tag: `lesson-${lesson.id}`,
+      url: `./?view=home&lesson=${encodeURIComponent(lesson.id)}`
     });
   }
   return out.sort((a, b) => a.t - b.t);

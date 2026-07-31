@@ -1,9 +1,9 @@
 // Service Worker – מאפשר עבודה גם בלי אינטרנט (offline) והתקנה כאפליקציה
-const CACHE = "morti-v3.8.9";
+const CACHE = "morti-v3.9.0";
 const ASSETS = [
   "index.html",
-  "styles.css?v=41",
-  "app.js?v=53",
+  "styles.css?v=42",
+  "app.js?v=54",
   "src/data.js",
   "src/push.js",
   "src/reminders.js",
@@ -54,19 +54,25 @@ self.addEventListener("push", e => {
         tag: item.tag,
         icon: "icon-192.png",
         badge: "icon-192.png",
-        data: { url: "./" }
+        data: { url: item.url || "./" }
       });
     }
   })());
 });
 
-// לחיצה על התראה — מביאה את האפליקציה לקדמת המסך (או פותחת אותה)
+// לחיצה על התראה — מביאה את האפליקציה לקדמת המסך (או פותחת אותה) ומנווטת לשיעור
 self.addEventListener("notificationclick", e => {
   e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || "./";
   e.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
-      for (const c of list) { if ("focus" in c) return c.focus(); }
-      if (clients.openWindow) return clients.openWindow("./");
+      for (const c of list) {
+        if ("focus" in c) {
+          if ("navigate" in c && url !== "./") c.navigate(url).catch(() => {});
+          return c.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(url);
     })
   );
 });
