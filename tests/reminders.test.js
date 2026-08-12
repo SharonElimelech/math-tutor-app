@@ -9,7 +9,8 @@ import {
   lessonsAwaitingConfirmation,
   nextLessonReminderTimestamp,
   paymentSignature,
-  reminderSignature
+  reminderSignature,
+  upcomingReminderLessons
 } from "../src/reminders.js";
 
 const lesson = {
@@ -27,6 +28,21 @@ test("finds reminders inside lead window and ignores delivered or done lessons",
   assert.deepEqual(dueLessonReminders([lesson], now, 30), [lesson]);
   assert.deepEqual(dueLessonReminders([lesson], now, 30, new Set([reminderSignature(lesson)])), []);
   assert.deepEqual(dueLessonReminders([{ ...lesson, done: true }], now, 30), []);
+});
+
+test("upcoming reminders drop lessons that already started today", () => {
+  const later = { ...lesson, id: "lesson_late", time: "20:00" };
+  const dates = ["2026-06-20"];
+  const now = new Date("2026-06-20T17:00:00");
+  // 16:00 כבר עבר, 20:00 עוד לפנינו
+  assert.deepEqual(upcomingReminderLessons([lesson, later], dates, now), [later]);
+  // לפני שני השיעורים — שניהם מועמדים
+  assert.deepEqual(upcomingReminderLessons([lesson, later], dates, new Date("2026-06-20T08:00:00")), [lesson, later]);
+  // חתימה שכבר נשלחה עדיין מסוננת
+  assert.deepEqual(
+    upcomingReminderLessons([lesson, later], dates, new Date("2026-06-20T08:00:00"), new Set([reminderSignature(lesson)])),
+    [later]
+  );
 });
 
 test("bulk reminders cover given dates, skip done and already-sent lessons", () => {

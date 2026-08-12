@@ -28,6 +28,15 @@ export function lessonStartTimestamp(lesson) {
   return new Date(`${lesson.date}T${lesson.time || "00:00"}:00`).getTime();
 }
 
+// כמו bulkReminderLessons, אבל בלי שיעורים שכבר התחילו — אין טעם לתזכר על שיעור שעבר.
+export function upcomingReminderLessons(lessons, dates, now = Date.now(), sent = new Set()) {
+  const nowTime = now instanceof Date ? now.getTime() : Number(now);
+  return bulkReminderLessons(lessons, dates, sent).filter(lesson => {
+    const start = lessonStartTimestamp(lesson);
+    return Number.isFinite(start) && start >= nowTime;
+  });
+}
+
 // שיעורים שכבר הסתיימו ולא סומנו "בוצע" — ממתינים לאישור המורה בדף הבית
 export function lessonsAwaitingConfirmation(lessons, now = Date.now()) {
   const nowTime = now instanceof Date ? now.getTime() : Number(now);

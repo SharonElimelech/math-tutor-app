@@ -23,7 +23,7 @@ const lesson = {
 };
 
 test("release exposes the expected app version", () => {
-  assert.equal(APP_VERSION, "3.9.0");
+  assert.equal(APP_VERSION, "3.10.0");
 });
 
 test("settings keep payment info within bounds", () => {

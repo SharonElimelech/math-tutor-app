@@ -1524,34 +1524,7 @@ input, select { min-height: 48px; }
 .page-intro.compact { margin-bottom: var(--sp-5); }
 
 .home-dashboard { display: grid; gap: 24px; }
-.home-primary,
-.home-secondary { min-width: 0; }
-.home-secondary {
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 16px;
-  align-self: start;
-}
-
-.section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin: 24px 2px 12px;
-}
-.section-heading h3,
-.view .section-heading h3 {
-  margin: 0;
-  color: var(--text);
-  font-family: "Heebo", "Assistant", sans-serif;
-  font-size: 1.02rem;
-  letter-spacing: -.015em;
-  text-transform: none;
-}
-.section-heading span { color: var(--faint); font-size: .74rem; font-weight: 700; }
-.home-secondary .section-heading { margin-top: 0; }
+.home-primary { min-width: 0; }
 
 .summary-foot {
   display: flex;
@@ -1614,9 +1587,6 @@ input, select { min-height: 48px; }
 .agenda-copy strong { font-size: 1rem; }
 .agenda-copy span { overflow: hidden; margin-top: 3px; color: var(--muted); font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
 .agenda-actions { display: flex; align-items: center; gap: 6px; }
-.agenda-remind { min-height: 42px; padding: 0 10px; border: 0; border-radius: 11px; background: color-mix(in srgb, var(--wa) 12%, var(--surface)); color: var(--wa); font: 700 .76rem "Assistant", sans-serif; cursor: pointer; }
-.agenda-remind .ic { width: 17px; height: 17px; }
-.agenda-remind span { margin-right: 4px; }
 
 .student-avatar { display: grid; place-items: center; flex: none; border-radius: 12px; background: color-mix(in srgb, var(--brand-1) 11%, var(--surface)); color: var(--brand-1); font-weight: 800; }
 .debt-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 44px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); font-family: inherit; text-align: start; cursor: pointer; }
@@ -1628,16 +1598,26 @@ input, select { min-height: 48px; }
 .debt-clear strong, .debt-clear span { display: block; }
 .debt-clear strong { color: var(--text); font-size: .9rem; }
 .debt-clear span { font-size: .74rem; }
-.debt-summary-line { padding: 2px 2px 8px; }
-.debt-summary-line strong { display: block; color: var(--red); font-size: .95rem; }
-.debt-summary-line span { display: block; margin-top: 2px; color: var(--muted); font-size: .74rem; }
 .debt-summary-link { width: 100%; min-height: 44px; margin-top: 4px; padding: 8px; border: none; background: none; color: var(--muted); font-family: inherit; font-size: .78rem; text-align: center; cursor: pointer; }
 
-.reminders-card { margin-top: 16px; }
-.remind-all { margin-bottom: 6px; }
-.home-calendar .remind-all { margin-bottom: 12px; }
-.remind-all-done { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding: 10px 14px; border-radius: 12px; background: var(--green-bg); color: var(--green); font-weight: 700; font-size: .82rem; }
-.remind-all-done .ic { width: 18px; height: 18px; }
+/* ---------- מרכז התזכורות: שיעורים וכסף בכרטיס אחד ---------- */
+.reminder-hub {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.hub-head { margin-bottom: 4px; }
+.hub-head h3 { margin: 0; color: var(--text); font: 800 1.05rem "Heebo", "Assistant", sans-serif; letter-spacing: -.015em; }
+.hub-head p { margin: 4px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.5; }
+.hub-group { margin-top: 18px; padding-top: 14px; border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+.hub-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.hub-group-head h4 { margin: 0; color: var(--text); font: 700 .95rem "Assistant", sans-serif; }
+.hub-count { flex: none; color: var(--muted); font-size: .8rem; font-weight: 700; }
+.hub-count-due { color: var(--red); }
+.hub-count-done { color: var(--green); }
+.hub-empty { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.5; }
 .remind-sent { color: var(--green); font-weight: 700; }
 .remind-sent .ic-sub { width: 12px; height: 12px; vertical-align: -2px; }
 /* תזכורת ישנה שטרם הביאה תשלום — כדאי לשלוח שוב */
@@ -1656,11 +1636,12 @@ input, select { min-height: 48px; }
 .backup-nudge strong { font-size: .88rem; }
 .backup-nudge span { color: var(--muted); font-size: .74rem; }
 .backup-nudge .btn { flex: none; }
+.remind-list { margin: 0; padding: 0; list-style: none; }
 .remind-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
 .remind-row:last-child { border-bottom: 0; }
 .remind-row strong { display: block; font-size: .9rem; }
-.remind-row span { display: block; color: var(--muted); font-size: .72rem; }
-.remind-row button { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 11px; padding: 8px 12px; background: color-mix(in srgb, var(--wa) 12%, var(--surface)); color: var(--wa); font-family: inherit; font-weight: 700; font-size: .8rem; cursor: pointer; white-space: nowrap; }
+.remind-row span { display: block; color: var(--muted); font-size: .8rem; }
+.remind-row button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border: 0; border-radius: 11px; padding: 8px 14px; background: color-mix(in srgb, var(--wa) 12%, var(--surface)); color: var(--wa); font-family: inherit; font-weight: 700; font-size: .8rem; cursor: pointer; white-space: nowrap; }
 .remind-row button .ic { width: 16px; height: 16px; }
 
 /* ---------- בית: תצוגת שבוע מלאה (כמו יומן גוגל) ---------- */
@@ -1823,8 +1804,7 @@ input, select { min-height: 48px; }
   .student-card:hover { box-shadow: var(--sh-md); transform: translateY(-2px); }
   .student-card:hover .student-card-arrow { transform: translateX(-3px); }
   .summary-time:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
-  .debt-summary:hover,
-  .agenda-remind:hover { filter: brightness(.96); transform: translateY(-1px); }
+  .debt-summary:hover { filter: brightness(.96); transform: translateY(-1px); }
   .nav-btn:hover { color: var(--text); background: rgba(255,255,255,.08); }
 }
 
@@ -1852,8 +1832,6 @@ input, select { min-height: 48px; }
   .summary-foot { flex-wrap: wrap; }
   .agenda-item { padding: 9px 10px; }
   .agenda-date { width: 62px; }
-  .agenda-remind { width: 42px; padding: 0; }
-  .agenda-remind span { display: none; }
   .student-card { grid-template-columns: auto minmax(0, 1fr); }
   .student-card-arrow { display: none; }
   .student-card-top { display: block !important; }
@@ -1886,7 +1864,6 @@ input, select { min-height: 48px; }
 
 @media (min-width: 760px) {
   main { padding: 32px 28px; max-width: 1120px; }
-  .home-dashboard { grid-template-columns: minmax(0, 1.45fr) minmax(280px, .75fr); align-items: start; }
   .home-actions { margin-top: 14px; }
   #studentsList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #paymentsList { max-width: 900px; }

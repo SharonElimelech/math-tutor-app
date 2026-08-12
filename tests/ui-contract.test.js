@@ -24,6 +24,31 @@ test("generated interactive surfaces use native controls", () => {
   assert.match(source, /<button type="button" class="\$\{cls\}"[^>]* aria-label=/);
 });
 
+test("reminder rows are a labelled list with reachable touch targets", () => {
+  const source = read("app.js");
+  const styles = read("styles.css");
+  assert.match(source, /<section class="reminder-hub" aria-labelledby="hubTitle">/);
+  assert.match(source, /<ul class="remind-list">/);
+  assert.match(source, /<li class="remind-row">/);
+  assert.doesNotMatch(source, /<article class="remind-row">/);
+  assert.match(styles, /\.remind-row button\s*\{[^}]*min-height:\s*44px/s);
+});
+
+test("lesson and payment reminders live in one hub, sendable in bulk", () => {
+  const html = read("index.html");
+  const source = read("app.js");
+  // מקום אחד: אין עוד רשימת תזכורות נפרדת ו-aside גבייה נפרד
+  assert.match(html, /id="reminderHub"/);
+  assert.doesNotMatch(html, /id="reminderList"|id="paymentAlerts"|home-secondary/);
+  // שתי הקבוצות גלויות יחד, כל אחת עם כותרת משלה
+  assert.match(source, /aria-labelledby="hubLessonsTitle"|id: "hubLessonsTitle"/);
+  assert.match(source, /aria-labelledby="hubMoneyTitle"|id: "hubMoneyTitle"/);
+  // שליחה לכולם קיימת לשני הסוגים ומשתמשת באותו תור
+  assert.match(source, /App\.startLessonReminders\(\)/);
+  assert.match(source, /App\.startDebtReminders\(\)/);
+  assert.match(source, /function startQueue\(/);
+});
+
 test("service worker scopes document fallback to navigation", () => {
   const worker = read("service-worker.js");
   assert.match(worker, /e\.request\.mode === "navigate"/);
