@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Heebo:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=44">
+  <link rel="stylesheet" href="styles.css?v=47">
   <link rel="apple-touch-icon" href="icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -23,13 +23,16 @@
       <div><h1>המורה שלי</h1><span>ניהול הוראה פרטית</span></div>
     </div>
     <div class="header-right">
-      <div id="reminderBadge" class="reminder-badge hidden" role="status" aria-live="polite"></div>
+      <button type="button" id="reminderBadge" class="reminder-badge hidden" aria-live="polite" onclick="App.goReminders()"></button>
     </div>
   </header>
 
   <main id="app">
-    <!-- מסך: בית = יומן בלבד -->
+    <!-- מסך: בית = יומן + מרכז התזכורות מתחתיו -->
     <section id="view-home" class="view active">
+      <h2 class="sr-only">יומן ותזכורות</h2>
+      <!-- מרכז התזכורות בראש היומן: מקופל כברירת מחדל, פתיחה אחת ומזכירים -->
+      <div id="reminderHub"></div>
       <div id="homeCalendar" class="home-calendar"></div>
       <input id="importFile" type="file" accept="application/json" style="display:none" onchange="App.importData(event)">
     </section>
@@ -47,8 +50,6 @@
             </div>
           </div>
           <div id="todaySummary" class="card summary-card"></div>
-          <!-- מרכז התזכורות: שיעורים וכסף באותו מקום, בלי מעבר בין מסכים -->
-          <div id="reminderHub"></div>
           <div id="homeInsights" class="home-insights" aria-label="תמונת מצב חודשית"></div>
           <div class="home-actions">
             <button class="action-tile primary" onclick="App.openLessonForm()">
@@ -150,6 +151,6 @@
   <!-- הודעות צפות -->
   <div id="toastWrap" class="toast-wrap" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="app.js?v=56"></script>
+  <script type="module" src="app.js?v=59"></script>
 </body>
 </html>

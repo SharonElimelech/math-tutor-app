@@ -208,6 +208,13 @@ body {
 .header-icon-btn:active { transform: scale(.9); background: rgba(255,255,255,.28); }
 .reminder-badge svg { width: 15px; height: 15px; vertical-align: -2px; margin-left: 5px; }
 .reminder-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
   background: rgba(255, 255, 255, .22);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255,255,255,.3);
@@ -1598,33 +1605,159 @@ input, select { min-height: 48px; }
 .debt-clear strong, .debt-clear span { display: block; }
 .debt-clear strong { color: var(--text); font-size: .9rem; }
 .debt-clear span { font-size: .74rem; }
-.debt-summary-link { width: 100%; min-height: 44px; margin-top: 4px; padding: 8px; border: none; background: none; color: var(--muted); font-family: inherit; font-size: .78rem; text-align: center; cursor: pointer; }
 
-/* ---------- מרכז התזכורות: שיעורים וכסף בכרטיס אחד ---------- */
+/* ---------- מרכז התזכורות: יושב בראש היומן, מקופל עד שצריך אותו ---------- */
 .reminder-hub {
-  margin-top: 16px;
-  padding: 16px;
+  margin-bottom: var(--sp-4);
+  scroll-margin-top: 88px; /* קפיצה מהבאדג' לא נחתכת מתחת לכותרת הדביקה */
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   background: var(--surface);
+  box-shadow: var(--sh-sm);
+  overflow: hidden;
 }
-.hub-head { margin-bottom: 4px; }
-.hub-head h3 { margin: 0; color: var(--text); font: 800 1.05rem "Heebo", "Assistant", sans-serif; letter-spacing: -.015em; }
-.hub-head p { margin: 4px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.5; }
-.hub-group { margin-top: 18px; padding-top: 14px; border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
-.hub-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+/* מצב "אין מה לעשות" — פס רזה, לא כרטיס שתופס את ראש המסך */
+.reminder-hub.hub-clear {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px var(--sp-4);
+  border-color: color-mix(in srgb, var(--green) 25%, var(--border));
+  background: var(--green-bg);
+}
+.hub-clear > .ic { width: 22px; height: 22px; flex: none; color: var(--green); }
+.hub-clear h3 { margin: 0; color: var(--text); font: 700 .88rem "Assistant", sans-serif; }
+.hub-clear span span { display: block; color: var(--muted); font-size: .74rem; }
+
+/* ----- הכותרת המתקפלת ----- */
+.hub-summary {
+  display: grid;
+  gap: 10px;
+  padding: var(--sp-3) var(--sp-4);
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.hub-summary::-webkit-details-marker { display: none; }
+.hub-summary:hover { background: var(--hover); }
+.hub-summary:active { background: var(--active); }
+.hub-summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.hub-summary-top { display: flex; align-items: center; gap: 9px; }
+.hub-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--brand-1) 12%, var(--surface));
+  color: var(--accent-ink);
+}
+.hub-mark .ic { width: 17px; height: 17px; }
+.hub-summary h3 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font: 800 1.02rem "Heebo", "Assistant", sans-serif;
+  letter-spacing: -.015em;
+}
+.hub-chevron { flex: none; color: var(--muted); }
+.hub-chevron .ic { width: 20px; height: 20px; }
+.hub-box[open] .hub-chevron { transform: rotate(180deg); }
+@media (prefers-reduced-motion: no-preference) {
+  .hub-chevron { transition: transform .18s var(--ease-out); }
+}
+
+/* אריחי המונים — הסיכום שנראה גם כשהכרטיס סגור */
+.hub-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+.hub-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
+}
+.hub-stat b { color: var(--text); font: 800 1.15rem "Heebo", "Assistant", sans-serif; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.hub-stat > span { color: var(--muted); font-size: .74rem; line-height: 1.35; }
+.hub-stat .ic-sub { width: 17px; height: 17px; }
+.hub-stat-live { background: color-mix(in srgb, var(--brand-1) 9%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-1) 22%, transparent); }
+.hub-stat-live b { color: var(--accent-ink); }
+.hub-stat-due { background: var(--red-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 22%, transparent); }
+.hub-stat-due b { color: var(--red); }
+.hub-stat-ok { flex-direction: row; align-items: center; gap: 7px; background: var(--green-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green) 22%, transparent); }
+.hub-stat-ok .ic-sub { flex: none; color: var(--green); }
+
+/* ----- הגוף שנפתח ----- */
+.hub-body { padding: 0 var(--sp-4) var(--sp-3); border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+.hub-group { margin-top: var(--sp-4); }
+.hub-group + .hub-group { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+.hub-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .hub-group-head h4 { margin: 0; color: var(--text); font: 700 .95rem "Assistant", sans-serif; }
-.hub-count { flex: none; color: var(--muted); font-size: .8rem; font-weight: 700; }
+.hub-count { flex: none; color: var(--muted); font-size: .8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .hub-count-due { color: var(--red); }
 .hub-count-done { color: var(--green); }
-.hub-empty { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.5; }
-.remind-sent { color: var(--green); font-weight: 700; }
+.hub-note { margin: 5px 0 0; color: var(--red); font-size: .74rem; font-weight: 600; }
+.hub-note .ic-sub { width: 13px; height: 13px; vertical-align: -2px; }
+.hub-empty { margin: 8px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.5; }
+
+/* ----- שורת תזכורת ----- */
+.remind-list { margin: 6px 0 0; padding: 0; list-style: none; }
+.remind-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+.remind-row:last-child { border-bottom: 0; }
+/* accent-ink במקום brand-1: ראשי התיבות קטנים, וזה מה שמעביר אותם את 4.5:1 בשני המצבים */
+.remind-avatar { width: 38px; height: 38px; border-radius: 12px; font-size: .82rem; color: var(--accent-ink); }
+/* מסך צר במיוחד: האווטאר הוא קישוט, והשם והפירוט צריכים את הרוחב יותר ממנו */
+@media (max-width: 359px) { .remind-avatar { display: none; } }
+.remind-info { min-width: 0; }
+.remind-info strong { display: block; font-size: .9rem; line-height: 1.35; }
+.remind-info > span { display: block; color: var(--muted); font-size: .78rem; line-height: 1.4; }
+.remind-when, .remind-owed { font-variant-numeric: tabular-nums; }
+.remind-owed { color: var(--red); font-weight: 700; }
+.remind-sent { color: var(--green); font-weight: 700; white-space: nowrap; }
 .remind-sent .ic-sub { width: 12px; height: 12px; vertical-align: -2px; }
 /* תזכורת ישנה שטרם הביאה תשלום — כדאי לשלוח שוב */
 .remind-sent.remind-stale { color: var(--red); }
-.remind-row button.is-sent { background: var(--surface); color: var(--muted); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent); }
-/* כפתור "תזכורת לכל שיעורי מחר" מעל רשימת התזכורות */
-.reminders-bulk { width: 100%; margin-bottom: 12px; }
+
+.remind-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--wa);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: .8rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.remind-btn .ic { width: 16px; height: 16px; }
+/* כבר נשלח — נשאר לחיץ לשליחה חוזרת, אבל מפסיק להתחרות על תשומת הלב */
+.remind-btn.is-sent { background: var(--surface); color: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }
+/* נשלח מזמן ועדיין לא שולם — חוזר להיות פעולה בולטת, הפעם באדום */
+.remind-btn-again { background: var(--red); color: #fff; }
+/* במצב כהה האדום בהיר, ולכן הטקסט שעליו חייב להיות כהה כדי לשמור על 4.5:1 */
+html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
+/* אי אפשר לשלוח בלי מספר — הפעולה היא להשלים אותו */
+.remind-btn-fix { background: color-mix(in srgb, var(--orange) 14%, var(--surface)); color: var(--orange); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--orange) 30%, transparent); }
+.debt-summary-link { width: 100%; min-height: 44px; margin-top: 4px; padding: 8px; border: none; background: none; color: var(--muted); font-family: inherit; font-size: .78rem; text-align: center; cursor: pointer; }
+
 /* הצעות מועד פנוי בטופס שיעור */
 .free-slots { margin-bottom: 14px; }
 .free-slots:empty { margin: 0; }
@@ -1636,31 +1769,9 @@ input, select { min-height: 48px; }
 .backup-nudge strong { font-size: .88rem; }
 .backup-nudge span { color: var(--muted); font-size: .74rem; }
 .backup-nudge .btn { flex: none; }
-.remind-list { margin: 0; padding: 0; list-style: none; }
-.remind-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
-.remind-row:last-child { border-bottom: 0; }
-.remind-row strong { display: block; font-size: .9rem; }
-.remind-row span { display: block; color: var(--muted); font-size: .8rem; }
-.remind-row button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border: 0; border-radius: 11px; padding: 8px 14px; background: color-mix(in srgb, var(--wa) 12%, var(--surface)); color: var(--wa); font-family: inherit; font-weight: 700; font-size: .8rem; cursor: pointer; white-space: nowrap; }
-.remind-row button .ic { width: 16px; height: 16px; }
 
 /* ---------- בית: תצוגת שבוע מלאה (כמו יומן גוגל) ---------- */
 .home-cal-seg { margin-bottom: 12px; }
-.cal-debt {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-  padding: 10px 14px;
-  border: 1px solid color-mix(in srgb, var(--red) 22%, var(--border));
-  border-radius: var(--r-md);
-  background: color-mix(in srgb, var(--red) 5%, var(--surface));
-}
-.cal-debt-sum { flex: 1; min-width: 120px; display: flex; flex-direction: column; }
-.cal-debt-sum strong { font-size: .95rem; }
-.cal-debt-sum span { font-size: .78rem; color: var(--muted); }
-.cal-debt-more { background: none; border: 0; padding: 6px 4px; font: inherit; font-size: .82rem; font-weight: 700; color: var(--brand-1); cursor: pointer; min-height: 44px; }
 .home-cal-bar { display: flex; align-items: center; gap: 8px; }
 .home-cal-bar .home-cal-seg { flex: 1; min-width: 0; }
 .cal-add-student { margin-bottom: 12px; flex: none; }

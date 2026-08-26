@@ -31,22 +31,35 @@ test("reminder rows are a labelled list with reachable touch targets", () => {
   assert.match(source, /<ul class="remind-list">/);
   assert.match(source, /<li class="remind-row">/);
   assert.doesNotMatch(source, /<article class="remind-row">/);
-  assert.match(styles, /\.remind-row button\s*\{[^}]*min-height:\s*44px/s);
+  assert.match(styles, /\.remind-btn\s*\{[^}]*min-height:\s*44px/s);
 });
 
-test("lesson and payment reminders live in one hub, sendable in bulk", () => {
+test("lesson and payment reminders live in one hub, sent one at a time", () => {
   const html = read("index.html");
   const source = read("app.js");
   // מקום אחד: אין עוד רשימת תזכורות נפרדת ו-aside גבייה נפרד
   assert.match(html, /id="reminderHub"/);
   assert.doesNotMatch(html, /id="reminderList"|id="paymentAlerts"|home-secondary/);
   // שתי הקבוצות גלויות יחד, כל אחת עם כותרת משלה
-  assert.match(source, /aria-labelledby="hubLessonsTitle"|id: "hubLessonsTitle"/);
-  assert.match(source, /aria-labelledby="hubMoneyTitle"|id: "hubMoneyTitle"/);
-  // שליחה לכולם קיימת לשני הסוגים ומשתמשת באותו תור
-  assert.match(source, /App\.startLessonReminders\(\)/);
-  assert.match(source, /App\.startDebtReminders\(\)/);
-  assert.match(source, /function startQueue\(/);
+  assert.match(source, /id: "hubLessonsTitle"/);
+  assert.match(source, /id: "hubMoneyTitle"/);
+  // אין "שליחה לכולם": וואטסאפ פותח צ'אט אחד בכל פעם
+  assert.doesNotMatch(source, /startLessonReminders|startDebtReminders|startQueue|reminderQueue|reminders-bulk/);
+});
+
+test("the reminder hub opens the calendar screen and collapses natively", () => {
+  const html = read("index.html");
+  const source = read("app.js");
+  // ראש דף היומן — התזכורות לפני הלוח, לא אחריו ולא במסך אחר
+  const hub = html.indexOf('id="reminderHub"');
+  const calendar = html.indexOf('id="homeCalendar"');
+  assert.ok(hub > -1 && calendar > -1 && hub < calendar);
+  assert.equal(html.match(/id="reminderHub"/g).length, 1);
+  // קיפול דרך details/summary — בלי מצב פתיחה שצריך לתחזק ביד
+  assert.match(source, /<details class="hub-box"/);
+  assert.match(source, /<summary class="hub-summary">/);
+  // קיצור דרך מהבאדג' בכותרת, בכל מסך
+  assert.match(html, /<button[^>]+id="reminderBadge"[^>]+onclick="App\.goReminders\(\)"/);
 });
 
 test("service worker scopes document fallback to navigation", () => {

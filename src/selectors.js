@@ -84,13 +84,6 @@ export function debtAgeWeeks(unpaidLessons, today) {
 
 // מי הבא בתור לתזכורת תשלום: החוב הגדול ביותר שיש לו טלפון וטרם נשלחה עליו תזכורת.
 // כשכולם כבר קיבלו — מחזיר את הגדול ביותר לשליחה חוזרת.
-export function nextDebtorToRemind(debtors, isSent = () => false) {
-  return debtors.find(d => d.student.phone && !isSent(d))
-    || debtors.find(d => d.student.phone)
-    || debtors[0]
-    || null;
-}
-
 function toMinutes(time) {
   const [hours, mins] = time.split(":").map(Number);
   return hours * 60 + (mins || 0);

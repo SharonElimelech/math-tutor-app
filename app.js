@@ -14,7 +14,7 @@ import {
   todayString as todayStr,
   ymd
 } from "./src/calendar.js";
-import { buildLessonIndex, debtAgeWeeks, findConflicts, findFreeSlots, nextDebtorToRemind, summarizeMonth } from "./src/selectors.js";
+import { buildLessonIndex, debtAgeWeeks, findConflicts, findFreeSlots, summarizeMonth } from "./src/selectors.js";
 import { AppStorage } from "./src/storage.js";
 import {
   createLessonsCalendar,
@@ -161,7 +161,7 @@ const App = (() => {
   }
 
   // ----- ניווט -----
-  function go(view) {
+  function go(view, after) {
     const target = document.getElementById("view-" + view);
     if (!target) return;
     const apply = () => {
@@ -178,6 +178,7 @@ const App = (() => {
       // Move focus to the new view's heading so screen readers announce the change.
       const heading = target.querySelector("h2");
       if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }
+      if (after) after();
     };
     // מעבר מסך חלק דרך View Transitions API — רק כשנתמך, כשבאמת מחליפים מסך, ובלי תנועה מופחתת
     if (document.startViewTransition && !target.classList.contains("active") &&
@@ -1293,26 +1294,7 @@ const App = (() => {
     </div>`;
   }
 
-  // רצועת גבייה ביומן: הכסף הפתוח נראה במסך שבו המורה נמצאת רוב הזמן,
-  // ולחיצה אחת שולחת תזכורת לתלמיד הבא בתור (הגדול ביותר שטרם קיבל).
-  function debtStripHtml() {
-    const debtors = debtorList();
-    if (!debtors.length) return "";
-    const total = debtors.reduce((sum, d) => sum + d.owed, 0);
-    const next = nextDebtorToRemind(debtors, d => waSent.has(debtSignature(d.student.id, d.unpaid)));
-    const sent = waSent.has(debtSignature(next.student.id, next.unpaid));
-    const name = escapeHtml(next.student.name);
-    const action = next.student.phone
-      ? `<button type="button" class="btn btn-wa" onclick="App.sendWhatsApp('${next.student.id}')" aria-label="${sent ? `שליחה חוזרת של תזכורת תשלום ל-${name}` : `שליחת תזכורת תשלום ל-${name}`}">${icon("whatsapp")} ${sent ? "שוב ל" : "תזכורת ל"}${name}</button>`
-      : `<button type="button" class="btn btn-light" onclick="App.openStudentForm('${next.student.id}')" aria-label="הוספת טלפון ל-${name}">הוספת טלפון ל${name}</button>`;
-    return `<section class="cal-debt" aria-label="גבייה פתוחה">
-      <div class="cal-debt-sum"><strong>${cur(total)} לגבייה</strong><span>${debtors.length === 1 ? "תלמיד אחד" : `${debtors.length} תלמידים`}</span></div>
-      ${action}
-      <button type="button" class="cal-debt-more" onclick="App.go('money')" aria-label="מעבר למסך כספים">הכול ‹</button>
-    </section>`;
-  }
-
-  // בית = יומן בלבד; כל השאר עבר למסך "סיכום"
+  // בית = יומן + מרכז התזכורות מתחתיו; כל השאר עבר למסך "סיכום"
   function renderHome() {
     const calDay = selectedDay || todayStr();
     const seg = (m, label) =>
@@ -1329,8 +1311,25 @@ const App = (() => {
         : homeCalMode === "list"
           ? listViewHtml()
           : renderWeekStrip(calDay) + renderDayAgenda(calDay);
-    document.getElementById("homeCalendar").innerHTML = debtStripHtml() + modeBar + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
+    document.getElementById("homeCalendar").innerHTML = modeBar + `<div class="cal-slide" id="homeCalSlide">${body}</div>`;
     applyCalScroll();
+    renderReminderHub();
+  }
+
+  // קיצור דרך מהכותרת (בכל מסך) אל מרכז התזכורות שבראש היומן.
+  // פותח אותו בדרך — מי שלחץ על "3 לגבייה" רוצה לראות את הרשימה, לא כותרת מקופלת.
+  function goReminders() {
+    go("home", () => {
+      const hub = document.querySelector("#reminderHub .reminder-hub");
+      if (!hub) return;
+      const box = hub.querySelector(".hub-box");
+      if (box) box.open = true;
+      // הפוקוס על הכותרת המתקפלת: פקד אמיתי, מכריז את המונים ואת מצב הפתיחה
+      const target = hub.querySelector(".hub-summary") || hub;
+      if (target === hub) hub.setAttribute("tabindex", "-1");
+      target.focus({ preventScroll: true });
+      hub.scrollIntoView({ block: "start" });
+    });
   }
 
   // מסך סיכום — השיעור הבא, קיצורי דרך, אישורי שיעורים וגבייה פתוחה
@@ -1361,78 +1360,133 @@ const App = (() => {
     `;
 
     renderInsights();
-    renderReminderHub();
     renderBackupNudge();
   }
 
   // ----- מרכז התזכורות -----
-  // שיעורים וכסף באותו כרטיס: שתי הפעולות היומיומיות בלי לעבור מסך.
-  // שתי הקבוצות גלויות תמיד — טאבים היו מסתירים חצי מהמידע ומוסיפים מצב לתחזק.
+  // יושב בראש היומן: שיעורים וכסף באותו כרטיס, בלי לעבור מסך.
+  // מקופל כברירת מחדל כדי שהלוח יישאר גלוי — הכותרת לבדה מספרת כמה ממתין,
+  // ופתיחה אחת חושפת את שתי הקבוצות. המצב נשמר, כך שמי שרוצה אותו פתוח מקבל אותו פתוח.
+  const HUB_OPEN_KEY = "mt_hub_open";
+  let hubOpen = localStorage.getItem(HUB_OPEN_KEY) === "1";
+  function setHubOpen(open) {
+    hubOpen = !!open;
+    try { localStorage.setItem(HUB_OPEN_KEY, hubOpen ? "1" : "0"); }
+    catch (error) { console.warn("Could not persist reminder hub state", error); }
+  }
 
-  // שיעורים קרובים שאפשר לתזכר: היום ומחר, טרם התחילו, ויש למי לשלוח
+  // תזכורת שיעור נשלחת לטלפון התלמיד; אם אין — לטלפון ההורה
+  const reminderPhone = student => student.studentPhone || student.phone;
+  // שיעורים קרובים שאפשר לתזכר: היום ומחר, טרם התחילו.
+  // גם שיעור של תלמיד בלי טלפון נשאר ברשימה — עם כפתור שמוסיף מספר, במקום להיעלם בשקט.
   function hubLessons() {
     const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return ymd(d); })();
     return upcomingReminderLessons(lessonSorted(), [todayStr(), tomorrow])
-      .filter(l => { const s = studentById(l.studentId); return s && (s.studentPhone || s.phone); });
+      .filter(l => studentById(l.studentId));
   }
-  // מה שטרם נשלח — הבסיס לכפתור "שליחה לכולם" ולמונה
-  const pendingLessons = () => hubLessons().filter(l => !waSent.has(reminderSignature(l)));
-  const pendingDebtors = () => debtorList()
-    .filter(d => d.student.phone && !waSent.has(debtSignature(d.student.id, d.unpaid)));
+  // כמה עוד ממתינים לשליחה — המונה שבכותרת
+  const pendingLessons = () => hubLessons()
+    .filter(l => reminderPhone(studentById(l.studentId)) && !waSent.has(reminderSignature(l)));
+
+  // שלד שורה משותף לשיעורים ולגבייה — אווטאר, שם, שורת פירוט, פעולה אחת
+  function remindRow({ name, meta, action }) {
+    return `<li class="remind-row">
+        <span class="student-avatar remind-avatar" aria-hidden="true">${escapeHtml(initials(name))}</span>
+        <span class="remind-info"><strong>${escapeHtml(name)}</strong><span>${meta}</span></span>
+        ${action}
+      </li>`;
+  }
+
+  // כפתור שליחה, או כפתור שמשלים את הטלפון החסר כשאי אפשר לשלוח
+  function remindAction({ id, studentId, phone, sendCall, sendLabel, resentLabel, sent, stale = false }) {
+    if (!phone) {
+      return `<button type="button" id="${id}" class="remind-btn remind-btn-fix" onclick="App.openStudentForm('${studentId}')" aria-label="${sendLabel} — חסר מספר טלפון, הוספה עכשיו">${icon("plus")} טלפון</button>`;
+    }
+    const cls = stale ? "remind-btn remind-btn-again" : sent ? "remind-btn is-sent" : "remind-btn";
+    return `<button type="button" id="${id}" class="${cls}" onclick="${sendCall}" aria-label="${sent ? resentLabel : sendLabel}">${icon("whatsapp")} ${sent ? "שוב" : "תזכורת"}</button>`;
+  }
 
   function lessonReminderRow(l) {
     const s = studentById(l.studentId);
     const signature = reminderSignature(l);
     const sent = waSent.has(signature);
     const name = escapeHtml(s.name);
-    return `<li class="remind-row">
-        <div><strong>${name}</strong><span>${dayLabelPlain(l.date)} · ${fmtTime(l.time)}${l.topic ? ` · ${escapeHtml(l.topic)}` : ""}${sent ? ` · <b class="remind-sent">${icon("check", "ic-sub")} ${sentAgoLabel(signature)}</b>` : ""}</span></div>
-        <button type="button" id="remind-${l.id}" class="${sent ? "is-sent" : ""}" onclick="App.sendLessonReminder('${l.id}')" aria-label="${sent ? `שליחה חוזרת של תזכורת ל-${name}` : `שליחת תזכורת ל-${name}`}">${icon("whatsapp")} ${sent ? "שוב" : "תזכורת"}</button>
-      </li>`;
+    const meta = `<span class="remind-when">${dayLabelPlain(l.date)} · ${fmtTime(l.time)}</span>${l.topic ? ` · ${escapeHtml(l.topic)}` : ""}` +
+      (sent ? ` · <b class="remind-sent">${icon("check", "ic-sub")} ${sentAgoLabel(signature)}</b>` : "");
+    return remindRow({
+      name: s.name,
+      meta,
+      action: remindAction({
+        id: `remind-${l.id}`,
+        studentId: s.id,
+        phone: reminderPhone(s),
+        sendCall: `App.sendLessonReminder('${l.id}')`,
+        sendLabel: `שליחת תזכורת ל-${name}`,
+        resentLabel: `שליחה חוזרת של תזכורת ל-${name}`,
+        sent
+      })
+    });
   }
 
   function debtReminderRow({ student: s, unpaid, owed }) {
     const signature = debtSignature(s.id, unpaid);
-    const sent = s.phone && waSent.has(signature);
+    const sent = !!s.phone && waSent.has(signature);
     const name = escapeHtml(s.name);
     // תזכורת בת יותר משישה ימים שעדיין לא הביאה תשלום — מסומנת ככזו שכדאי לחזור עליה
     const stale = sent && (Date.now() - (waSent.get(signature) || 0)) > 6 * 86400000;
-    const btn = s.phone
-      ? `<button type="button" id="debt-${s.id}" class="${sent ? "is-sent" : ""}" onclick="App.sendWhatsApp('${s.id}')" aria-label="${sent ? `שליחה חוזרת של תזכורת תשלום ל-${name}` : `שליחת תזכורת תשלום ל-${name}`}">${icon("whatsapp")} ${sent ? "שוב" : "תזכורת"}</button>`
-      : `<button type="button" id="debt-${s.id}" onclick="App.openStudentForm('${s.id}')" aria-label="הוספת טלפון להורה של ${name}">הוספת טלפון</button>`;
-    return `<li class="remind-row">
-        <div><strong>${name}</strong><span>${unpaid.length === 1 ? "שיעור אחד" : `${unpaid.length} שיעורים`} · ${cur(owed)}${sent ? ` · <b class="remind-sent${stale ? " remind-stale" : ""}">${icon(stale ? "warn" : "check", "ic-sub")} ${sentAgoLabel(signature)}</b>` : ""}</span></div>
-        ${btn}
-      </li>`;
+    const meta = `<span class="remind-owed">${cur(owed)}</span> · ${unpaid.length === 1 ? "שיעור אחד" : `${unpaid.length} שיעורים`}` +
+      (sent ? ` · <b class="remind-sent${stale ? " remind-stale" : ""}">${icon(stale ? "warn" : "check", "ic-sub")} ${sentAgoLabel(signature)}</b>` : "");
+    return remindRow({
+      name: s.name,
+      meta,
+      action: remindAction({
+        id: `debt-${s.id}`,
+        studentId: s.id,
+        phone: s.phone,
+        sendCall: `App.sendWhatsApp('${s.id}')`,
+        sendLabel: `שליחת תזכורת תשלום ל-${name}`,
+        resentLabel: `שליחה חוזרת של תזכורת תשלום ל-${name}`,
+        sent,
+        stale
+      })
+    });
   }
 
-  function hubGroup({ id, title, count, countClass = "", bulk, rows, empty, footer = "" }) {
+  function hubGroup({ id, title, count, countClass = "", note = "", rows, empty, footer = "" }) {
     return `<section class="hub-group" aria-labelledby="${id}">
       <div class="hub-group-head">
         <h4 id="${id}">${title}</h4>
         <span class="hub-count ${countClass}">${count}</span>
       </div>
-      ${rows ? `${bulk}<ul class="remind-list">${rows}</ul>${footer}` : `<p class="hub-empty">${empty}</p>`}
+      ${note ? `<p class="hub-note">${note}</p>` : ""}
+      ${rows ? `<ul class="remind-list">${rows}</ul>${footer}` : `<p class="hub-empty">${empty}</p>`}
     </section>`;
   }
+
+  // אריח מונה בכותרת המקופלת. מצב תקין מסומן גם באייקון ולא בצבע בלבד.
+  const hubStat = (kind, value, label) =>
+    `<span class="hub-stat hub-stat-${kind}">${kind === "ok" ? icon("check", "ic-sub") : `<b>${value}</b>`}<span>${label}</span></span>`;
 
   function renderReminderHub() {
     const el = document.getElementById("reminderHub");
     if (!el) return;
+    // ה-DOM החי הוא מקור האמת למצב הפתיחה. אירוע toggle מגיע בתור נפרד, ורינדור
+    // שנכנס באמצע (טיימר תזכורות, שליחה) היה סוגר בחזרה כרטיס שהמשתמשת בדיוק פתחה.
+    const live = el.querySelector(".hub-box");
+    if (live) hubOpen = live.open;
 
     const lessonList = hubLessons();
     const lessonsToSend = pendingLessons().length;
     const debtors = debtorList();
-    const debtorsToSend = pendingDebtors().length;
     const unpaidAll = lessons.filter(l => l.done && !l.paid);
     const totalOwed = unpaidAll.reduce((sum, l) => sum + lessonPrice(l), 0);
     // גיל החוב הוותיק ביותר — מוצג רק כשהוא כבר מדאיג (שבועיים ומעלה)
     const oldestAge = debtAgeWeeks(unpaidAll, todayStr());
 
     if (!lessonList.length && !debtors.length) {
-      renderKeepFocus(el, `<section class="reminder-hub" aria-labelledby="hubTitle">
-        <div class="hub-head"><h3 id="hubTitle">מרכז התזכורות</h3></div>
-        <div class="debt-clear">${icon("checkCircle")}<div><strong>אין תזכורות ממתינות</strong><span>אין שיעורים קרובים לתזכר ואין תשלומים פתוחים.</span></div></div>
+      renderKeepFocus(el, `<section class="reminder-hub hub-clear" aria-labelledby="hubTitle">
+        ${icon("checkCircle")}
+        <span><h3 id="hubTitle">אין תזכורות ממתינות</h3><span>אין שיעורים קרובים לתזכר ואין תשלומים פתוחים.</span></span>
       </section>`);
       return;
     }
@@ -1442,9 +1496,6 @@ const App = (() => {
       title: "שיעורים קרובים",
       count: lessonsToSend ? `${lessonsToSend} לשליחה` : "הכול נשלח",
       countClass: lessonsToSend ? "" : "hub-count-done",
-      bulk: lessonsToSend > 1
-        ? `<button type="button" class="btn btn-wa reminders-bulk" onclick="App.startLessonReminders()">${icon("send")} תזכורת לכל השיעורים (${lessonsToSend})</button>`
-        : "",
       rows: lessonList.map(lessonReminderRow).join(""),
       empty: "אין שיעורים היום או מחר שממתינים לתזכורת."
     });
@@ -1454,21 +1505,35 @@ const App = (() => {
       title: "תשלומים פתוחים",
       count: debtors.length ? cur(totalOwed) : "הכול שולם",
       countClass: debtors.length ? "hub-count-due" : "hub-count-done",
-      bulk: debtorsToSend > 1
-        ? `<button type="button" class="btn btn-wa reminders-bulk" onclick="App.startDebtReminders()">${icon("send")} תזכורת תשלום לכולם (${debtorsToSend})</button>`
-        : "",
+      note: oldestAge >= 2 ? `${icon("warn", "ic-sub")} הוותיק כבר מחכה ${debtAgeLabel(oldestAge)}` : "",
       rows: debtors.map(debtReminderRow).join(""),
       empty: "אין כרגע תשלומים פתוחים.",
       footer: `<button type="button" class="debt-summary-link" onclick="App.go('money')" aria-label="מעבר למסך כספים למעקב מלא">מעקב מלא במסך כספים ‹</button>`
     });
 
+    const stats =
+      (lessonsToSend
+        ? hubStat("live", lessonsToSend, lessonsToSend === 1 ? "שיעור לתזכורת" : "שיעורים לתזכורת")
+        : hubStat("ok", "", "כל התזכורות נשלחו")) +
+      (totalOwed
+        ? hubStat("due", cur(totalOwed), `לגבייה · ${debtors.length === 1 ? "תלמיד אחד" : `${debtors.length} תלמידים`}`)
+        : hubStat("ok", "", "אין חוב פתוח"));
+
     renderKeepFocus(el, `<section class="reminder-hub" aria-labelledby="hubTitle">
-      <div class="hub-head">
-        <h3 id="hubTitle">מרכז התזכורות</h3>
-        <p>שיעורים וכסף נשלחים מכאן. מה שנשלח מסומן, בלי שליחות כפולות${oldestAge >= 2 ? ` · הוותיק מחכה ${debtAgeLabel(oldestAge)}` : ""}.</p>
-      </div>
-      ${lessonsGroup}
-      ${debtGroup}
+      <details class="hub-box"${hubOpen ? " open" : ""} ontoggle="App.setHubOpen(this.open)">
+        <summary class="hub-summary">
+          <span class="hub-summary-top">
+            <span class="hub-mark" aria-hidden="true">${icon("bell")}</span>
+            <h3 id="hubTitle">תזכורות</h3>
+            <span class="hub-chevron" aria-hidden="true">${icon("chevron")}</span>
+          </span>
+          <span class="hub-stats">${stats}</span>
+        </summary>
+        <div class="hub-body">
+          ${lessonsGroup}
+          ${debtGroup}
+        </div>
+      </details>
     </section>`);
   }
 
@@ -1739,7 +1804,6 @@ const App = (() => {
     if (!l) return false;
     const s = studentById(l.studentId);
     if (!s) return false;
-    // תזכורת שיעור נשלחת לטלפון של התלמיד; אם אין — לטלפון ההורה
     const toStudent = !!s.studentPhone;
     const greet = toStudent ? `שלום ${s.name},` : (s.parentName ? `שלום ${s.parentName},` : "שלום,");
     const when = dayLabelPlain(l.date);
@@ -1750,39 +1814,14 @@ const App = (() => {
         : `תזכורת לשיעור של ${s.name} ${when} בשעה ${l.time}.`) +
       (l.topic ? `\nנושא: ${l.topic}.` : "") +
       `\nנתראה!`;
-    if (!waOpen(s.studentPhone || s.phone, msg)) return false;
+    if (!waOpen(reminderPhone(s), msg)) return false;
     rememberWaSent(reminderSignature(l));
     render();
     return true;
   }
 
-  // ----- שליחה לכולם בתור אחד -----
-  // כל פתיחת וואטסאפ צריכה לחיצת משתמש, לכן זה תור: לוחצים → נשלח → "הבא".
-  // אותו מנגנון משרת גם תזכורות שיעור וגם תזכורות תשלום.
-  let reminderQueue = [];
-  function startQueue(senders, emptyMessage) {
-    reminderQueue = senders;
-    if (!reminderQueue.length) { toast(emptyMessage, "info"); return; }
-    sendNextReminder();
-  }
-  function sendNextReminder() {
-    const send = reminderQueue.shift();
-    if (!send) return;
-    // אם וואטסאפ לא נפתח (למשל טלפון שנמחק) — לא מדווחים "נשלח", עוברים לבא בתור
-    if (!send()) { sendNextReminder(); return; }
-    if (reminderQueue.length) {
-      toast(`נשלח. נותרו ${reminderQueue.length}`, "ok",
-        { label: `הבא (${reminderQueue.length})`, run: sendNextReminder }, 8000);
-    } else {
-      toast("כל התזכורות נשלחו 🎉", "ok");
-    }
-  }
-  function startLessonReminders() {
-    startQueue(pendingLessons().map(l => () => sendLessonReminder(l.id)), "אין תזכורות שיעור לשליחה");
-  }
-  function startDebtReminders() {
-    startQueue(pendingDebtors().map(d => () => sendWhatsApp(d.student.id)), "כל תזכורות התשלום כבר נשלחו");
-  }
+  // אין "שליחה לכולם": וואטסאפ פותח צ'אט אחד בכל פעם, ותור של חלונות קופצים
+  // רק נראה כמו שליחה מרוכזת. שולחים שורה-שורה, והמונה מראה כמה נשארו.
 
   // ========== גיבוי ושחזור ==========
   function exportData() {
@@ -2706,14 +2745,14 @@ const App = (() => {
 
   // ----- חשיפת פונקציות לממשק -----
   return {
-    go, closeModal, renderStudents,
+    go, goReminders, setHubOpen, closeModal, renderStudents,
     openStudentForm, openStudentProfile, saveStudentNotes, saveStudent, deleteStudent,
     openLessonForm, saveLesson, deleteLesson, deleteSeriesFuture, deleteStudentFuture, toggleDone,
     confirmLesson, confirmAndRepeat, skipLesson,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, quickAddStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, setRecurInterval, renderFreeSlots, pickFreeSlot, scheduleForStudent, togglePaid,
     calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson,
-    setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, startLessonReminders, startDebtReminders, repeatLastLesson, markAllPaid, postponeLesson,
+    setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, repeatLastLesson, markAllPaid, postponeLesson,
     exportData, importData, exportCalendar,
     changeMonth,
     updateSetting, setTheme, clearAll,
