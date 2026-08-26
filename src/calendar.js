@@ -1,4 +1,8 @@
-export const formatDate = value => new Date(value).toLocaleDateString("he-IL", {
+// new Date("YYYY-MM-DD") נקרא כחצות UTC ולכן מציג את היום הקודם בכל אזור שמאחורי
+// גריניץ'. הוספת T00:00 מפרשת את התאריך כחצות מקומית — היום הנכון בכל מקום.
+export const formatDate = value => new Date(
+  typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00` : value
+).toLocaleDateString("he-IL", {
   weekday: "short",
   day: "numeric",
   month: "numeric"

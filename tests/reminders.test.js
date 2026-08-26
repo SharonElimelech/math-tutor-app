@@ -102,7 +102,12 @@ test("calendar export includes lesson and native alarm", () => {
   const calendar = createLessonsCalendar([lesson], students, 30, new Date("2026-06-20T10:00:00Z"));
   assert.match(calendar, /BEGIN:VEVENT\r\n/);
   assert.match(calendar, /SUMMARY:שיעור עם דנה/);
-  assert.match(calendar, /DTSTART:20260620T160000/);
+  // הזמן חייב לצאת ב-UTC מפורש, אחרת יומנים מפרשים שעת ערב כמחרת
+  const start = new Date("2026-06-20T16:00:00");
+  const expected = start.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  assert.match(calendar, new RegExp(`DTSTART:${expected}`));
+  assert.match(calendar, /DTSTART:\d{8}T\d{6}Z/);
+  assert.match(calendar, /DTEND:\d{8}T\d{6}Z/);
   assert.match(calendar, /TRIGGER:-PT30M/);
   assert.match(calendar, /END:VCALENDAR\r\n$/);
 });

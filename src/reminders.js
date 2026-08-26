@@ -83,11 +83,17 @@ const calendarEscape = value => String(value ?? "")
   .replace(/,/g, "\\,")
   .replace(/;/g, "\\;");
 
-const localCalendarTime = (date, time) =>
-  `${String(date).replaceAll("-", "")}T${String(time || "00:00").replace(":", "")}00`;
+const pad2 = value => String(value).padStart(2, "0");
+
+// חותמת UTC מפורשת (עם Z). בלי סיומת אזור זמן ובלי VTIMEZONE, יומנים רבים —
+// ובראשם Google Calendar — מפרשים את השעה כ-UTC, ואז שיעור ערב בישראל (UTC+3)
+// נוחת למחרת אחרי חצות. UTC מפורש חד-משמעי בכל לקוח יומן.
+const utcCalendarTime = date =>
+  `${date.getUTCFullYear()}${pad2(date.getUTCMonth() + 1)}${pad2(date.getUTCDate())}` +
+  `T${pad2(date.getUTCHours())}${pad2(date.getUTCMinutes())}${pad2(date.getUTCSeconds())}Z`;
 
 export function createLessonsCalendar(lessons, studentsById, reminderMinutes = 30, generatedAt = new Date()) {
-  const stamp = generatedAt.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const stamp = utcCalendarTime(generatedAt);
   const alarmMinutes = Math.max(0, Math.round(Number(reminderMinutes) || 0));
   const lines = [
     "BEGIN:VCALENDAR",
@@ -99,22 +105,17 @@ export function createLessonsCalendar(lessons, studentsById, reminderMinutes = 3
 
   for (const lesson of lessons) {
     const student = studentsById.get(lesson.studentId);
+    // השיעור נשמר כשעת קיר מקומית; new Date מפרש אותה באזור המכשיר, כולל שעון קיץ
     const start = new Date(`${lesson.date}T${lesson.time || "00:00"}:00`);
     const end = new Date(start.getTime() + Math.max(0, Number(lesson.duration) || 0) * MINUTE);
-    const endDate = [
-      end.getFullYear(),
-      String(end.getMonth() + 1).padStart(2, "0"),
-      String(end.getDate()).padStart(2, "0")
-    ].join("-");
-    const endTime = `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`;
     const name = student?.name || "תלמיד";
 
     lines.push(
       "BEGIN:VEVENT",
       `UID:${calendarEscape(lesson.id)}@my-tutor-manager`,
       `DTSTAMP:${stamp}`,
-      `DTSTART:${localCalendarTime(lesson.date, lesson.time)}`,
-      `DTEND:${localCalendarTime(endDate, endTime)}`,
+      `DTSTART:${utcCalendarTime(start)}`,
+      `DTEND:${utcCalendarTime(end)}`,
       `SUMMARY:${calendarEscape(`שיעור עם ${name}`)}`,
       lesson.topic ? `DESCRIPTION:${calendarEscape(lesson.topic)}` : "DESCRIPTION:שיעור פרטי",
       "BEGIN:VALARM",
