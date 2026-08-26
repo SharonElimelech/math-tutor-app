@@ -125,6 +125,10 @@ html[data-theme="dark"] {
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+/* החלפת ערכת נושא מחליפה עשרות טוקנים בבת אחת — מעבירים אותה בלי אנימציה */
+html.theme-switch *, html.theme-switch *::before, html.theme-switch *::after {
+  transition: none !important;
+}
 /* בלי זה הדפדפן ממתין ~300ms אחרי כל נגיעה כדי לבדוק אם זו הקשה כפולה */
 button, summary, a, label, input, select, textarea, .seg-btn, .nav-btn { touch-action: manipulation; }
 
@@ -430,6 +434,9 @@ main { width: 100%; padding: 24px 16px; max-width: 760px; margin: 0 auto; }
 .btn:active { transform: scale(.96); }
 .btn-wa    { background: var(--wa); color: #fff; box-shadow: 0 4px 12px rgba(8, 124, 67, .2); }
 .btn-green { background: var(--green); color: #fff; box-shadow: 0 4px 12px rgba(11,107,94,.22); }
+/* במצב כהה --green הוא מנטה בהיר, וטקסט לבן עליו יורד ל-1.76:1. טקסט כהה מחזיר
+   את כל הכפתורים הירוקים (אישור שיעור, קביעת שיעור, סימון כשולם) מעל 4.5:1. */
+html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
 .btn-light { background: var(--bg-soft); color: var(--text); border: 1px solid color-mix(in srgb, var(--border) 76%, transparent); }
 .btn-light:active { background: var(--border); }
 .btn-danger { background: var(--red-bg); color: var(--red); }
@@ -1697,12 +1704,14 @@ input, select { min-height: 48px; }
 }
 
 /* אריחי המונים — הסיכום שנראה גם כשהכרטיס סגור */
-.hub-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+.hub-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: var(--sp-2); }
 .hub-stat {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 1px;
   min-width: 0;
+  min-height: 57px; /* אריח "הכול תקין" נמוך יותר — נעילת גובה משאירה את השורה ישרה */
   padding: 9px 12px;
   border-radius: var(--r-sm);
   background: var(--surface-2);
@@ -1863,19 +1872,17 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 .cal-time { color: var(--brand-1); font-size: .58rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
 .cal-cell.sel .cal-time, .cal-cell.today .cal-time { color: inherit; }
 
-/* ---------- בית: אישור שיעורים שעברו ---------- */
-.confirm-card { margin-top: var(--sp-3); border-inline-start: 3px solid var(--brand-1); }
-.confirm-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.confirm-head .ic { width: 18px; height: 18px; color: var(--brand-1); flex: none; }
-.confirm-head h3 { font-size: .95rem; }
-.confirm-more { margin-inline-start: auto; color: var(--muted); font-size: .74rem; font-weight: 600; }
-.confirm-row { padding: 12px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+/* ---------- אישור שיעורים שהסתיימו (בתוך מרכז התזכורות) ---------- */
+.hub-confirm { margin-top: 6px; }
+.confirm-row { padding: 12px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
 .confirm-row:last-child { border-bottom: 0; padding-bottom: 2px; }
 .confirm-info strong { font-size: .95rem; }
 .confirm-info span { margin-inline-start: 8px; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
-.confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
-.confirm-actions .btn { flex: 1 1 auto; min-height: 42px; padding: 0 8px; font-size: .8rem; white-space: nowrap; }
-.confirm-actions .btn .ic { width: 15px; height: 15px; }
+.hub-confirm .confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+.hub-confirm .confirm-actions .btn { flex: 1 1 auto; min-height: 44px; padding: 0 10px; font-size: .8rem; white-space: nowrap; }
+/* הפעולה שמסיימת את הטיפול בשורה מקבלת שורה משלה; השאר מתחלקות מתחתיה */
+.hub-confirm .confirm-actions .btn-green { flex-basis: 100%; }
+.hub-confirm .confirm-actions .btn .ic { width: 15px; height: 15px; }
 .confirm-skip { color: var(--red); }
 
 /* ---------- תלמידים ---------- */

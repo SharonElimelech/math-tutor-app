@@ -1279,33 +1279,27 @@ const App = (() => {
     });
   }
 
-  function renderConfirmQueue() {
-    const el = document.getElementById("confirmQueue");
-    if (!el) return;
-    const pending = pendingConfirmations();
-    if (!pending.length) { el.innerHTML = ""; return; }
-    const shown = pending.slice(0, 4);
-    const rows = shown.map(l => {
+  // שיעורים שכבר הסתיימו וטרם אושרו. זו הקבוצה שהמורה מחפשת אחרי יום עבודה:
+  // מכאן מסמנים "בוצע ושולם", ומכאן שיעור לא-משולם ממשיך לקבוצת הגבייה.
+  function confirmRowsHtml(pending) {
+    return pending.map(l => {
       const s = studentById(l.studentId);
       const price = lessonPrice(l);
+      const name = escapeHtml(s?.name || "תלמיד");
       return `<article class="confirm-row">
         <div class="confirm-info">
-          <strong>${escapeHtml(s?.name || "תלמיד")}</strong>
+          <strong>${name}</strong>
           <span>${escapeHtml(dayLabelPlain(l.date))} · ${fmtTime(l.time)}${price > 0 ? ` · ${cur(price)}` : ""}</span>
         </div>
         <div class="confirm-actions">
           <button class="btn btn-green" onclick="App.confirmLesson('${l.id}', true)">${icon("check")} התקיים ושולם</button>
-          <button class="btn btn-light" onclick="App.confirmLesson('${l.id}', false)">התקיים</button>
+          <button class="btn btn-light" onclick="App.confirmLesson('${l.id}', false)" aria-label="השיעור של ${name} התקיים אך טרם שולם">התקיים · לא שולם</button>
           <button class="btn btn-light" onclick="App.confirmAndRepeat('${l.id}')" aria-label="סימון שבוצע ושולם וקביעת עוד שיעור בשבוע הבא">${icon("repeat")} בוצע + עוד אחד</button>
           <button class="btn btn-light" onclick="App.postponeLesson('${l.id}')" aria-label="דחיית השיעור בשבוע, לאותו יום ושעה">לשבוע הבא</button>
           <button class="btn btn-light confirm-skip" onclick="App.skipLesson('${l.id}')" aria-label="השיעור לא התקיים — הסרה מהיומן">לא התקיים</button>
         </div>
       </article>`;
     }).join("");
-    el.innerHTML = `<div class="card confirm-card">
-      <div class="confirm-head">${icon("bell")}<h3>שיעורים שעברו — מה קרה איתם?</h3>${pending.length > shown.length ? `<span class="confirm-more">ועוד ${pending.length - shown.length}</span>` : ""}</div>
-      ${rows}
-    </div>`;
   }
 
   // בית = יומן + מרכז התזכורות מתחתיו; כל השאר עבר למסך "סיכום"
@@ -1352,7 +1346,6 @@ const App = (() => {
       settings.teacherName ? `שלום ${settings.teacherName}` : "שלום";
 
     renderOnboard();
-    renderConfirmQueue();
     const today = todayStr();
     const todayLessons = lessonIndex.onDate(today);
     const nextLesson = lessonSorted().find(l => l.date >= today && !l.done);
@@ -1466,14 +1459,15 @@ const App = (() => {
     });
   }
 
-  function hubGroup({ id, title, count, countClass = "", note = "", rows, empty, footer = "" }) {
+  function hubGroup({ id, title, count, countClass = "", note = "", rows, body, empty, footer = "" }) {
+    const content = body ?? (rows ? `<ul class="remind-list">${rows}</ul>` : "");
     return `<section class="hub-group" aria-labelledby="${id}">
       <div class="hub-group-head">
         <h4 id="${id}">${title}</h4>
         <span class="hub-count ${countClass}">${count}</span>
       </div>
       ${note ? `<p class="hub-note">${note}</p>` : ""}
-      ${rows ? `<ul class="remind-list">${rows}</ul>${footer}` : `<p class="hub-empty">${empty}</p>`}
+      ${content ? content + footer : `<p class="hub-empty">${empty}</p>`}
     </section>`;
   }
 
@@ -1491,19 +1485,33 @@ const App = (() => {
 
     const lessonList = hubLessons();
     const lessonsToSend = pendingLessons().length;
+    const pending = pendingConfirmations();
     const debtors = debtorList();
     const unpaidAll = lessons.filter(l => l.done && !l.paid);
     const totalOwed = unpaidAll.reduce((sum, l) => sum + lessonPrice(l), 0);
     // גיל החוב הוותיק ביותר — מוצג רק כשהוא כבר מדאיג (שבועיים ומעלה)
     const oldestAge = debtAgeWeeks(unpaidAll, todayStr());
 
-    if (!lessonList.length && !debtors.length) {
+    if (!lessonList.length && !debtors.length && !pending.length) {
       renderKeepFocus(el, `<section class="reminder-hub hub-clear" aria-labelledby="hubTitle">
         ${icon("checkCircle")}
         <span><h3 id="hubTitle">אין תזכורות ממתינות</h3><span>אין שיעורים קרובים לתזכר ואין תשלומים פתוחים.</span></span>
       </section>`);
       return;
     }
+
+    // ראשונה בתור: מה שכבר קרה וממתין להחלטה. בלי זה שיעור שלימדת היום נעלם
+    // מהמרכז — הוא כבר לא "קרוב", ועדיין לא "חוב" — ורק שיעורי מחר נשארו לעין.
+    const confirmGroup = pending.length ? hubGroup({
+      id: "hubConfirmTitle",
+      title: "שיעורים שהסתיימו",
+      count: `${pending.length} לאישור`,
+      countClass: "hub-count-due",
+      body: `<div class="hub-confirm">${confirmRowsHtml(pending.slice(0, 5))}</div>`,
+      footer: pending.length > 5
+        ? `<p class="hub-empty">ועוד ${pending.length - 5} ממתינים — אישור אחד חושף את הבא.</p>`
+        : ""
+    }) : "";
 
     const lessonsGroup = hubGroup({
       id: "hubLessonsTitle",
@@ -1526,6 +1534,9 @@ const App = (() => {
     });
 
     const stats =
+      (pending.length
+        ? hubStat("due", pending.length, pending.length === 1 ? "שיעור לאישור" : "שיעורים לאישור")
+        : "") +
       (lessonsToSend
         ? hubStat("live", lessonsToSend, lessonsToSend === 1 ? "שיעור לתזכורת" : "שיעורים לתזכורת")
         : hubStat("ok", "", "כל התזכורות נשלחו")) +
@@ -1544,6 +1555,7 @@ const App = (() => {
           <span class="hub-stats">${stats}</span>
         </summary>
         <div class="hub-body">
+          ${confirmGroup}
           ${lessonsGroup}
           ${debtGroup}
         </div>
@@ -1802,7 +1814,7 @@ const App = (() => {
     const msg =
       `${greet}\n` +
       `תזכורת ידידותית לגבי תשלום עבור השיעורים הפרטיים של ${s.name}.\n` +
-      `סה"כ ${unpaid.length} שיעורים שטרם שולמו, בסך ${owed} ${settings.currency}.\n` +
+      `${unpaid.length === 1 ? "שיעור אחד שטרם שולם" : `סה"כ ${unpaid.length} שיעורים שטרם שולמו`}, בסך ${owed} ${settings.currency}.\n` +
       `תודה רבה!` +
       payInfoLine();
     if (!unpaid.length || !waOpen(s.phone, msg)) return false;
@@ -2163,7 +2175,14 @@ const App = (() => {
   }
   function applyTheme() {
     const t = resolveTheme();
-    document.documentElement.setAttribute("data-theme", t);
+    const root = document.documentElement;
+    // מכבים מעברים לרגע אחד. בלי זה כל אלמנט עם transition על background מנסה
+    // להנפיש את החלפת הטוקן, ובפועל חלקם נתקעים על צבע הערכה הקודמת עד רינדור הבא
+    // (כפתורים ירוקים נשארו בגוון של המצב הכהה במעבר לבהיר).
+    root.classList.add("theme-switch");
+    root.setAttribute("data-theme", t);
+    void root.offsetWidth; // מאלץ חישוב סגנון לפני שהמעברים חוזרים
+    requestAnimationFrame(() => root.classList.remove("theme-switch"));
     const meta = document.getElementById("themeColorMeta");
     if (meta) meta.setAttribute("content", t === "dark" ? "#0f141b" : "#1f2937");
     // ציור מחדש של הגרף כדי שצבעי הטקסט יתעדכנו
