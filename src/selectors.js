@@ -1,5 +1,10 @@
 const empty = Object.freeze([]);
 
+// תאריך ISO + שעה HH:MM מסודרים לקסיקוגרפית בדיוק לפי הזמן, ולכן השוואת מחרוזות
+// פשוטה מספיקה. localeCompare היה מפעיל Collator לכל השוואה — פי כמה איטי יותר
+// על יומן של שנה, וזה רץ מחדש אחרי כל שינוי.
+const byWhen = (a, b) => { const x = a.date + a.time, y = b.date + b.time; return x < y ? -1 : x > y ? 1 : 0; };
+
 export function buildLessonIndex(students, lessons) {
   const studentsById = new Map(students.map(student => [student.id, student]));
   const lessonsByStudent = new Map();
@@ -16,13 +21,11 @@ export function buildLessonIndex(students, lessons) {
     }
   }
 
-  const sortedLessons = [...lessons].sort((a, b) =>
-    `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)
-  );
+  const sortedLessons = [...lessons].sort(byWhen);
 
   // רשימות פר-תלמיד ממוינות כרונולוגית — כל הצרכנים מסתמכים על זה במקום למיין שוב
   for (const list of lessonsByStudent.values()) {
-    list.sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+    list.sort(byWhen);
   }
 
   return {

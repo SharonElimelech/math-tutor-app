@@ -357,7 +357,7 @@ const App = (() => {
     const upcoming = all.filter(l => l.date >= today && !l.done); // כבר ממוין באינדקס
     const next = upcoming[0];
     const done = all.filter(l => l.done)
-      .sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`));
+      .sort((a, b) => (b.date + b.time < a.date + a.time ? -1 : 1));
     const owed = lessonIndex.unpaidForStudent(id).reduce((sum, l) => sum + lessonPrice(l), 0);
     const totalPaid = done.filter(l => l.paid).reduce((sum, l) => sum + lessonPrice(l), 0);
     const contact = escapeHtml(s.parentName) + (s.phone ? ` · ${escapeHtml(s.phone)}` : "");
@@ -454,15 +454,17 @@ const App = (() => {
 
   function renderStudents() {
     const el = document.getElementById("studentsList");
-    if (!students.length) { el.innerHTML = `<div class="empty empty-action">${icon("plus")}<h3>עדיין אין תלמידים</h3><p>הוסיפי תלמיד ראשון כדי לקבוע שיעור ולעקוב אחר תשלומים.</p><button class="btn btn-green" onclick="App.openStudentForm()">הוספת תלמיד</button></div>`; return; }
+    const paint = html => renderKeepFocus(el, html);
+    if (!students.length) { paint( `<div class="empty empty-action">${icon("plus")}<h3>עדיין אין תלמידים</h3><p>הוסיפי תלמיד ראשון כדי לקבוע שיעור ולעקוב אחר תשלומים.</p><button class="btn btn-green" onclick="App.openStudentForm()">הוספת תלמיד</button></div>`); return; }
     const searchEl = document.getElementById("studentSearch");
     const q = searchEl ? searchEl.value.trim().toLowerCase() : "";
     const filtered = q
       ? students.filter(s => (s.name + " " + (s.parentName || "")).toLowerCase().includes(q))
       : students;
-    if (!filtered.length) { el.innerHTML = `<div class="empty empty-action"><h3>לא נמצאו תלמידים</h3><p>נסי שם תלמיד או שם הורה אחר.</p></div>`; return; }
-    el.innerHTML = filtered.map(s => {
-      const upcoming = lessonIndex.forStudent(s.id).filter(l => l.date >= todayStr() && !l.done);
+    if (!filtered.length) { paint(`<div class="empty empty-action"><h3>לא נמצאו תלמידים</h3><p>נסי שם תלמיד או שם הורה אחר.</p></div>`); return; }
+    const today = todayStr();
+    paint(filtered.map(s => {
+      const upcoming = lessonIndex.forStudent(s.id).filter(l => l.date >= today && !l.done);
       const next = upcoming[0];
       const unpaid = lessonIndex.unpaidForStudent(s.id);
       const owed = unpaid.reduce((sum, lesson) => sum + lessonPrice(lesson), 0);
@@ -479,7 +481,7 @@ const App = (() => {
           </span>
           <span class="student-card-arrow" aria-hidden="true">‹</span>
         </button>`;
-    }).join("");
+    }).join(""));
   }
 
   // ========== שיעורים / יומן ==========
@@ -799,7 +801,7 @@ const App = (() => {
     lessons.forEach(l => { if (l.seriesId && l.openEnded) (groups[l.seriesId] = groups[l.seriesId] || []).push(l); });
     let added = false;
     Object.values(groups).forEach(arr => {
-      arr.sort((a, b) => a.date.localeCompare(b.date));
+      arr.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
       const last = arr[arr.length - 1];
       const step = Number(last.intervalDays) === 14 ? 14 : 7;
       const d = new Date(last.date + "T00:00");
@@ -965,12 +967,11 @@ const App = (() => {
   // רצועת שבוע בסגנון יומן — 7 ימים, בחירה מהירה
   function renderWeekStrip(day) {
     const days = weekDaysFor(day);
-    const counts = {};
-    lessons.forEach(l => { counts[l.date] = (counts[l.date] || 0) + 1; });
     const dows = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
     const cells = days.map(ds => {
       const d = new Date(ds + "T00:00");
-      const n = counts[ds] || 0;
+      // דרך האינדקס: שבע קריאות מפה במקום סריקה של כל השיעורים בכל החלקה
+      const n = lessonIndex.onDate(ds).length;
       const isToday = ds === todayStr();
       const isSel = ds === day;
       const cls = ["week-day", isToday ? "today" : "", isSel ? "sel" : ""].filter(Boolean).join(" ");
@@ -990,7 +991,7 @@ const App = (() => {
     const h = holidayFor(day);
     const banner = h ? `<div class="holiday-banner">${icon("info")} ${escapeHtml(h.name)}</div>` : "";
     const addBtn = `<button class="btn btn-light btn-block agenda-add" onclick="App.openLessonForm()">${icon("plus")} קביעת שיעור ב-${escapeHtml(fmtDate(day))}</button>`;
-    const dayLessons = lessonSorted().filter(l => l.date === day);
+    const dayLessons = [...lessonIndex.onDate(day)].sort((a, b) => ((a.time || "") < (b.time || "") ? -1 : 1));
     const HOUR_PX = 64;
     const startH = 0, endH = 24; // יממה מלאה — אפשר לגרור שיעור לכל שעה
     const rows = [];
@@ -1145,6 +1146,12 @@ const App = (() => {
   }
 
   // מצב רשימה בלוח הבית — כל השיעורים הקרובים לפי ימים, ועבר בקיפול
+  // כמה שיעורים מוצגים ברשימה בבת אחת. יומן של שנה קדימה הוא אלפי שורות,
+  // וכולן ביחד היו ~11,000 צמתי DOM וגלילה כבדה. מרחיבים לפי בקשה.
+  const LIST_PAGE = 40;
+  let listLimit = LIST_PAGE;
+  function showMoreLessons() { listLimit += LIST_PAGE; renderHome(); }
+
   function listViewHtml() {
     const list = lessonSorted();
     if (!list.length) {
@@ -1154,16 +1161,23 @@ const App = (() => {
     const upcoming = list.filter(l => l.date >= today);
     const past = list.filter(l => l.date < today).reverse();
 
+    const more = (rest, label) =>
+      `<button type="button" class="past-toggle" onclick="App.showMoreLessons()">${label} (${rest})</button>`;
+
     let html = "";
     if (upcoming.length) {
-      groupByDate(upcoming).forEach((ls, date) => { html += dayGroupHtml(date, ls); });
+      const shown = upcoming.slice(0, listLimit);
+      groupByDate(shown).forEach((ls, date) => { html += dayGroupHtml(date, ls); });
+      if (upcoming.length > shown.length) html += more(upcoming.length - shown.length, "הצגת עוד שיעורים");
     } else {
       html += `<div class="empty empty-action"><h3>אין שיעורים קרובים</h3><p>אפשר לקבוע עכשיו את המועד הבא.</p><button class="btn btn-green" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
     }
     if (past.length) {
-      html += `<button class="past-toggle" onclick="App.togglePast()">${showPast ? "הסתר" : "הצג"} שיעורים שעברו (${past.length})</button>`;
+      html += `<button type="button" class="past-toggle" onclick="App.togglePast()" aria-expanded="${showPast}">${showPast ? "הסתרת" : "הצגת"} שיעורים שעברו (${past.length})</button>`;
       if (showPast) {
-        groupByDate(past).forEach((ls, date) => { html += dayGroupHtml(date, ls); });
+        const shownPast = past.slice(0, listLimit);
+        groupByDate(shownPast).forEach((ls, date) => { html += dayGroupHtml(date, ls); });
+        if (past.length > shownPast.length) html += more(past.length - shownPast.length, "הצגת עוד שיעורים שעברו");
       }
     }
     return html;
@@ -1595,41 +1609,64 @@ const App = (() => {
     }).filter(item => item.unpaid.length).sort((a, b) => b.owed - a.owed);
   }
 
+  // מי מהחייבים פתוח כרגע. הפירוט נבנה רק בפתיחה — סגור הוא אפס צמתי DOM,
+  // והסט שורד רינדור מחדש כדי שסימון תשלום לא יסגור את הרשימה שעובדים בה.
+  const openDebtors = new Set();
+  function togglePaymentBox(box, studentId) {
+    if (box.open) openDebtors.add(studentId); else openDebtors.delete(studentId);
+    const list = box.querySelector(".payment-lessons");
+    if (box.open && list && !list.children.length) {
+      const student = studentById(studentId);
+      if (student) list.innerHTML = paymentLessonRows(student);
+    }
+  }
+
+  function paymentLessonRows(student) {
+    return lessonIndex.unpaidForStudent(student.id).map(l => `
+      <li class="payment-lesson">
+        <div class="payment-lesson-info">
+          <span class="payment-lesson-date">${icon("calendar", "ic-sub")} ${fmtDate(l.date)}</span>
+          ${l.topic ? `<span class="payment-lesson-topic">${escapeHtml(l.topic)}</span>` : ""}
+        </div>
+        <strong class="payment-lesson-price">${cur(lessonPrice(l))}</strong>
+        <button class="payment-mark" onclick="App.togglePaid('${l.id}')" aria-label="סימון השיעור של ${escapeHtml(student.name)} מ-${fmtDate(l.date)} בסך ${cur(lessonPrice(l))} כשולם">
+          ${icon("check")} <span>סימון כשולם</span>
+        </button>
+      </li>`).join("");
+  }
+
   function renderPayments() {
     const el = document.getElementById("paymentsList");
+    const paint = html => renderKeepFocus(el, html);
     if (!students.length) {
-      el.innerHTML = `<div class="empty">כדי לעקוב אחר תשלומים, צריך קודם להוסיף תלמיד ושיעור.</div>`;
+      paint(`<div class="empty">כדי לעקוב אחר תשלומים, צריך קודם להוסיף תלמיד ושיעור.</div>`);
       return;
     }
     const totalUnpaid = lessons.filter(lesson => lesson.done && !lesson.paid);
     const totalOwed = totalUnpaid.reduce((sum, lesson) => sum + lessonPrice(lesson), 0);
     const debtors = debtorList();
 
-    const queue = debtors.length ? debtors.map(({ student, unpaid, owed, age }) => `
+    // פירוט השיעורים מקופל: חשבון של מורה ותיקה הוא עשרות שורות לתלמיד, וכולן פרושות
+    // היו אלפי צמתי DOM ורינדור של ~33ms בכל סימון תשלום. מה שצריך כדי להחליט —
+    // שם, כמה, כמה כסף וכמה זמן זה מחכה — נשאר גלוי; הפירוט נפתח בלחיצה.
+    const queue = debtors.length ? debtors.map(({ student, unpaid, owed, age }) => {
+      const open = openDebtors.has(student.id);
+      return `
       <article class="payment-account" aria-labelledby="payment-student-${student.id}">
-        <header class="payment-account-head">
-          <div>
-            <h3 id="payment-student-${student.id}">${escapeHtml(student.name)}</h3>
-            <p>${unpaid.length === 1 ? "שיעור אחד ממתין לתשלום" : `${unpaid.length} שיעורים ממתינים לתשלום`}${debtAgeLabel(age) ? ` · <span class="debt-age${age >= 3 ? " debt-age-old" : ""}">מחכה כבר ${debtAgeLabel(age)}</span>` : ""}</p>
-          </div>
-          <div class="payment-account-total" aria-label="יתרת חוב ${cur(owed)}">
-            <span>לתשלום</span>
-            <strong>${cur(owed)}</strong>
-          </div>
-        </header>
-        <ul class="payment-lessons" aria-label="שיעורים שטרם שולמו">
-          ${unpaid.map(l => `
-            <li class="payment-lesson">
-              <div class="payment-lesson-info">
-                <span class="payment-lesson-date">${icon("calendar", "ic-sub")} ${fmtDate(l.date)}</span>
-                ${l.topic ? `<span class="payment-lesson-topic">${escapeHtml(l.topic)}</span>` : ""}
-              </div>
-              <strong class="payment-lesson-price">${cur(lessonPrice(l))}</strong>
-              <button class="payment-mark" onclick="App.togglePaid('${l.id}')" aria-label="סימון השיעור של ${escapeHtml(student.name)} מ-${fmtDate(l.date)} בסך ${cur(lessonPrice(l))} כשולם">
-                ${icon("check")} <span>סימון כשולם</span>
-              </button>
-            </li>`).join("")}
-        </ul>
+        <details class="payment-box"${open ? " open" : ""} ontoggle="App.togglePaymentBox(this, '${student.id}')">
+          <summary class="payment-account-head">
+            <span class="student-avatar payment-avatar" aria-hidden="true">${escapeHtml(initials(student.name))}</span>
+            <span class="payment-account-copy">
+              <h3 id="payment-student-${student.id}">${escapeHtml(student.name)}</h3>
+              <span>${unpaid.length === 1 ? "שיעור אחד ממתין" : `${unpaid.length} שיעורים ממתינים`}${debtAgeLabel(age) ? ` · <span class="debt-age${age >= 3 ? " debt-age-old" : ""}">מחכה כבר ${debtAgeLabel(age)}</span>` : ""}</span>
+            </span>
+            <span class="payment-account-total">
+              <b>${cur(owed)}</b>
+              <span class="payment-expand">${icon("chevron", "ic-sub")} פירוט</span>
+            </span>
+          </summary>
+          <ul class="payment-lessons" aria-label="שיעורים שטרם שולמו">${open ? paymentLessonRows(student) : ""}</ul>
+        </details>
         <footer class="payment-actions">
           ${student.phone
             ? (waSent.has(debtSignature(student.id, unpaid))
@@ -1638,15 +1675,15 @@ const App = (() => {
             : `<button class="btn btn-light" onclick="App.openStudentForm('${student.id}')">הוספת מספר טלפון</button>`}
           <button class="btn btn-green" onclick="App.markAllPaid('${student.id}')">${icon("check")} סימון ${unpaid.length === 1 ? "השיעור" : "הכול"} כשולם</button>
         </footer>
-      </article>
-    `).join("") : `
+      </article>`;
+    }).join("") : `
       <div class="payment-empty">
         <span class="payment-empty-icon">${icon("checkCircle")}</span>
         <div><h3>אין תשלומים פתוחים</h3><p>כל השיעורים שבוצעו מסומנים כשולמו.</p></div>
       </div>`;
 
     const settledStudents = students.length - debtors.length;
-    el.innerHTML = `
+    paint(`
       <section class="payment-summary" aria-label="סיכום תשלומים פתוחים">
         <div class="payment-summary-main">
           <span>יתרה לגבייה</span>
@@ -1661,7 +1698,7 @@ const App = (() => {
         <h3>ממתינים לטיפול</h3>
         <span>${debtors.length === 0 ? "הכול מעודכן" : debtors.length === 1 ? "תלמיד אחד" : `${debtors.length} תלמידים`}</span>
       </div>
-      <div class="payment-queue">${queue}</div>`;
+      <div class="payment-queue">${queue}</div>`);
   }
 
   // "שבוע" / "שבועיים" / "X שבועות" — תווית גיל חוב; ריק כשהחוב בן פחות משבוע
@@ -1781,7 +1818,7 @@ const App = (() => {
     const mkey = monthKey(new Date());
     const monthLessons = lessonIndex.forStudent(studentId)
       .filter(l => l.done && l.date.startsWith(mkey))
-      .sort((a, b) => a.date.localeCompare(b.date));
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     if (!monthLessons.length) { toast("אין שיעורים שבוצעו החודש", "err"); return; }
     const total = monthLessons.reduce((sum, l) => sum + lessonPrice(l), 0);
     const paid = monthLessons.filter(l => l.paid).reduce((sum, l) => sum + lessonPrice(l), 0);
@@ -1976,7 +2013,7 @@ const App = (() => {
   // ========== הגדרות ==========
   function renderSettings() {
     const body = document.getElementById("settingsBody");
-    body.innerHTML = `
+    renderKeepFocus(body, `
       <section class="settings-group">
         <div class="settings-group-head"><span>${icon("edit")}</span><div><h3>פרופיל</h3><p>הפרטים שמופיעים באפליקציה</p></div></div>
         <div class="settings-panel">
@@ -2062,13 +2099,16 @@ const App = (() => {
       <section class="settings-group settings-wide">
         <div class="settings-group-head"><span>${icon("note")}</span><div><h3>נתונים וגיבוי</h3><p>המידע נשמר מקומית במכשיר הזה</p></div></div>
         <div class="settings-action-stack settings-data-actions">
-          <button class="btn btn-light btn-block" onclick="App.exportData()">ייצוא גיבוי לקובץ</button>
-          <button class="btn btn-light btn-block" onclick="document.getElementById('importFile').click()">שחזור מקובץ גיבוי</button>
-          <button class="btn btn-danger btn-block" onclick="App.clearAll()">מחיקת כל הנתונים</button>
+          <button class="btn btn-light btn-block" onclick="App.exportData()">${icon("note")} ייצוא גיבוי לקובץ</button>
+          <button class="btn btn-light btn-block" onclick="document.getElementById('importFile').click()">${icon("repeat")} שחזור מקובץ גיבוי</button>
+        </div>
+        <div class="settings-danger">
+          <p>מחיקה היא סופית ואי אפשר לבטל אותה. כדאי לייצא גיבוי קודם.</p>
+          <button class="btn btn-danger btn-block" onclick="App.clearAll()">${icon("warn")} מחיקת כל הנתונים</button>
         </div>
         <div class="app-version">המורה שלי · גרסה ${APP_VERSION}</div>
       </section>
-    `;
+    `);
     fillPushDiag();
   }
 
@@ -2751,8 +2791,8 @@ const App = (() => {
     confirmLesson, confirmAndRepeat, skipLesson,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, quickAddStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, setRecurInterval, renderFreeSlots, pickFreeSlot, scheduleForStudent, togglePaid,
-    calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson,
-    setMoneyTab, sendWhatsApp, sendReceipt, sendLessonReminder, repeatLastLesson, markAllPaid, postponeLesson,
+    calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson, showMoreLessons,
+    setMoneyTab, togglePaymentBox, sendWhatsApp, sendReceipt, sendLessonReminder, repeatLastLesson, markAllPaid, postponeLesson,
     exportData, importData, exportCalendar,
     changeMonth,
     updateSetting, setTheme, clearAll,
