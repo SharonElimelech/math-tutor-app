@@ -1874,16 +1874,41 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 
 /* ---------- אישור שיעורים שהסתיימו (בתוך מרכז התזכורות) ---------- */
 .hub-confirm { margin-top: 6px; }
-.confirm-row { padding: 12px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.confirm-row { padding: 14px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
 .confirm-row:last-child { border-bottom: 0; padding-bottom: 2px; }
-.confirm-info strong { font-size: .95rem; }
-.confirm-info span { margin-inline-start: 8px; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
-.hub-confirm .confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
-.hub-confirm .confirm-actions .btn { flex: 1 1 auto; min-height: 44px; padding: 0 10px; font-size: .8rem; white-space: nowrap; }
-/* הפעולה שמסיימת את הטיפול בשורה מקבלת שורה משלה; השאר מתחלקות מתחתיה */
-.hub-confirm .confirm-actions .btn-green { flex-basis: 100%; }
-.hub-confirm .confirm-actions .btn .ic { width: 15px; height: 15px; }
-.confirm-skip { color: var(--red); }
+.confirm-lead { display: flex; align-items: center; gap: 11px; margin-bottom: 10px; }
+.confirm-avatar { width: 38px; height: 38px; font-size: .82rem; }
+.confirm-info { min-width: 0; }
+.confirm-info strong { display: block; font-size: .92rem; line-height: 1.3; }
+.confirm-info span { display: block; color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+/* שלוש התוצאות הראשיות: הירוקה על שורה מלאה, שתי האחרות חולקות שורה מתחתיה */
+.confirm-outcomes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.confirm-outcomes .btn { min-height: 44px; padding: 0 10px; font-size: .82rem; white-space: nowrap; }
+.confirm-outcomes .btn .ic { width: 16px; height: 16px; }
+.confirm-paid { grid-column: 1 / -1; }
+/* "לא התקיים" — פעולה הרסנית, מסומנת בצבע וגם באייקון, לא בצבע בלבד */
+.confirm-skip { background: var(--red-bg); color: var(--red); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 22%, transparent); }
+.confirm-skip:active { background: color-mix(in srgb, var(--red) 16%, var(--surface)); }
+/* פעולות משניות — קישורים דקים שלא מתחרים על תשומת הלב */
+.confirm-extra { display: flex; gap: 8px; margin-top: 8px; }
+.confirm-extra button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: .76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.confirm-extra button:hover { background: var(--hover); color: var(--text); }
+.confirm-extra .ic-sub { width: 14px; height: 14px; opacity: 1; margin: 0; }
 
 /* ---------- תלמידים ---------- */
 .student-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; width: 100%; min-height: 122px; padding: 16px; border: 0; border-radius: var(--r-md); background: var(--surface); color: var(--text); box-shadow: var(--sh-sm); font: inherit; text-align: right; cursor: pointer; transition: transform .2s var(--ease-out), box-shadow .25s var(--ease-out); }

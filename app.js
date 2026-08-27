@@ -42,6 +42,7 @@ const App = (() => {
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
     note: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h4"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
+    close: '<path d="M18 6 6 18M6 6l12 12"/>',
     checkCircle: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5L16 9"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
@@ -1286,17 +1287,25 @@ const App = (() => {
       const s = studentById(l.studentId);
       const price = lessonPrice(l);
       const name = escapeHtml(s?.name || "תלמיד");
+      const priceText = price > 0 ? ` · ${cur(price)}` : "";
+      // שתי שאלות: קרה או לא, ואם כן — שולם או לא. שלוש התוצאות הראשיות בשורה אחת,
+      // והפעולות הנוספות (עוד שיעור, דחייה) כקישורים דקים מתחת שלא יתחרו עליהן.
       return `<article class="confirm-row">
-        <div class="confirm-info">
-          <strong>${name}</strong>
-          <span>${escapeHtml(dayLabelPlain(l.date))} · ${fmtTime(l.time)}${price > 0 ? ` · ${cur(price)}` : ""}</span>
+        <div class="confirm-lead">
+          <span class="student-avatar confirm-avatar" aria-hidden="true">${escapeHtml(initials(s?.name || "?"))}</span>
+          <div class="confirm-info">
+            <strong>${name}</strong>
+            <span>${escapeHtml(dayLabelPlain(l.date))} · ${fmtTime(l.time)}${priceText}</span>
+          </div>
         </div>
-        <div class="confirm-actions">
-          <button class="btn btn-green" onclick="App.confirmLesson('${l.id}', true)">${icon("check")} התקיים ושולם</button>
-          <button class="btn btn-light" onclick="App.confirmLesson('${l.id}', false)" aria-label="השיעור של ${name} התקיים אך טרם שולם">התקיים · לא שולם</button>
-          <button class="btn btn-light" onclick="App.confirmAndRepeat('${l.id}')" aria-label="סימון שבוצע ושולם וקביעת עוד שיעור בשבוע הבא">${icon("repeat")} בוצע + עוד אחד</button>
-          <button class="btn btn-light" onclick="App.postponeLesson('${l.id}')" aria-label="דחיית השיעור בשבוע, לאותו יום ושעה">לשבוע הבא</button>
-          <button class="btn btn-light confirm-skip" onclick="App.skipLesson('${l.id}')" aria-label="השיעור לא התקיים — הסרה מהיומן">לא התקיים</button>
+        <div class="confirm-outcomes">
+          <button class="btn btn-green confirm-paid" onclick="App.confirmLesson('${l.id}', true)" aria-label="השיעור של ${name} התקיים ושולם">${icon("check")} התקיים ושולם</button>
+          <button class="btn btn-light confirm-unpaid" onclick="App.confirmLesson('${l.id}', false)" aria-label="השיעור של ${name} התקיים אך טרם שולם">התקיים · טרם שולם</button>
+          <button class="btn confirm-skip" onclick="App.skipLesson('${l.id}')" aria-label="השיעור של ${name} לא התקיים — הסרה מהיומן">${icon("close")} לא התקיים</button>
+        </div>
+        <div class="confirm-extra">
+          <button type="button" onclick="App.confirmAndRepeat('${l.id}')" aria-label="סימון שבוצע ושולם וקביעת עוד שיעור בשבוע הבא">${icon("repeat", "ic-sub")} בוצע + קביעת עוד</button>
+          <button type="button" onclick="App.postponeLesson('${l.id}')" aria-label="דחיית השיעור בשבוע, לאותו יום ושעה">${icon("calendar", "ic-sub")} דחייה לשבוע</button>
         </div>
       </article>`;
     }).join("");
