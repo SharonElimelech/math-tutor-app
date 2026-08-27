@@ -58,8 +58,9 @@ test("the reminder hub opens the calendar screen and collapses natively", () => 
   // קיפול דרך details/summary — בלי מצב פתיחה שצריך לתחזק ביד
   assert.match(source, /<details class="hub-box"/);
   assert.match(source, /<summary class="hub-summary">/);
-  // קיצור דרך מהבאדג' בכותרת, בכל מסך
-  assert.match(html, /<button[^>]+id="reminderBadge"[^>]+onclick="App\.goReminders\(\)"/);
+  // הבאדג' בכותרת הוסר — אריחי המונים של ה-hub מציגים את אותו מידע בלי חיתוך
+  assert.doesNotMatch(html, /id="reminderBadge"/);
+  assert.doesNotMatch(source, /goReminders|renderHeader/);
 });
 
 test("service worker scopes document fallback to navigation", () => {

@@ -199,7 +199,6 @@ body {
   line-height: 1.15;
 }
 .app-brand > div > span { display: block; margin-top: 2px; color: #bfcbe0; font-size: .68rem; font-weight: 600; }
-.header-right { display: flex; align-items: center; gap: 10px; position: relative; }
 .header-icon-btn {
   background: rgba(255,255,255,.16);
   border: 1px solid rgba(255,255,255,.22);
@@ -212,25 +211,7 @@ body {
 }
 .header-icon-btn svg { width: 20px; height: 20px; stroke-width: 1.9; }
 .header-icon-btn:active { transform: scale(.9); background: rgba(255,255,255,.28); }
-.reminder-badge svg { width: 15px; height: 15px; vertical-align: -2px; margin-left: 5px; }
-.reminder-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  font-family: inherit;
-  color: inherit;
-  cursor: pointer;
-  background: rgba(255, 255, 255, .22);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,.3);
-  border-radius: 999px;
-  padding: 6px 14px;
-  font-size: .8rem;
-  font-weight: 600;
-  position: relative;
-  white-space: nowrap;
-}
+
 
 main { width: 100%; padding: 24px 16px; max-width: 760px; margin: 0 auto; }
 
@@ -412,7 +393,6 @@ main { width: 100%; padding: 24px 16px; max-width: 760px; margin: 0 auto; }
 .tag-soon { background: var(--orange-bg); color: var(--orange); }
 .tag .ic-sub { width: 13px; height: 13px; margin-inline-end: 3px; }
 .lesson-unpaid { margin-inline-start: 8px; padding: 2px 8px; font-size: .7rem; vertical-align: 1px; }
-.badge-sep { display: inline-block; width: 1px; height: 11px; margin: 0 8px; vertical-align: -1px; background: currentColor; opacity: .35; }
 
 /* ---------- כפתורים ---------- */
 .btn {
@@ -1995,7 +1975,6 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
   .setting-row input[type="text"] { max-width: none; text-align: right; }
   .theme-seg { width: 100%; }
   .theme-seg button { flex: 1; }
-  .reminder-badge { max-width: 128px; overflow: hidden; padding-inline: 10px; text-overflow: ellipsis; font-size: .72rem; }
   .home-actions { grid-template-columns: 1fr; }
   .reminder-status-card { grid-template-columns: 1fr; }
   .reminder-actions { grid-template-columns: 1fr; }
@@ -2060,10 +2039,8 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
   }
   .app-header::after { background: radial-gradient(260px 260px at 50% 0, rgba(54,88,220,.28), transparent 70%); }
   .app-header h1 { font-size: 1.55rem; }
-  .header-right { margin-top: auto; width: 100%; align-items: stretch; flex-direction: column; }
   .header-icon-btn { width: 100%; border-radius: 12px; gap: 8px; }
   .header-icon-btn::after { content: "הגדרות"; font-family: "Assistant", sans-serif; font-weight: 700; }
-  .reminder-badge { width: 100%; text-align: center; }
   .bottom-nav {
     position: fixed;
     top: 106px;

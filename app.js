@@ -1333,22 +1333,6 @@ const App = (() => {
     renderReminderHub();
   }
 
-  // קיצור דרך מהכותרת (בכל מסך) אל מרכז התזכורות שבראש היומן.
-  // פותח אותו בדרך — מי שלחץ על "3 לגבייה" רוצה לראות את הרשימה, לא כותרת מקופלת.
-  function goReminders() {
-    go("home", () => {
-      const hub = document.querySelector("#reminderHub .reminder-hub");
-      if (!hub) return;
-      const box = hub.querySelector(".hub-box");
-      if (box) box.open = true;
-      // הפוקוס על הכותרת המתקפלת: פקד אמיתי, מכריז את המונים ואת מצב הפתיחה
-      const target = hub.querySelector(".hub-summary") || hub;
-      if (target === hub) hub.setAttribute("tabindex", "-1");
-      target.focus({ preventScroll: true });
-      hub.scrollIntoView({ block: "start" });
-    });
-  }
-
   // מסך סיכום — השיעור הבא, קיצורי דרך, אישורי שיעורים וגבייה פתוחה
   function renderOverview() {
     document.getElementById("homeGreeting").textContent =
@@ -2472,26 +2456,11 @@ const App = (() => {
   }
 
   // ========== רנדור כללי ==========
-  let lastBadgeHtml = null;
   function activeViewName() {
     const active = document.querySelector(".view.active");
     return active ? active.id.replace("view-", "") : "home";
   }
-  function renderHeader() {
-    const todayLessons = lessonIndex.onDate(todayStr());
-    const unpaidCount = lessons.filter(l => l.done && !l.paid && lessonPrice(l) > 0).length;
-    const badge = document.getElementById("reminderBadge");
-    const parts = [];
-    if (todayLessons.length) parts.push(`${icon("bell")} ${todayLessons.length} ${todayLessons.length === 1 ? "שיעור היום" : "שיעורים היום"}`);
-    if (unpaidCount) parts.push(`${icon("warn")} ${unpaidCount} לגבייה`);
-    // aria-live: כתיבה מחדש של אותו טקסט מכריזה שוב בקורא מסך בכל רנדור. כותבים רק כשהשתנה.
-    // ההשוואה מול משתנה ולא מול badge.innerHTML — הדפדפן מנרמל את ה-SVG בקריאה חוזרת.
-    const html = parts.join('<span class="badge-sep"></span>');
-    if (html !== lastBadgeHtml) { badge.innerHTML = html; lastBadgeHtml = html; }
-    badge.classList.toggle("hidden", !parts.length);
-  }
   function render(view = activeViewName()) {
-    renderHeader();
     if (view === "home") renderHome();
     else if (view === "overview") renderOverview();
     else if (view === "students") renderStudents();
@@ -2822,7 +2791,7 @@ const App = (() => {
 
   // ----- חשיפת פונקציות לממשק -----
   return {
-    go, goReminders, setHubOpen, closeModal, renderStudents,
+    go, setHubOpen, closeModal, renderStudents,
     openStudentForm, openStudentProfile, saveStudentNotes, saveStudent, deleteStudent,
     openLessonForm, saveLesson, deleteLesson, deleteSeriesFuture, deleteStudentFuture, toggleDone,
     confirmLesson, confirmAndRepeat, skipLesson,
