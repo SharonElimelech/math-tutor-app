@@ -1783,6 +1783,8 @@ input, select { min-height: 48px; }
   cursor: pointer;
 }
 .remind-btn .ic { width: 16px; height: 16px; }
+.remind-btn { transition: transform .15s var(--ease-out), background .18s var(--ease-out); }
+.remind-btn:active { transform: scale(.96); }
 /* כבר נשלח — נשאר לחיץ לשליחה חוזרת, אבל מפסיק להתחרות על תשומת הלב */
 .remind-btn.is-sent { background: var(--surface); color: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }
 /* נשלח מזמן ועדיין לא שולם — חוזר להיות פעולה בולטת, הפעם באדום */
@@ -1907,7 +1909,9 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
   font-weight: 600;
   cursor: pointer;
 }
+.confirm-extra button { transition: transform .15s var(--ease-out), background .18s var(--ease-out), color .18s var(--ease-out); }
 .confirm-extra button:hover { background: var(--hover); color: var(--text); }
+.confirm-extra button:active { transform: scale(.97); }
 .confirm-extra .ic-sub { width: 14px; height: 14px; opacity: 1; margin: 0; }
 
 /* ---------- תלמידים ---------- */

@@ -2182,16 +2182,25 @@ const App = (() => {
     if (settings.theme === "auto") return mq.matches ? "dark" : "light";
     return settings.theme;
   }
+  let appliedTheme = null;
   function applyTheme() {
     const t = resolveTheme();
     const root = document.documentElement;
-    // מכבים מעברים לרגע אחד. בלי זה כל אלמנט עם transition על background מנסה
-    // להנפיש את החלפת הטוקן, ובפועל חלקם נתקעים על צבע הערכה הקודמת עד רינדור הבא
-    // (כפתורים ירוקים נשארו בגוון של המצב הכהה במעבר לבהיר).
-    root.classList.add("theme-switch");
+    // מכבים מעברים רק כשבאמת מחליפים ערכה — בטעינה ראשונה אין ממה להנפיש, ובלי
+    // ההחלפה כל אלמנט עם transition על background היה מנסה להנפיש את החלפת הטוקן
+    // וחלקם נתקעו על צבע הערכה הקודמת. שומרים את הערכה שהוחלה כדי לזהות שינוי.
+    const changed = appliedTheme !== null && appliedTheme !== t;
+    appliedTheme = t;
     root.setAttribute("data-theme", t);
-    void root.offsetWidth; // מאלץ חישוב סגנון לפני שהמעברים חוזרים
-    requestAnimationFrame(() => root.classList.remove("theme-switch"));
+    if (changed) {
+      root.classList.add("theme-switch");
+      void root.offsetWidth; // מאלץ חישוב סגנון לפני שהמעברים חוזרים
+      // rAF לא נורה בלשונית ברקע; setTimeout מבטיח שהמחלקה תוסר בכל מקרה, אחרת
+      // כלל ה-!important היה מכבה לצמיתות כל אנימציה באפליקציה.
+      const clear = () => root.classList.remove("theme-switch");
+      requestAnimationFrame(clear);
+      setTimeout(clear, 120);
+    }
     const meta = document.getElementById("themeColorMeta");
     if (meta) meta.setAttribute("content", t === "dark" ? "#0f141b" : "#1f2937");
     // ציור מחדש של הגרף כדי שצבעי הטקסט יתעדכנו
