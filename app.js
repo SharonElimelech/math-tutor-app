@@ -1428,30 +1428,6 @@ const App = (() => {
     });
   }
 
-  function debtReminderRow({ student: s, unpaid, owed }) {
-    const signature = debtSignature(s.id, unpaid);
-    const sent = !!s.phone && waSent.has(signature);
-    const name = escapeHtml(s.name);
-    // תזכורת בת יותר משישה ימים שעדיין לא הביאה תשלום — מסומנת ככזו שכדאי לחזור עליה
-    const stale = sent && (Date.now() - (waSent.get(signature) || 0)) > 6 * 86400000;
-    const meta = `<span class="remind-owed">${cur(owed)}</span> · ${unpaid.length === 1 ? "שיעור אחד" : `${unpaid.length} שיעורים`}` +
-      (sent ? ` · <b class="remind-sent${stale ? " remind-stale" : ""}">${icon(stale ? "warn" : "check", "ic-sub")} ${sentAgoLabel(signature)}</b>` : "");
-    return remindRow({
-      name: s.name,
-      meta,
-      action: remindAction({
-        id: `debt-${s.id}`,
-        studentId: s.id,
-        phone: s.phone,
-        sendCall: `App.sendWhatsApp('${s.id}')`,
-        sendLabel: `שליחת תזכורת תשלום ל-${name}`,
-        resentLabel: `שליחה חוזרת של תזכורת תשלום ל-${name}`,
-        sent,
-        stale
-      })
-    });
-  }
-
   function hubGroup({ id, title, count, countClass = "", note = "", rows, body, empty, footer = "" }) {
     const content = body ?? (rows ? `<ul class="remind-list">${rows}</ul>` : "");
     return `<section class="hub-group" aria-labelledby="${id}">
@@ -1521,7 +1497,11 @@ const App = (() => {
       count: debtors.length ? cur(totalOwed) : "הכול שולם",
       countClass: debtors.length ? "hub-count-due" : "hub-count-done",
       note: oldestAge >= 2 ? `${icon("warn", "ic-sub")} הוותיק כבר מחכה ${debtAgeLabel(oldestAge)}` : "",
-      rows: debtors.map(debtReminderRow).join(""),
+      // כרטיס תשלום מלא לכל תלמיד — פתיחה חושפת כל שיעור עם כפתור "סימון כשולם",
+      // בדיוק כמו במסך כספים, כדי שאפשר לגבות ישירות מהתזכורות בלי לעבור מסך.
+      body: debtors.length
+        ? `<div class="payment-queue hub-payment-queue">${debtors.map(d => paymentAccountCard(d, "hub-payment-student")).join("")}</div>`
+        : "",
       empty: "אין כרגע תשלומים פתוחים.",
       footer: `<button type="button" class="debt-summary-link" onclick="App.go('money')" aria-label="מעבר למסך כספים למעקב מלא">מעקב מלא במסך כספים ‹</button>`
     });
@@ -1640,29 +1620,19 @@ const App = (() => {
       </li>`).join("");
   }
 
-  function renderPayments() {
-    const el = document.getElementById("paymentsList");
-    const paint = html => renderKeepFocus(el, html);
-    if (!students.length) {
-      paint(`<div class="empty">כדי לעקוב אחר תשלומים, צריך קודם להוסיף תלמיד ושיעור.</div>`);
-      return;
-    }
-    const totalUnpaid = lessons.filter(lesson => lesson.done && !lesson.paid);
-    const totalOwed = totalUnpaid.reduce((sum, lesson) => sum + lessonPrice(lesson), 0);
-    const debtors = debtorList();
-
-    // פירוט השיעורים מקופל: חשבון של מורה ותיקה הוא עשרות שורות לתלמיד, וכולן פרושות
-    // היו אלפי צמתי DOM ורינדור של ~33ms בכל סימון תשלום. מה שצריך כדי להחליט —
-    // שם, כמה, כמה כסף וכמה זמן זה מחכה — נשאר גלוי; הפירוט נפתח בלחיצה.
-    const queue = debtors.length ? debtors.map(({ student, unpaid, owed, age }) => {
-      const open = openDebtors.has(student.id);
-      return `
-      <article class="payment-account" aria-labelledby="payment-student-${student.id}">
+  // כרטיס חשבון תלמיד: מקופל לפירוט השיעורים שטרם שולמו, כל שיעור עם כפתור "סימון כשולם".
+  // מקור אחד למסך כספים ולקבוצת "תשלומים פתוחים" שבמרכז התזכורות. idPrefix מבדיל בין
+  // שני המופעים כדי שלא ייווצרו מזהי id כפולים כששני המסכים חיים יחד ב-DOM.
+  function paymentAccountCard({ student, unpaid, owed, age }, idPrefix = "payment-student") {
+    const open = openDebtors.has(student.id);
+    const headingId = `${idPrefix}-${student.id}`;
+    return `
+      <article class="payment-account" aria-labelledby="${headingId}">
         <details class="payment-box"${open ? " open" : ""} ontoggle="App.togglePaymentBox(this, '${student.id}')">
           <summary class="payment-account-head">
             <span class="student-avatar payment-avatar" aria-hidden="true">${escapeHtml(initials(student.name))}</span>
             <span class="payment-account-copy">
-              <h3 id="payment-student-${student.id}">${escapeHtml(student.name)}</h3>
+              <h3 id="${headingId}">${escapeHtml(student.name)}</h3>
               <span>${unpaid.length === 1 ? "שיעור אחד ממתין" : `${unpaid.length} שיעורים ממתינים`}${debtAgeLabel(age) ? ` · <span class="debt-age${age >= 3 ? " debt-age-old" : ""}">מחכה כבר ${debtAgeLabel(age)}</span>` : ""}</span>
             </span>
             <span class="payment-account-total">
@@ -1681,7 +1651,23 @@ const App = (() => {
           <button class="btn btn-green" onclick="App.markAllPaid('${student.id}')">${icon("check")} סימון ${unpaid.length === 1 ? "השיעור" : "הכול"} כשולם</button>
         </footer>
       </article>`;
-    }).join("") : `
+  }
+
+  function renderPayments() {
+    const el = document.getElementById("paymentsList");
+    const paint = html => renderKeepFocus(el, html);
+    if (!students.length) {
+      paint(`<div class="empty">כדי לעקוב אחר תשלומים, צריך קודם להוסיף תלמיד ושיעור.</div>`);
+      return;
+    }
+    const totalUnpaid = lessons.filter(lesson => lesson.done && !lesson.paid);
+    const totalOwed = totalUnpaid.reduce((sum, lesson) => sum + lessonPrice(lesson), 0);
+    const debtors = debtorList();
+
+    // פירוט השיעורים מקופל: חשבון של מורה ותיקה הוא עשרות שורות לתלמיד, וכולן פרושות
+    // היו אלפי צמתי DOM ורינדור של ~33ms בכל סימון תשלום. מה שצריך כדי להחליט —
+    // שם, כמה, כמה כסף וכמה זמן זה מחכה — נשאר גלוי; הפירוט נפתח בלחיצה.
+    const queue = debtors.length ? debtors.map(d => paymentAccountCard(d)).join("") : `
       <div class="payment-empty">
         <span class="payment-empty-icon">${icon("checkCircle")}</span>
         <div><h3>אין תשלומים פתוחים</h3><p>כל השיעורים שבוצעו מסומנים כשולמו.</p></div>
