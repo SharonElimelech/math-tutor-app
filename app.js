@@ -2649,7 +2649,7 @@ const App = (() => {
   let lessonDragging = false;
   function initLessonDrag() {
     const HOLD_MS = 280, SNAP = 15;
-    let drag = null, edgeTimer = 0;
+    let drag = null, edgeTimer = 0, movePending = null, moveRaf = 0;
 
     const snapTime = min => {
       const m = Math.max(0, Math.min(23 * 60 + 45, Math.round(min / SNAP) * SNAP));
@@ -2686,11 +2686,12 @@ const App = (() => {
       ghost.classList.add("drag-ghost");
       Object.assign(ghost.style, {
         left: `${r.left}px`, top: `${r.top}px`, right: "auto",
-        width: `${r.width}px`, height: `${r.height}px`
+        width: `${r.width}px`, height: `${r.height}px`, willChange: "transform"
       });
       document.body.appendChild(ghost);
       block.classList.add("drag-src");
-      drag = { l, ghost, ox: e0.clientX - r.left, oy: e0.clientY - r.top, from: { date: l.date, time: l.time }, target: null, x: e0.clientX };
+      drag = { l, ghost, ox: e0.clientX - r.left, oy: e0.clientY - r.top, baseLeft: r.left, baseTop: r.top, from: { date: l.date, time: l.time }, target: null, x: e0.clientX };
+      movePending = null; moveRaf = 0;
       document.addEventListener("pointermove", onMove);
       document.addEventListener("pointerup", onUp);
       document.addEventListener("pointercancel", onCancel);
@@ -2728,10 +2729,19 @@ const App = (() => {
       if (!edgeTimer) edgeTimer = setTimeout(() => { edgeTimer = 0; calShift(dir); if (drag) edgeCheck(drag.x); }, 450);
     }
 
+    // pointermove יורה מהר מקצב הציור; מאגדים לפריים אחד עם requestAnimationFrame ומזיזים
+    // את הרפאי ב-transform (שכבת קומפוזיציה, בלי layout בכל פריים) במקום left/top — גרירה חלקה בנייד.
     function onMove(ev) {
+      movePending = ev;
+      if (moveRaf) return;
+      moveRaf = requestAnimationFrame(() => {
+        moveRaf = 0;
+        if (drag && movePending) applyMove(movePending);
+      });
+    }
+    function applyMove(ev) {
       const topY = ev.clientY - drag.oy;
-      drag.ghost.style.left = `${ev.clientX - drag.ox}px`;
-      drag.ghost.style.top = `${topY}px`;
+      drag.ghost.style.transform = `translate3d(${ev.clientX - drag.ox - drag.baseLeft}px, ${topY - drag.baseTop}px, 0)`;
       // גרירה לקצה העליון/תחתון של ציר השעות — גוללת אותו כדי להגיע לכל שעה
       const rail = document.querySelector(".week-grid, .day-agenda");
       if (rail) {
@@ -2750,6 +2760,7 @@ const App = (() => {
 
     function endDrag(commit) {
       clearTimeout(edgeTimer); edgeTimer = 0;
+      if (moveRaf) { cancelAnimationFrame(moveRaf); moveRaf = 0; }
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
       document.removeEventListener("pointercancel", onCancel);
