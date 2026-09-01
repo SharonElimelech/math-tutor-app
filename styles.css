@@ -140,11 +140,7 @@ html { -webkit-text-size-adjust: 100%; }
 
 body {
   font-family: "Assistant", "Segoe UI", system-ui, Arial, sans-serif;
-  background:
-    radial-gradient(1100px 560px at 100% -5%, var(--body-glow-1), transparent 60%),
-    radial-gradient(900px 500px at -10% 4%, var(--body-glow-2), transparent 55%),
-    var(--bg);
-  background-attachment: fixed;
+  background: var(--bg);
   color: var(--text);
   padding-bottom: 96px;
   line-height: 1.5;
@@ -152,7 +148,21 @@ body {
   -webkit-font-smoothing: antialiased;
   transition: background-color .35s var(--ease-out), color .35s var(--ease-out);
   min-height: 100vh;
+  min-height: 100dvh; /* iOS Safari: גובה ויופורט אמיתי, בלי קפיצות משורת הכתובת */
   overflow-x: hidden;
+}
+
+/* הזוהר הדקורטיבי על שכבה קבועה נפרדת שנצבעת פעם אחת ואינה נצבעת מחדש בכל פריים
+   גלילה. background-attachment: fixed על ה-body היה גורם עיקרי לגמגום גלילה ב-iOS. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 560px at 100% -5%, var(--body-glow-1), transparent 60%),
+    radial-gradient(900px 500px at -10% 4%, var(--body-glow-2), transparent 55%);
 }
 
 /* ---------- כותרת ---------- */
@@ -924,8 +934,10 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   width: calc(100% - 28px);
   max-width: 560px;
   background: var(--nav-glass);
-  backdrop-filter: blur(18px) saturate(150%);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  /* טשטוש קל יותר: הרקע כבר אטום ~82%, וזה מוזיל משמעותית את עלות הריקומפוזיציה
+     של אלמנט fixed מעל תוכן נגלל ב-iOS, בלי שינוי מורגש במראה. */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--nav-glass-border);
   border-radius: 18px;
   display: flex;
