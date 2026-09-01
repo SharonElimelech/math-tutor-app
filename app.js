@@ -487,8 +487,11 @@ const App = (() => {
 
   // ========== שיעורים / יומן ==========
   let lessonFormEditing = false; // בעריכה לא ממלאים אוטומטית לפי התלמיד
+  // שעה שנבחרה במפורש בלחיצה על היומן — בחירת תלמיד לא תדרוס אותה
+  let lessonTimePinned = false;
   function openLessonForm(id, presetStudentId) {
     lessonFormEditing = !!id;
+    lessonTimePinned = !id && !!quickAddTime;
     const l = id
       ? lessons.find(x => x.id === id)
       : { studentId: presetStudentId || "", date: selectedDay || todayStr(), time: quickAddTime || settings.defaultTime, topic: "", duration: settings.defaultDuration, price: undefined };
@@ -649,7 +652,8 @@ const App = (() => {
     const last = all[all.length - 1];
     if (!last) return;
     const set = (elId, val) => { const e = document.getElementById(elId); if (e && val != null && val !== "") e.value = val; };
-    set("f-time", last.time);
+    // שעה שנבחרה בלחיצה על היומן נשמרת — רק כשלא נבחרה, ממלאים לפי השיעור האחרון
+    if (!lessonTimePinned) set("f-time", last.time);
     set("f-duration", last.duration);
     if (typeof last.price === "number") set("f-price", last.price);
     renderFreeSlots();
