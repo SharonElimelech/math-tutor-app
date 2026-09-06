@@ -110,3 +110,43 @@ test("high-end redesign keeps every product surface structured", () => {
   assert.match(styles, /body\s*\{[^}]*overflow-x:\s*hidden/s);
   assert.match(styles, /@media \(max-width: 520px\)[\s\S]*\.income-overview\s*\{[^}]*grid-template-columns:\s*1fr/);
 });
+
+test("v4 shell: one home screen, four tabs, a contextual FAB and top bar", () => {
+  const html = read("index.html");
+  const source = read("app.js");
+  const styles = read("styles.css");
+  // מסך "סיכום" מוזג לתוך "היום" — אין יותר שני מסכי בית
+  assert.doesNotMatch(html, /id="view-overview"|data-view="overview"/);
+  assert.equal(html.match(/class="nav-btn/g).length, 4);
+  // רצועת היום לפני מרכז התזכורות, ושניהם לפני היומן
+  const strip = html.indexOf('id="todayStrip"'), hub = html.indexOf('id="reminderHub"'), cal = html.indexOf('id="homeCalendar"');
+  assert.ok(strip > -1 && strip < hub && hub < cal);
+  // FAB: כפתור אמיתי שממופה לפעולה של המסך הפעיל, ונעלם כשמודאל פתוח
+  assert.match(html, /<button id="fab" class="fab" type="button"[^>]+onclick="App\.fabAction\(\)"/);
+  assert.match(source, /const FAB_BY_VIEW = \{/);
+  assert.match(styles, /body\.modal-open \.fab \{ display: none; \}/);
+  // כותרת הקשרית במקום כרטיס מותג
+  assert.match(html, /id="topbarContext"/);
+  assert.match(source, /function updateChrome\(/);
+});
+
+test("v4 calendar: three-day grid, smart scroll, payment state on blocks", () => {
+  const source = read("app.js");
+  const styles = read("styles.css");
+  assert.match(source, /function renderWeekGrid\(day, span = 7\)/);
+  assert.match(source, /seg\("3d", "3 ימים"\)/);
+  assert.match(source, /function smartCalTop\(/);
+  assert.match(source, /const lessonStateClass = /);
+  assert.match(styles, /\.wg-block\.is-done\.is-unpaid/);
+  assert.match(styles, /grid-template-columns: repeat\(var\(--wg-cols, 7\), minmax\(0, 1fr\)\)/);
+});
+
+test("v4 income chart is SVG driven by design tokens, with hover and keyboard access", () => {
+  const html = read("index.html");
+  const source = read("app.js");
+  assert.doesNotMatch(html, /<canvas id="incomeChart"/);
+  assert.match(html, /<div id="incomeChart" class="income-chart" role="img"/);
+  assert.match(source, /<svg viewBox="0 0 \$\{W\} \$\{H\}" class="chart-svg" role="list"/);
+  assert.match(source, /class="chart-bar [^>]*tabindex="0" role="listitem"/);
+  assert.doesNotMatch(source, /getContext\("2d"\)/);
+});
