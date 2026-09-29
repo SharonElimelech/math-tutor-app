@@ -815,6 +815,8 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
 .setting-sub { font-size: .78rem; color: var(--faint); margin-top: 2px; }
 .setting-row input { margin: 0; max-width: 130px; text-align: center; }
 .setting-row input[type="text"] { max-width: 170px; text-align: right; }
+.setting-row input[type="time"], .setting-row select { margin: 0; max-width: 170px; }
+.setting-inline { display: flex; align-items: center; gap: var(--sp-2); }
 /* שדה רחב (פרטי תשלום): תווית מעל, קלט לכל הרוחב */
 .setting-row-wide { flex-direction: column; align-items: stretch; }
 .setting-row-wide input[type="text"] { max-width: none; width: 100%; }

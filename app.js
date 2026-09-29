@@ -2124,6 +2124,31 @@ const App = (() => {
           </div>
           <input type="number" inputmode="numeric" min="0" value="${settings.remindMinutes}" onchange="App.updateSetting('remindMinutes', this.value)" aria-label="דקות לפני שיעור">
         </div>
+        <div class="settings-panel">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">תזכורת בוקר</div>
+              <p class="settings-help">push עם מספר השיעורים של היום — משם שולחים תזכורות לתלמידים</p>
+            </div>
+            <div class="setting-inline">
+              <input type="time" value="${settings.morningReminderTime}" onchange="App.updateSetting('morningReminderTime', this.value)" aria-label="שעת תזכורת בוקר">
+              ${settings.morningReminderTime
+                ? `<button type="button" class="btn btn-light" onclick="App.updateSetting('morningReminderTime', '')">כבוי</button>`
+                : `<span class="settings-help">כבוי</span>`}
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">תזכורת תשלום להורה</div>
+              <p class="settings-help">push אחרי השיעור — לחיצה פותחת את ההודעה מוכנה לוואטסאפ</p>
+            </div>
+            <select onchange="App.updateSetting('payReminderMode', this.value)" aria-label="מתי להזכיר על תשלום">
+              <option value="afterLesson" ${settings.payReminderMode === "afterLesson" ? "selected" : ""}>אחרי כל שיעור</option>
+              <option value="nextMorning" ${settings.payReminderMode === "nextMorning" ? "selected" : ""}>למחרת בבוקר</option>
+              <option value="off" ${settings.payReminderMode === "off" ? "selected" : ""}>כבוי</option>
+            </select>
+          </div>
+        </div>
         <div class="settings-action-stack reminder-actions">
           <button class="btn btn-green btn-block" onclick="App.exportCalendar()">${icon("calendar")} הוספת השיעורים ליומן הטלפון</button>
           <button class="btn btn-light btn-block" onclick="App.testClosedPush()">${icon("bell")} בדיקה: התראה כשהאפליקציה סגורה</button>
@@ -2196,7 +2221,7 @@ const App = (() => {
     if (key === "payInfo") value = value.slice(0, 300); // גבול האימות ב-normalizeSettings
     settings[key] = value;
     if (!saveSettings()) { render(); return; }
-    if (key === "remindMinutes") reschedule();
+    if (["remindMinutes", "morningReminderTime", "payReminderMode"].includes(key)) reschedule();
     render();
     toast("נשמר", "ok");
   }

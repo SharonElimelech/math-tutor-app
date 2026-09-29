@@ -9,7 +9,11 @@ export const DEFAULT_SETTINGS = Object.freeze({
   defaultDuration: 60,
   theme: "auto",
   remindMinutes: 30,
-  payInfo: ""
+  payInfo: "",
+  // push של בוקר: "X שיעורים היום"; ריק = כבוי
+  morningReminderTime: "08:00",
+  // תזכורת תשלום להורה: אחרי כל שיעור / למחרת בבוקר / כבוי
+  payReminderMode: "afterLesson"
 });
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
@@ -58,6 +62,12 @@ export function normalizeSettings(input = {}) {
   const theme = ["auto", "light", "dark"].includes(source.theme) ? source.theme : DEFAULT_SETTINGS.theme;
   const currency = text(source.currency ?? DEFAULT_SETTINGS.currency, "currency", 3, { required: true });
   if (/[<>"'`]/.test(currency)) fail("currency is invalid");
+  const morningReminderTime = source.morningReminderTime === undefined
+    ? DEFAULT_SETTINGS.morningReminderTime
+    : (source.morningReminderTime === "" ? "" : time(source.morningReminderTime, "morningReminderTime"));
+  const payReminderMode = ["afterLesson", "nextMorning", "off"].includes(source.payReminderMode)
+    ? source.payReminderMode
+    : DEFAULT_SETTINGS.payReminderMode;
 
   return {
     teacherName: text(source.teacherName, "teacherName", 80),
@@ -67,7 +77,9 @@ export function normalizeSettings(input = {}) {
     defaultDuration: number(source.defaultDuration, "defaultDuration", { fallback: DEFAULT_SETTINGS.defaultDuration, max: 1440 }),
     theme,
     remindMinutes: number(source.remindMinutes, "remindMinutes", { fallback: DEFAULT_SETTINGS.remindMinutes, max: 10080 }),
-    payInfo: text(source.payInfo, "payInfo", 300)
+    payInfo: text(source.payInfo, "payInfo", 300),
+    morningReminderTime,
+    payReminderMode
   };
 }
 

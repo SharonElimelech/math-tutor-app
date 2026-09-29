@@ -190,3 +190,11 @@ test("WhatsApp opens in the same browsing context on phones", () => {
   assert.doesNotMatch(source, /window\.open\(`https:\/\/wa\.me/);
   assert.match(source, /whatsappLinks\(/);
 });
+
+test("reminder settings expose morning time and payment mode", () => {
+  const source = read("app.js");
+  assert.match(source, /App\.updateSetting\('morningReminderTime', this\.value\)/);
+  assert.match(source, /App\.updateSetting\('payReminderMode', this\.value\)/);
+  assert.match(source, /<option value="nextMorning"/);
+  assert.match(source, /\["remindMinutes", "morningReminderTime", "payReminderMode"\]\.includes\(key\)\) reschedule\(\)/);
+});
