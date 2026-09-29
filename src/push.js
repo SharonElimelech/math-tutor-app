@@ -1,4 +1,5 @@
-import { reminderSignature } from "./reminders.js";
+import { paymentSignature, reminderSignature } from "./reminders.js";
+import { ymd } from "./calendar.js";
 
 // התראות כשהאפליקציה סגורה: ה-cron בשרת שולח web push בזמן התזכורת, וה-service
 // worker מציג את ההתראה מהמטמון המקומי. טקסט התזכורת מסונכרן לשרת ולמטמון.
@@ -32,6 +33,74 @@ export function upcomingPushReminders(lessons, studentsById, leadMinutes = 30, n
     });
   }
   return out.sort((a, b) => a.t - b.t);
+}
+
+// ----- כל התזכורות במקום אחד -----
+// מקור אמת יחיד לשלושת סוגי ה-push: לפני שיעור, בוקר ("X שיעורים היום") ותשלום אחרי שיעור.
+// גם הטיימר בדף (גיבוי) וגם הסנכרון לשרת ולמטמון צורכים את אותה רשימה — שני חישובים שונים
+// היו הסיבה לתזכורת הכפולה ב-v4.0.0. חלון: 30 דק' אחורה (ה-SW מציג מהמטמון פריטים שכבר עברו)
+// ועד האופק קדימה.
+const atTime = (date, hhmm) => new Date(`${date}T${hhmm || "00:00"}:00`).getTime();
+const nextDay = date => {
+  const d = new Date(`${date}T12:00:00`);
+  d.setDate(d.getDate() + 1);
+  return ymd(d);
+};
+const morningBody = n => n === 1 ? "שיעור אחד היום — שלחי תזכורת לתלמיד" : `${n} שיעורים היום — שלחי תזכורות לתלמידים`;
+
+export function plannedReminders(lessons, studentsById, settings, now = Date.now(), horizonDays = 60) {
+  const lead = Math.max(0, Number(settings.remindMinutes ?? 30) || 0) * MINUTE;
+  const morning = String(settings.morningReminderTime ?? "");
+  const payMode = settings.payReminderMode ?? "afterLesson";
+  const from = now - 30 * MINUTE;
+  const to = now + horizonDays * 24 * 60 * MINUTE;
+  const out = [];
+  const perDay = new Map();
+  for (const l of lessons) {
+    const start = atTime(l.date, l.time);
+    if (!Number.isFinite(start)) continue;
+    const student = studentsById.get(l.studentId);
+    const name = student?.name || "תלמיד";
+    if (!l.done) {
+      out.push({
+        t: start - lead,
+        title: "תזכורת שיעור",
+        body: `שיעור עם ${name} בשעה ${l.time}`,
+        tag: `lesson-${l.id}`,
+        url: `./?view=home&lesson=${encodeURIComponent(l.id)}`,
+        sig: reminderSignature(l)
+      });
+      perDay.set(l.date, (perDay.get(l.date) || 0) + 1);
+    }
+    // תשלום: לא דורש "בוצע" — ה-push עצמו הוא הבקשה לאשר את השיעור ולשלוח תזכורת
+    const price = Number(l.price ?? student?.price) || 0;
+    if (!l.paid && price > 0 && payMode !== "off") {
+      const t = payMode === "nextMorning"
+        ? atTime(nextDay(l.date), morning || "08:00")
+        : start + (Number(l.duration) || 60) * MINUTE;
+      out.push({
+        t,
+        title: "תזכורת תשלום",
+        body: `השיעור עם ${name} הסתיים — שלחי תזכורת תשלום להורה`,
+        tag: `pay-${l.id}`,
+        url: `./?view=home&pay=${encodeURIComponent(l.studentId)}`,
+        sig: paymentSignature(l)
+      });
+    }
+  }
+  if (morning) {
+    for (const [date, n] of perDay) {
+      out.push({
+        t: atTime(date, morning),
+        title: "תזכורות להיום",
+        body: morningBody(n),
+        tag: `morning-${date}`,
+        url: "./?view=home&hub=lessons",
+        sig: `morning:${date}`
+      });
+    }
+  }
+  return out.filter(i => Number.isFinite(i.t) && i.t > from && i.t <= to).sort((a, b) => a.t - b.t);
 }
 
 const urlB64ToBytes = s => {
