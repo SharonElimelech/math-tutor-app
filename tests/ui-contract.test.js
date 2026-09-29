@@ -164,7 +164,7 @@ test("lesson reminders are shown once across the page and the service worker", (
   assert.match(worker, /silent: true/);
   // אפליקציה: כשה-push בריא השרת הוא הבעלים של תזכורות השיעור; מה שה-SW הציג נכנס ל-notified
   assert.match(source, /await shownSigs\(\)/);
-  assert.match(source, /serverOwnsLessons/);
+  assert.match(source, /lastPushSync\(\)\?\.state === "ok" && await pushSubscribed\(\)/);
 });
 
 test("service worker registration lives outside the app module", () => {

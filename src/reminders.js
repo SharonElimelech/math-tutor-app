@@ -10,20 +10,6 @@ export function bulkReminderLessons(lessons, dates, sent = new Set()) {
   return lessons.filter(l => !l.done && wanted.has(l.date) && !sent.has(reminderSignature(l)));
 }
 
-// Lessons that are done but still unpaid and already finished — i.e. money you
-// likely forgot to collect. graceMinutes delays the nudge past the lesson end
-// (e.g. next morning) so it is a calm digest, not a ping the second class ends.
-export function duePaymentReminders(lessons, now = Date.now(), notified = new Set(), graceMinutes = 0) {
-  const nowTime = now instanceof Date ? now.getTime() : Number(now);
-  const grace = Math.max(0, Number(graceMinutes) || 0) * MINUTE;
-  return lessons.filter(lesson => {
-    if (!lesson.done || lesson.paid) return false;
-    if (notified.has(paymentSignature(lesson))) return false;
-    const start = lessonStartTimestamp(lesson);
-    return Number.isFinite(start) && nowTime >= start + grace;
-  });
-}
-
 export function lessonStartTimestamp(lesson) {
   return new Date(`${lesson.date}T${lesson.time || "00:00"}:00`).getTime();
 }
@@ -46,35 +32,6 @@ export function lessonsAwaitingConfirmation(lessons, now = Date.now()) {
     if (!Number.isFinite(start)) return false;
     return start + (Number(lesson.duration) || 60) * MINUTE <= nowTime;
   });
-}
-
-export function dueLessonReminders(lessons, now = Date.now(), leadMinutes = 30, notified = new Set()) {
-  const nowTime = now instanceof Date ? now.getTime() : Number(now);
-  const lead = Math.max(0, Number(leadMinutes) || 0) * MINUTE;
-  const grace = 5 * MINUTE;
-
-  return lessons.filter(lesson => {
-    if (lesson.done || notified.has(reminderSignature(lesson))) return false;
-    const start = lessonStartTimestamp(lesson);
-    if (!Number.isFinite(start)) return false;
-    return nowTime >= start - lead && nowTime <= start + grace;
-  });
-}
-
-export function nextLessonReminderTimestamp(lessons, now = Date.now(), leadMinutes = 30, notified = new Set()) {
-  const nowTime = now instanceof Date ? now.getTime() : Number(now);
-  const lead = Math.max(0, Number(leadMinutes) || 0) * MINUTE;
-  const grace = 5 * MINUTE;
-  let next = Infinity;
-
-  for (const lesson of lessons) {
-    if (lesson.done || notified.has(reminderSignature(lesson))) continue;
-    const start = lessonStartTimestamp(lesson);
-    if (!Number.isFinite(start) || nowTime > start + grace) continue;
-    next = Math.min(next, Math.max(nowTime, start - lead));
-  }
-
-  return Number.isFinite(next) ? next : null;
 }
 
 const calendarEscape = value => String(value ?? "")

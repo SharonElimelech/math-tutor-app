@@ -10,31 +10,6 @@ export const PUSH_CACHE = "mt-push-data";
 
 const MINUTE = 60 * 1000;
 
-// אילו תזכורות עתידיות צריכות push. מחזיר [{t, title, body, tag}] ממוין לפי זמן.
-export function upcomingPushReminders(lessons, studentsById, leadMinutes = 30, now = Date.now(), horizonDays = 60) {
-  const lead = Math.max(0, Number(leadMinutes) || 0) * MINUTE;
-  const horizon = now + horizonDays * 24 * 3600 * 1000;
-  const out = [];
-  for (const lesson of lessons) {
-    if (lesson.done) continue;
-    const start = new Date(`${lesson.date}T${lesson.time || "00:00"}:00`).getTime();
-    if (!Number.isFinite(start)) continue;
-    const t = start - lead;
-    if (t <= now || t > horizon) continue;
-    const name = studentsById.get(lesson.studentId)?.name || "תלמיד";
-    out.push({
-      t,
-      title: "תזכורת שיעור",
-      body: `שיעור עם ${name} בשעה ${lesson.time}`,
-      tag: `lesson-${lesson.id}`,
-      // מפתח הדדופ המשותף עם ה-service worker (ראו shown/ למטה); כולל תאריך+שעה
-      sig: reminderSignature(lesson),
-      url: `./?view=home&lesson=${encodeURIComponent(lesson.id)}`
-    });
-  }
-  return out.sort((a, b) => a.t - b.t);
-}
-
 // ----- כל התזכורות במקום אחד -----
 // מקור אמת יחיד לשלושת סוגי ה-push: לפני שיעור, בוקר ("X שיעורים היום") ותשלום אחרי שיעור.
 // גם הטיימר בדף (גיבוי) וגם הסנכרון לשרת ולמטמון צורכים את אותה רשימה — שני חישובים שונים
@@ -134,20 +109,22 @@ function clientId() {
 }
 
 // כתיבה למטמון (בשביל ה-SW) ושליחת התזכורות לשרת. זורק על כשל HTTP.
-async function writeAndSync(sub, items) {
+// המטמון מקבל גם את 30 הדקות האחרונות (ה-SW מציג ממנו פריטים שכבר עברו כש-push מגיע);
+// השרת מקבל רק עתיד — אחרת ה-cron היה דוחף מיד פריט שהדף בדיוק הציג.
+async function writeAndSync(sub, items, now = Date.now()) {
   try {
     const cache = await caches.open(PUSH_CACHE);
     await cache.put("reminders", new Response(JSON.stringify(items), {
       headers: { "Content-Type": "application/json" }
     }));
-  } catch { /* אין Cache API — המייל עדיין יעבוד */ }
+  } catch { /* אין Cache API — ה-push עדיין יעבוד עם ההודעה הגנרית */ }
   const res = await fetch(`${PUSH_SERVER}/sync`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       id: clientId(),
       sub: sub ? sub.toJSON() : null,
-      items: items.map(({ t, title, body }) => ({ t, title, body }))
+      items: items.filter(i => i.t > now).map(({ t, title, body }) => ({ t, title, body }))
     })
   });
   if (!res.ok) throw new Error(`sync-failed-${res.status}`);
@@ -175,22 +152,23 @@ async function currentSub() {
   }
 }
 
-// סנכרון: תזכורות למטמון + לשרת (מייל תמיד, push אם יש מנוי). רץ אחרי כל שמירה.
-// מחזיר "ok"; זורק על כשל רשת/שרת.
-export async function syncPush(lessons, studentsById, leadMinutes) {
-  await writeAndSync(await currentSub(), upcomingPushReminders(lessons, studentsById, leadMinutes));
+// סנכרון: כל התזכורות המתוכננות למטמון + לשרת. רץ אחרי כל שמירה. מחזיר "ok"; זורק על כשל רשת/שרת.
+export async function syncPush(lessons, studentsById, settings) {
+  const now = Date.now();
+  await writeAndSync(await currentSub(), plannedReminders(lessons, studentsById, settings, now), now);
   return "ok";
 }
 
 // בדיקת "אפליקציה סגורה": תזכורת בדיקה בעוד 2 דק' + סנכרון לשרת.
-// ה-cron רץ כל 5 דק' — ההתראה/מייל יגיעו תוך 2-7 דקות. מחזיר את זמן הבדיקה.
+// ה-cron רץ כל 5 דק' — ההתראה תגיע תוך 2-7 דקות. מחזיר את זמן הבדיקה.
 // ponytail: סנכרון רגיל שירוץ לפני שהבדיקה נורתה ידרוס אותה — זניח, המשתמשת מתבקשת לסגור את האפליקציה.
-export async function sendClosedAppTest(lessons, studentsById, leadMinutes) {
-  const items = upcomingPushReminders(lessons, studentsById, leadMinutes);
-  const t = Date.now() + 2 * MINUTE;
+export async function sendClosedAppTest(lessons, studentsById, settings) {
+  const now = Date.now();
+  const items = plannedReminders(lessons, studentsById, settings, now);
+  const t = now + 2 * MINUTE;
   items.push({ t, title: "בדיקת התראות ✓", body: "מצוין — התזכורות מגיעות גם כשהאפליקציה סגורה", tag: "push-test", sig: `test:${t}` });
   items.sort((a, b) => a.t - b.t);
-  await writeAndSync(await currentSub(), items);
+  await writeAndSync(await currentSub(), items, now);
   return t;
 }
 

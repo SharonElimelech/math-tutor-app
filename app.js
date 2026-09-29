@@ -18,15 +18,12 @@ import { buildLessonIndex, debtAgeWeeks, findConflicts, findFreeSlots, summarize
 import { AppStorage } from "./src/storage.js";
 import {
   createLessonsCalendar,
-  dueLessonReminders,
-  duePaymentReminders,
   lessonsAwaitingConfirmation,
-  nextLessonReminderTimestamp,
   paymentSignature,
   reminderSignature,
   upcomingReminderLessons
 } from "./src/reminders.js";
-import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest, shownSigs, markShown, pruneShown } from "./src/push.js";
+import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest, plannedReminders, shownSigs, markShown, pruneShown } from "./src/push.js";
 import { whatsappLinks, normalizePhone } from "./src/whatsapp.js";
 
 /* =========================================================
@@ -2327,10 +2324,11 @@ const App = (() => {
   function scheduleNextReminder() {
     clearTimeout(reminderTimer);
     if (!notifSupported || Notification.permission !== "granted") return;
-    const next = nextLessonReminderTimestamp(lessons, new Date(), reminderLeadMinutes(settings.remindMinutes), notified);
-    if (next === null) return;
+    const now = Date.now();
+    const next = plannedReminders(lessons, lessonIndex.studentsById, settings, now).find(i => i.t > now && !notified.has(i.sig));
+    if (!next) return;
     // ponytail: normal web notifications cannot wake a closed app; this only tightens timing while it is open.
-    const delay = Math.min(Math.max(30 * 1000, next - Date.now()), 2147483647);
+    const delay = Math.min(Math.max(30 * 1000, next.t - now), 2147483647);
     reminderTimer = setTimeout(() => void checkReminders(), delay);
   }
 
@@ -2380,10 +2378,10 @@ const App = (() => {
     }
   }
 
-  async function showAppNotification(title, options) {
+  async function showAppNotification(title, options, url = "./") {
     if ("serviceWorker" in navigator) {
       const reg = await navigator.serviceWorker.ready;
-      return reg.showNotification(title, { ...options, data: { url: "./" } });
+      return reg.showNotification(title, { ...options, data: { url } });
     }
     return new Notification(title, options);
   }
@@ -2408,7 +2406,7 @@ const App = (() => {
   }
   function trySyncPush() {
     // רץ תמיד — המייל לא תלוי בתמיכת push (חשוב באייפון שאינו מותקן למסך הבית)
-    syncPush(lessons, lessonIndex.studentsById, reminderLeadMinutes(settings.remindMinutes))
+    syncPush(lessons, lessonIndex.studentsById, settings)
       .then(state => rememberPushSync(state))
       .catch(error => { rememberPushSync("fail"); console.warn("Push sync failed", error); });
   }
@@ -2427,7 +2425,7 @@ const App = (() => {
   // בדיקה אמיתית של תזכורת כשהאפליקציה סגורה — עוברת דרך השרת (מייל + push אם יש)
   async function testClosedPush() {
     try {
-      await sendClosedAppTest(lessons, lessonIndex.studentsById, reminderLeadMinutes(settings.remindMinutes));
+      await sendClosedAppTest(lessons, lessonIndex.studentsById, settings);
       rememberPushSync("ok");
       toast("נשלח! סגרי עכשיו את האפליקציה — ההתראה תגיע תוך 2-7 דקות", "ok");
     } catch (error) {
@@ -2451,7 +2449,11 @@ const App = (() => {
   function rememberNotification(signature) {
     notified.add(signature);
     const activeSignatures = new Set();
-    for (const l of lessons) { activeSignatures.add(reminderSignature(l)); activeSignatures.add(paymentSignature(l)); }
+    for (const l of lessons) {
+      activeSignatures.add(reminderSignature(l));
+      activeSignatures.add(paymentSignature(l));
+      activeSignatures.add(`morning:${l.date}`);
+    }
     for (const value of notified) {
       if (!activeSignatures.has(value)) notified.delete(value);
     }
@@ -2464,39 +2466,23 @@ const App = (() => {
     try {
       // מה שה-service worker כבר הציג (push) נכנס ל-notified דרך המטמון המשותף — לא מציגים שוב.
       for (const sig of await shownSigs()) notified.add(sig);
-      // כשה-push בריא (מנוי + הסנכרון האחרון הצליח) השרת הוא הבעלים של תזכורות השיעור, גם כשהאפליקציה
-      // פתוחה. שני מסלולים שמציגים את אותה תזכורת = פעמיים (push → לחיצה → האפליקציה נפתחת → הטיימר
-      // מציג שוב; או הטיימר קודם וה-cron אחריו). הדף מציג בעצמו רק כשאין push שאפשר לסמוך עליו.
-      const serverOwnsLessons = lastPushSync()?.state === "ok" && await pushSubscribed();
-      const due = serverOwnsLessons ? [] : dueLessonReminders(lessons, new Date(), reminderLeadMinutes(settings.remindMinutes), notified);
-      for (const l of due) {
-        const s = studentById(l.studentId);
-        await showAppNotification("תזכורת שיעור", {
-          tag: `lesson-${l.id}`,
-          body: `שיעור עם ${s ? s.name : "תלמיד"} בשעה ${l.time}`,
+      // כשה-push בריא (מנוי + הסנכרון האחרון הצליח) השרת הוא הבעלים של כל התזכורות, גם כשהאפליקציה
+      // פתוחה. שני מסלולים שמציגים את אותה תזכורת = פעמיים. הדף מציג בעצמו רק כשאין push שאפשר לסמוך עליו.
+      if (lastPushSync()?.state === "ok" && await pushSubscribed()) return;
+      const now = Date.now();
+      const due = plannedReminders(lessons, lessonIndex.studentsById, settings, now).filter(i => i.t <= now && !notified.has(i.sig));
+      for (const item of due) {
+        await showAppNotification(item.title, {
+          tag: item.tag,
+          body: item.body,
           icon: "icon-192.png",
           badge: "icon-192.png"
-        });
-        rememberNotification(reminderSignature(l));
-        await markShown(reminderSignature(l)); // שגם ה-service worker ידע, אם push בכל זאת יגיע
-      }
-      // תזכורת גבייה: שיעור שהסתיים, סומן כבוצע, אך טרם שולם — רק למחרת ואילך (לא מיד בתום השיעור)
-      const duePay = duePaymentReminders(lessons, new Date(), notified, 12 * 60);
-      for (const l of duePay) {
-        const price = lessonPrice(l);
-        if (price > 0) {
-          const s = studentById(l.studentId);
-          await showAppNotification("תזכורת גבייה", {
-            tag: `pay-${l.id}`,
-            body: `עדיין לא נגבה תשלום מ${s ? s.name : "תלמיד"} (${cur(price)})`,
-            icon: "icon-192.png",
-            badge: "icon-192.png"
-          });
-        }
-        rememberNotification(paymentSignature(l));
+        }, item.url);
+        rememberNotification(item.sig);
+        await markShown(item.sig); // שגם ה-service worker ידע, אם push בכל זאת יגיע
       }
     } catch (error) {
-      console.warn("Could not show lesson reminder", error);
+      console.warn("Could not show reminder", error);
     } finally {
       reminderCheckRunning = false;
       scheduleNextReminder();

@@ -4,10 +4,7 @@ import test from "node:test";
 import {
   bulkReminderLessons,
   createLessonsCalendar,
-  dueLessonReminders,
-  duePaymentReminders,
   lessonsAwaitingConfirmation,
-  nextLessonReminderTimestamp,
   paymentSignature,
   reminderSignature,
   upcomingReminderLessons
@@ -22,13 +19,6 @@ const lesson = {
   topic: "אלגברה",
   done: false
 };
-
-test("finds reminders inside lead window and ignores delivered or done lessons", () => {
-  const now = new Date("2026-06-20T15:40:00");
-  assert.deepEqual(dueLessonReminders([lesson], now, 30), [lesson]);
-  assert.deepEqual(dueLessonReminders([lesson], now, 30, new Set([reminderSignature(lesson)])), []);
-  assert.deepEqual(dueLessonReminders([{ ...lesson, done: true }], now, 30), []);
-});
 
 test("upcoming reminders drop lessons that already started today", () => {
   const later = { ...lesson, id: "lesson_late", time: "20:00" };
@@ -56,45 +46,6 @@ test("bulk reminders cover given dates, skip done and already-sent lessons", () 
   // שיעור שהוזז מקבל חתימה חדשה — חוזר לתור השליחה
   const moved = { ...lesson, time: "18:00" };
   assert.deepEqual(bulkReminderLessons([moved], dates, new Set([reminderSignature(lesson)])), [moved]);
-});
-
-test("payment reminders flag finished, done, unpaid lessons only once", () => {
-  const ended = { ...lesson, done: true, paid: false };
-  const after = new Date("2026-06-20T17:30:00");
-  const before = new Date("2026-06-20T15:00:00");
-  assert.deepEqual(duePaymentReminders([ended], after), [ended]);
-  assert.deepEqual(duePaymentReminders([ended], before), []); // not finished yet
-  assert.deepEqual(duePaymentReminders([{ ...ended, paid: true }], after), []); // already paid
-  assert.deepEqual(duePaymentReminders([{ ...lesson, done: false }], after), []); // not done
-  assert.deepEqual(duePaymentReminders([ended], after, new Set([paymentSignature(ended)])), []); // already reminded
-});
-
-test("payment reminders can wait a grace period so they are not instant", () => {
-  const ended = { ...lesson, done: true, paid: false }; // 16:00–17:00
-  const soon = new Date("2026-06-20T17:30:00"); // חצי שעה אחרי הסיום
-  const nextDay = new Date("2026-06-21T05:30:00"); // למחרת
-  assert.deepEqual(duePaymentReminders([ended], soon, new Set(), 12 * 60), []); // עוד לא, יש חלון חסד
-  assert.deepEqual(duePaymentReminders([ended], nextDay, new Set(), 12 * 60), [ended]); // אחרי חלון החסד
-});
-
-test("zero-minute reminder gets a short polling grace window", () => {
-  assert.deepEqual(dueLessonReminders([lesson], new Date("2026-06-20T16:01:00"), 0), [lesson]);
-  assert.deepEqual(dueLessonReminders([lesson], new Date("2026-06-20T16:06:00"), 0), []);
-});
-
-test("finds the next reminder time", () => {
-  assert.equal(
-    nextLessonReminderTimestamp([lesson], new Date("2026-06-20T12:00:00"), 30),
-    new Date("2026-06-20T15:30:00").getTime()
-  );
-  assert.equal(
-    nextLessonReminderTimestamp([lesson], new Date("2026-06-20T15:40:00"), 30),
-    new Date("2026-06-20T15:40:00").getTime()
-  );
-  assert.equal(
-    nextLessonReminderTimestamp([lesson], new Date("2026-06-20T16:06:00"), 30),
-    null
-  );
 });
 
 test("calendar export includes lesson and native alarm", () => {
