@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { plannedReminders, pageDueItems } from "../src/push.js";
+import { plannedReminders, pageDueItems, serverItems } from "../src/push.js";
 
 const now = new Date("2026-07-04T12:00:00").getTime();
 const lesson = (over = {}) => ({
@@ -92,4 +92,23 @@ test("pageDueItems: with healthy push the page shows only items the last sync al
   assert.deepEqual(pageDueItems(items, now, new Set(["a"]), true, syncedAt), []);
   // בלי סנכרון מוצלח מעולם (syncedAt ברירת מחדל 0) ועם push בריא — הדף לא מציג כלום
   assert.deepEqual(pageDueItems(items, now, new Set(), true), []);
+});
+
+test("pageDueItems: boundaries are inclusive — t === now is due, and with healthy push t === syncedAt too", () => {
+  const sigs = (items, ...rest) => pageDueItems(items, ...rest).map(i => i.sig);
+  // t === now: זמנו הגיע
+  assert.deepEqual(sigs([{ t: 500, sig: "x" }], 500, new Set(), false), ["x"]);
+  assert.deepEqual(sigs([{ t: 501, sig: "x" }], 500, new Set(), false), []);
+  // push בריא, t === syncedAt: הסנכרון שלח רק t > syncedAt, כלומר הפריט ירד מהשרת — הדף מציג
+  assert.deepEqual(sigs([{ t: 200, sig: "y" }], 500, new Set(), true, 200), ["y"]);
+  assert.deepEqual(sigs([{ t: 201, sig: "y" }], 500, new Set(), true, 200), []);
+  // שניהם יחד: t === now === syncedAt (הסנכרון והבדיקה באותו אלפית שנייה)
+  assert.deepEqual(sigs([{ t: 500, sig: "z" }], 500, new Set(), true, 500), ["z"]);
+});
+
+test("serverItems: the server gets only the future, and only t/title/body", () => {
+  const item = (t, n) => ({ t, title: `title${n}`, body: `body${n}`, tag: `tag${n}`, url: `./?n=${n}`, sig: `sig${n}` });
+  // עבר, בדיוק עכשיו (t === now לא נשלח), עתיד — רק העתיד נשלח, בלי tag/url/sig
+  const sent = serverItems([item(now - 1, 1), item(now, 2), item(now + 1, 3)], now);
+  assert.deepEqual(sent, [{ t: now + 1, title: "title3", body: "body3" }]);
 });

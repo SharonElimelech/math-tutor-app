@@ -62,7 +62,7 @@ export function normalizeSettings(input = {}) {
   const theme = ["auto", "light", "dark"].includes(source.theme) ? source.theme : DEFAULT_SETTINGS.theme;
   const currency = text(source.currency ?? DEFAULT_SETTINGS.currency, "currency", 3, { required: true });
   if (/[<>"'`]/.test(currency)) fail("currency is invalid");
-  const morningReminderTime = source.morningReminderTime === undefined
+  const morningReminderTime = source.morningReminderTime == null
     ? DEFAULT_SETTINGS.morningReminderTime
     : (source.morningReminderTime === "" ? "" : time(source.morningReminderTime, "morningReminderTime"));
   const payReminderMode = ["afterLesson", "nextMorning", "off"].includes(source.payReminderMode)

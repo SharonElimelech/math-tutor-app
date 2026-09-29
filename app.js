@@ -2123,23 +2123,17 @@ const App = (() => {
         </div>
         <div class="settings-panel">
           <div class="setting-row">
-            <div>
-              <div class="setting-label">תזכורת בוקר</div>
-              <p class="settings-help">push עם מספר השיעורים של היום — משם שולחים תזכורות לתלמידים</p>
-            </div>
+            <div><label class="setting-label" for="set-morning">תזכורת בוקר</label><div class="setting-sub">push עם מספר השיעורים של היום — משם שולחים תזכורות לתלמידים</div></div>
             <div class="setting-inline">
-              <input type="time" value="${settings.morningReminderTime}" onchange="App.updateSetting('morningReminderTime', this.value)" aria-label="שעת תזכורת בוקר">
+              <input type="time" id="set-morning" value="${settings.morningReminderTime}" onchange="App.updateSetting('morningReminderTime', this.value)">
               ${settings.morningReminderTime
-                ? `<button type="button" class="btn btn-light" onclick="App.updateSetting('morningReminderTime', '')">כבוי</button>`
+                ? `<button type="button" class="btn btn-light" onclick="App.updateSetting('morningReminderTime', '')" aria-label="כיבוי תזכורת הבוקר">כבוי</button>`
                 : `<span class="settings-help">כבוי</span>`}
             </div>
           </div>
           <div class="setting-row">
-            <div>
-              <div class="setting-label">תזכורת תשלום להורה</div>
-              <p class="settings-help">push אחרי השיעור — לחיצה פותחת את ההודעה מוכנה לוואטסאפ</p>
-            </div>
-            <select onchange="App.updateSetting('payReminderMode', this.value)" aria-label="מתי להזכיר על תשלום">
+            <div><label class="setting-label" for="set-paymode">תזכורת תשלום להורה</label><div class="setting-sub">push אחרי השיעור — לחיצה פותחת את ההודעה מוכנה לוואטסאפ</div></div>
+            <select id="set-paymode" onchange="App.updateSetting('payReminderMode', this.value)">
               <option value="afterLesson" ${settings.payReminderMode === "afterLesson" ? "selected" : ""}>אחרי כל שיעור</option>
               <option value="nextMorning" ${settings.payReminderMode === "nextMorning" ? "selected" : ""}>למחרת בבוקר</option>
               <option value="off" ${settings.payReminderMode === "off" ? "selected" : ""}>כבוי</option>
@@ -2292,7 +2286,7 @@ const App = (() => {
   }
 
   function initReminders() {
-    // סנכרון תזכורות לשרת המייל תמיד — לא תלוי בהרשאת התראות (חשוב באייפון)
+    // סנכרון תזכורות לשרת ה-push תמיד — לא תלוי בהרשאת התראות (חשוב באייפון)
     trySyncPush();
     void pruneShown();
     if (notifSupported && Notification.permission === "granted") startInterval();
@@ -2387,7 +2381,7 @@ const App = (() => {
   }
 
   function reschedule() {
-    trySyncPush(); // מייל: תמיד מסנכרן את התזכורות המעודכנות לשרת
+    trySyncPush(); // תמיד מסנכרן את התזכורות המעודכנות לשרת ה-push, גם בלי הרשאת התראות
     if (notifSupported && Notification.permission === "granted") {
       scheduleNextReminder();
       void checkReminders();
@@ -2397,21 +2391,26 @@ const App = (() => {
   // סנכרון תזכורות לשרת ה-push — רץ ברקע אחרי כל שמירה, כשלון לא מפריע לאפליקציה.
   // התוצאה נשמרת כדי שמסך ההגדרות יראה אם התראות ברקע באמת עובדות.
   const PUSH_SYNC_KEY = "mt_push_sync";
-  function rememberPushSync(state) {
-    try { localStorage.setItem(PUSH_SYNC_KEY, JSON.stringify({ state, at: Date.now() })); } catch { /* אין אחסון */ }
+  function rememberPushSync(state, at = Date.now()) {
+    try { localStorage.setItem(PUSH_SYNC_KEY, JSON.stringify({ state, at })); } catch { /* אין אחסון */ }
     if (document.getElementById("view-settings")?.classList.contains("active")) renderSettings();
   }
   function lastPushSync() {
     try { return JSON.parse(localStorage.getItem(PUSH_SYNC_KEY)); } catch { return null; }
   }
   function trySyncPush() {
-    // רץ תמיד — המייל לא תלוי בתמיכת push (חשוב באייפון שאינו מותקן למסך הבית)
+    // רץ תמיד — הסנכרון לא תלוי בתמיכת push בדפדפן (חשוב באייפון שאינו מותקן למסך הבית).
+    // החותמת היא הזמן שהסנכרון סינן איתו (כך ש-pageDueItems רואה בדיוק מה השרת השמיט), והבדיקה
+    // המיידית מציגה פריט שהסנכרון הזה בדיוק השמיט במקום לחכות לטיימר של 30 שניות.
     syncPush(lessons, lessonIndex.studentsById, settings)
-      .then(state => rememberPushSync(state))
+      .then(at => {
+        rememberPushSync("ok", at);
+        if (notifSupported && Notification.permission === "granted") void checkReminders();
+      })
       .catch(error => { rememberPushSync("fail"); console.warn("Push sync failed", error); });
   }
 
-  // שורת סטטוס לתזכורות רקע (מייל) במסך ההגדרות
+  // שורת סטטוס לתזכורות רקע (push) במסך ההגדרות
   function pushStatusHtml() {
     const s = lastPushSync();
     if (!s) return "";
@@ -2422,7 +2421,7 @@ const App = (() => {
     return `<p class="push-status err">סנכרון התזכורות נכשל — בדקי חיבור לאינטרנט. ינוסה שוב אוטומטית.</p>`;
   }
 
-  // בדיקה אמיתית של תזכורת כשהאפליקציה סגורה — עוברת דרך השרת (מייל + push אם יש)
+  // בדיקה אמיתית של תזכורת כשהאפליקציה סגורה — עוברת דרך השרת וה-cron, כמו תזכורת אמיתית
   async function testClosedPush() {
     try {
       await sendClosedAppTest(lessons, lessonIndex.studentsById, settings);
@@ -2559,12 +2558,19 @@ const App = (() => {
 
   // הגעה מ-push של בוקר/תשלום: פותחים את מרכז התזכורות ומדגישים לרגע את הקבוצה או את כרטיס
   // התשלום של התלמיד. ה-<details> החי הוא מקור האמת למצב הפתיחה (ראו renderReminderHub), לכן
-  // פותחים אותו ישירות ולא דרך setHubOpen.
+  // פותחים אותו ישירות; אירוע toggle ישמור את זה דרך App.setHubOpen — וזה הרצוי, אחרי הגעה
+  // מהתראה משאירים את המרכז פתוח.
+  // push התשלום מגיע בדרך כלל לפני שהשיעור אושר, ושיעור לא מאושר עדיין לא חלק מהחוב — שליחה
+  // מכרטיס התשלום הייתה משמיטה את שיעור היום. לכן כשיש לתלמיד שיעור לאישור מדגישים קודם את
+  // "שיעורים שהסתיימו": מאשרים, ואז שולחים.
   function highlightHub(studentId) {
     const box = document.querySelector("#reminderHub .hub-box");
     if (box) box.open = true;
-    const target = (studentId && document.getElementById(`hub-payment-student-${studentId}`)?.closest(".payment-account"))
-      || document.getElementById(studentId ? "hubMoneyTitle" : "hubLessonsTitle")?.closest(".hub-group");
+    const groupOf = id => document.getElementById(id)?.closest(".hub-group");
+    const needsConfirm = studentId && pendingConfirmations().some(l => l.studentId === studentId);
+    const target = (needsConfirm && groupOf("hubConfirmTitle"))
+      || (studentId && document.getElementById(`hub-payment-student-${studentId}`)?.closest(".payment-account"))
+      || groupOf(studentId ? "hubMoneyTitle" : "hubLessonsTitle");
     if (!target) return;
     target.classList.add("is-highlight");
     target.scrollIntoView({ block: "center" });

@@ -87,6 +87,7 @@ test("reminder settings: morning time and payment mode normalize with defaults",
   assert.equal(s.morningReminderTime, "08:00");
   assert.equal(s.payReminderMode, "afterLesson");
   assert.equal(normalizeSettings({ morningReminderTime: "" }).morningReminderTime, ""); // כבוי
+  assert.equal(normalizeSettings({ morningReminderTime: null }).morningReminderTime, "08:00"); // null = כמו חסר
   assert.equal(normalizeSettings({ morningReminderTime: "07:15" }).morningReminderTime, "07:15");
   assert.throws(() => normalizeSettings({ morningReminderTime: "25:99" }), /morningReminderTime is invalid/);
   assert.equal(normalizeSettings({ payReminderMode: "nextMorning" }).payReminderMode, "nextMorning");

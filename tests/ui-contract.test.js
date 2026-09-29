@@ -207,6 +207,10 @@ test("push deep links open the reminder hub and highlight the target", () => {
   assert.match(source, /p\.get\("pay"\)/);
   assert.match(source, /function highlightHub\(/);
   assert.match(source, /hub-payment-student-\$\{/);
+  // שיעור שלא אושר עדיין לא חלק מהחוב — קודם מדגישים את האישור, ואז את כרטיס התשלום
+  assert.match(source, /pendingConfirmations\(\)\.some\(/);
+  // פתיחת ה-hub ישירות על ה-<details> החי (ה-toggle שומר את זה)
+  assert.match(source, /box\.open = true/);
   assert.match(styles, /\.is-highlight\s*\{/);
-  assert.match(styles, /prefers-reduced-motion: reduce\)[^}]*\.is-highlight/s);
+  assert.match(styles, /prefers-reduced-motion: reduce\)[^}]*\.hub-group, \.payment-account/s);
 });

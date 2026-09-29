@@ -23,7 +23,7 @@ const nextDay = date => {
 };
 const morningBody = n => n === 1 ? "שיעור אחד היום — שלחי תזכורת לתלמיד" : `${n} שיעורים היום — שלחי תזכורות לתלמידים`;
 
-export function plannedReminders(lessons, studentsById, settings, now = Date.now(), horizonDays = 60) {
+export function plannedReminders(lessons, studentsById, settings = {}, now = Date.now(), horizonDays = 60) {
   const lead = Math.max(0, Number(settings.remindMinutes ?? 30) || 0) * MINUTE;
   const morning = String(settings.morningReminderTime ?? "");
   const payMode = settings.payReminderMode ?? "afterLesson";
@@ -115,9 +115,15 @@ function clientId() {
   return id;
 }
 
+// מה נשלח לשרת: רק עתיד. פריט שזמנו עבר לא נשלח — אחרת ה-cron היה דוחף מיד פריט שהדף בדיוק
+// הציג. (המטמון המקומי כן שומר את 30 הדקות האחרונות — ראו writeAndSync.)
+export function serverItems(items, now) {
+  return items.filter(i => i.t > now).map(({ t, title, body }) => ({ t, title, body }));
+}
+
 // כתיבה למטמון (בשביל ה-SW) ושליחת התזכורות לשרת. זורק על כשל HTTP.
 // המטמון מקבל גם את 30 הדקות האחרונות (ה-SW מציג ממנו פריטים שכבר עברו כש-push מגיע);
-// השרת מקבל רק עתיד — אחרת ה-cron היה דוחף מיד פריט שהדף בדיוק הציג.
+// השרת מקבל רק עתיד (serverItems).
 async function writeAndSync(sub, items, now = Date.now()) {
   try {
     const cache = await caches.open(PUSH_CACHE);
@@ -131,7 +137,7 @@ async function writeAndSync(sub, items, now = Date.now()) {
     body: JSON.stringify({
       id: clientId(),
       sub: sub ? sub.toJSON() : null,
-      items: items.filter(i => i.t > now).map(({ t, title, body }) => ({ t, title, body }))
+      items: serverItems(items, now)
     })
   });
   if (!res.ok) throw new Error(`sync-failed-${res.status}`);
@@ -159,11 +165,12 @@ async function currentSub() {
   }
 }
 
-// סנכרון: כל התזכורות המתוכננות למטמון + לשרת. רץ אחרי כל שמירה. מחזיר "ok"; זורק על כשל רשת/שרת.
+// סנכרון: כל התזכורות המתוכננות למטמון + לשרת. רץ אחרי כל שמירה. מחזיר את ה-now שבו סונן —
+// חותמת הסנכרון ש-pageDueItems משווה אליה; זורק על כשל רשת/שרת.
 export async function syncPush(lessons, studentsById, settings) {
   const now = Date.now();
   await writeAndSync(await currentSub(), plannedReminders(lessons, studentsById, settings, now), now);
-  return "ok";
+  return now;
 }
 
 // בדיקת "אפליקציה סגורה": תזכורת בדיקה בעוד 2 דק' + סנכרון לשרת.
