@@ -23,7 +23,7 @@ import {
   reminderSignature,
   upcomingReminderLessons
 } from "./src/reminders.js";
-import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest, plannedReminders, shownSigs, markShown, pruneShown } from "./src/push.js";
+import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest, plannedReminders, pageDueItems, shownSigs, markShown, pruneShown } from "./src/push.js";
 import { whatsappLinks, normalizePhone } from "./src/whatsapp.js";
 
 /* =========================================================
@@ -2466,11 +2466,13 @@ const App = (() => {
     try {
       // מה שה-service worker כבר הציג (push) נכנס ל-notified דרך המטמון המשותף — לא מציגים שוב.
       for (const sig of await shownSigs()) notified.add(sig);
-      // כשה-push בריא (מנוי + הסנכרון האחרון הצליח) השרת הוא הבעלים של כל התזכורות, גם כשהאפליקציה
-      // פתוחה. שני מסלולים שמציגים את אותה תזכורת = פעמיים. הדף מציג בעצמו רק כשאין push שאפשר לסמוך עליו.
-      if (lastPushSync()?.state === "ok" && await pushSubscribed()) return;
+      // כשה-push בריא (מנוי + הסנכרון האחרון הצליח) השרת הוא הבעלים של התזכורות, גם כשהאפליקציה
+      // פתוחה — שני מסלולים שמציגים את אותה תזכורת = פעמיים. חריג: פריט שזמנו עבר לפני הסנכרון
+      // האחרון כבר ירד מרשומת השרת (הסנכרון שולח רק עתיד), ואם ה-SW לא הציג אותו — רק הדף יכול.
+      const sync = lastPushSync();
+      const pushHealthy = sync?.state === "ok" && await pushSubscribed();
       const now = Date.now();
-      const due = plannedReminders(lessons, lessonIndex.studentsById, settings, now).filter(i => i.t <= now && !notified.has(i.sig));
+      const due = pageDueItems(plannedReminders(lessons, lessonIndex.studentsById, settings, now), now, notified, pushHealthy, sync?.at || 0);
       for (const item of due) {
         await showAppNotification(item.title, {
           tag: item.tag,

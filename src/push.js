@@ -78,6 +78,13 @@ export function plannedReminders(lessons, studentsById, settings, now = Date.now
   return out.filter(i => Number.isFinite(i.t) && i.t > from && i.t <= to).sort((a, b) => a.t - b.t);
 }
 
+// מה הדף מציג בעצמו. כשה-push בריא — רק פריטים שזמנם עבר לפני הסנכרון האחרון: הסנכרון שולח
+// לשרת רק עתיד, כלומר פריט כזה כבר ירד מרשומת השרת ואף אחד אחר לא יציג אותו. פריט שזמנו אחרי
+// הסנכרון עדיין בשרת — ה-cron ידחוף אותו וה-SW יציג. בלי push בריא הדף מציג כל פריט שהגיע זמנו.
+export function pageDueItems(items, now, notified, pushHealthy, syncedAt = 0) {
+  return items.filter(i => i.t <= now && !notified.has(i.sig) && (!pushHealthy || i.t <= syncedAt));
+}
+
 const urlB64ToBytes = s => {
   const raw = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from(raw, c => c.charCodeAt(0));

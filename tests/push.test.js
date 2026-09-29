@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { plannedReminders } from "../src/push.js";
+import { plannedReminders, pageDueItems } from "../src/push.js";
 
 const now = new Date("2026-07-04T12:00:00").getTime();
-const students = new Map([["s1", { id: "s1", name: "דנה" }]]);
 const lesson = (over = {}) => ({
   id: "l1", studentId: "s1", date: "2026-07-04", time: "16:00", done: false, paid: false, ...over
 });
@@ -77,4 +76,20 @@ test("planner: unknown student gets a fallback name; done lessons get no lesson 
   const items = plannedReminders([lesson({ studentId: "missing" }), lesson({ id: "done", done: true })], priced, settings, now);
   assert.ok(byTag(items, "lesson-")[0].body.includes("תלמיד"));
   assert.deepEqual(byTag(items, "lesson-").map(i => i.tag), ["lesson-l1"]);
+});
+
+test("pageDueItems: with healthy push the page shows only items the last sync already dropped from the server", () => {
+  const items = [
+    { t: 100, sig: "a" }, // עבר לפני הסנכרון — ירד מהשרת, הדף חייב להציג
+    { t: 300, sig: "b" }, // עבר אחרי הסנכרון — עדיין בשרת, ה-cron ידחוף
+    { t: 900, sig: "c" }  // עתיד
+  ];
+  const now = 500, syncedAt = 200;
+  assert.deepEqual(pageDueItems(items, now, new Set(), true, syncedAt).map(i => i.sig), ["a"]);
+  // בלי push בריא — כל מה שהגיע זמנו
+  assert.deepEqual(pageDueItems(items, now, new Set(), false).map(i => i.sig), ["a", "b"]);
+  // מה שכבר הוצג (גם על ידי ה-SW) לא חוזר
+  assert.deepEqual(pageDueItems(items, now, new Set(["a"]), true, syncedAt), []);
+  // בלי סנכרון מוצלח מעולם (syncedAt ברירת מחדל 0) ועם push בריא — הדף לא מציג כלום
+  assert.deepEqual(pageDueItems(items, now, new Set(), true), []);
 });
