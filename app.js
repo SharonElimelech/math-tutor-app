@@ -26,7 +26,8 @@ import {
   reminderSignature,
   upcomingReminderLessons
 } from "./src/reminders.js";
-import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest } from "./src/push.js";
+import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest, shownSigs, markShown, pruneShown } from "./src/push.js";
+import { whatsappLinks, normalizePhone } from "./src/whatsapp.js";
 
 /* =========================================================
    "המורה שלי" – אפליקציה לניהול שיעורים פרטיים
@@ -1791,14 +1792,17 @@ const App = (() => {
   // פרטי תשלום (קישור ביט/פייבוקס או מספר להעברה) שנדבקים לסוף הודעת גבייה
   const payInfoLine = () => settings.payInfo ? `\n\nלתשלום: ${settings.payInfo}` : "";
 
-  // פתיחת וואטסאפ עם הודעה מוכנה. מנרמל מספר ישראלי לפורמט בינלאומי.
+  // פתיחת וואטסאפ עם הודעה מוכנה. בטלפון מנווטים באותו הקשר (whatsapp:// / intent://): הדפדפן
+  // מעביר לוואטסאפ והדף נשאר בדיוק איפה שהיה. window.open(wa.me) פתח חלון דפדפן מעל האפליקציה
+  // המותקנת, שנשאר לבן אחרי החזרה. בדסקטופ טאב חדש הוא ההתנהגות הרצויה.
+  // ponytail: באייפון מניחים שוואטסאפ מותקן — בלי fallback (בלעדיו iOS מציג "כתובת לא תקינה").
+  const isMobile = () => /Android/i.test(navigator.userAgent) || isIOS();
   function waOpen(rawPhone, msg) {
-    if (!rawPhone) { toast("לתלמיד אין מספר טלפון. הוסיפי אותו במסך התלמידים.", "err"); return false; }
-    let phone = rawPhone.replace(/[^0-9]/g, "");
-    if (phone.startsWith("00")) phone = phone.slice(2);
-    if (phone.startsWith("0")) phone = "972" + phone.slice(1);
-    else if (!phone.startsWith("972")) phone = "972" + phone;
-    window.open(`https://wa.me/${phone}${msg ? `?text=${encodeURIComponent(msg)}` : ""}`, "_blank");
+    if (!normalizePhone(rawPhone)) { toast("לתלמיד אין מספר טלפון. הוסיפי אותו במסך התלמידים.", "err"); return false; }
+    const links = whatsappLinks(rawPhone, msg);
+    if (!isMobile()) { window.open(links.web, "_blank", "noopener"); return true; }
+    // אנדרואיד: intent:// עם fallback מובנה לאתר כשוואטסאפ לא מותקן — בלי טיימרים ובלי חלון נוסף
+    location.href = /Android/i.test(navigator.userAgent) ? links.intent : links.scheme;
     return true;
   }
 
@@ -2268,6 +2272,7 @@ const App = (() => {
   function initReminders() {
     // סנכרון תזכורות לשרת המייל תמיד — לא תלוי בהרשאת התראות (חשוב באייפון)
     trySyncPush();
+    void pruneShown();
     if (notifSupported && Notification.permission === "granted") startInterval();
     // focus + pageshow + visibilitychange יורים יחד בחזרה לאפליקציה — סנכרון אחד מספיק
     let lastResume = 0;
@@ -2432,7 +2437,13 @@ const App = (() => {
     if (!notifSupported || Notification.permission !== "granted" || reminderCheckRunning) return;
     reminderCheckRunning = true;
     try {
-      const due = dueLessonReminders(lessons, new Date(), reminderLeadMinutes(settings.remindMinutes), notified);
+      // מה שה-service worker כבר הציג (push) נכנס ל-notified דרך המטמון המשותף — לא מציגים שוב.
+      for (const sig of await shownSigs()) notified.add(sig);
+      // כשה-push בריא (מנוי + הסנכרון האחרון הצליח) השרת הוא הבעלים של תזכורות השיעור, גם כשהאפליקציה
+      // פתוחה. שני מסלולים שמציגים את אותה תזכורת = פעמיים (push → לחיצה → האפליקציה נפתחת → הטיימר
+      // מציג שוב; או הטיימר קודם וה-cron אחריו). הדף מציג בעצמו רק כשאין push שאפשר לסמוך עליו.
+      const serverOwnsLessons = lastPushSync()?.state === "ok" && await pushSubscribed();
+      const due = serverOwnsLessons ? [] : dueLessonReminders(lessons, new Date(), reminderLeadMinutes(settings.remindMinutes), notified);
       for (const l of due) {
         const s = studentById(l.studentId);
         await showAppNotification("תזכורת שיעור", {
@@ -2442,6 +2453,7 @@ const App = (() => {
           badge: "icon-192.png"
         });
         rememberNotification(reminderSignature(l));
+        await markShown(reminderSignature(l)); // שגם ה-service worker ידע, אם push בכל זאת יגיע
       }
       // תזכורת גבייה: שיעור שהסתיים, סומן כבוצע, אך טרם שולם — רק למחרת ואילך (לא מיד בתום השיעור)
       const duePay = duePaymentReminders(lessons, new Date(), notified, 12 * 60);
@@ -2530,27 +2542,12 @@ const App = (() => {
     if (lessonId && lessons.some(l => l.id === lessonId)) openLessonForm(lessonId);
   }
 
-  function registerSW() {
-    if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("service-worker.js").catch(error => {
-      console.warn("Service worker registration failed", error);
-    });
-    // עדכון אוטומטי שקט: כש-SW חדש משתלט (skipWaiting), מרעננים פעם אחת
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (refreshing) return;
-      refreshing = true;
-      window.location.reload();
-    });
-  }
-
   function init() {
     // קודם מחברים בקרות קריטיות שלא תלויות ברינדור — כך שגיאת רינדור לא תשבית אותן
     try { migrate(); } catch (e) { console.error(e); }
     try { maintainSeries(); } catch (e) { console.error(e); }
     initModalControls();
     initInstall();
-    registerSW();
     applyTheme();
     try { render(); } catch (e) { console.error(e); }
     if (startupDataError) {

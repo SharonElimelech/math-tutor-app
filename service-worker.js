@@ -1,15 +1,18 @@
 // Service Worker – מאפשר עבודה גם בלי אינטרנט (offline) והתקנה כאפליקציה
-const CACHE = "morti-v4.0.0";
+const CACHE = "morti-v4.0.1";
+// נתוני ה-push של האפליקציה (רשימת תזכורות + סימוני "הוצג") — חיים מעבר לעדכוני גרסה
+const PUSH_DATA = "mt-push-data";
 const ASSETS = [
   "index.html",
   "styles.css?v=61",
-  "app.js?v=73",
+  "app.js?v=74",
   "src/data.js",
   "src/push.js",
   "src/reminders.js",
   "src/calendar.js",
   "src/selectors.js",
   "src/storage.js",
+  "src/whatsapp.js",
   "manifest.json",
   "icon-192.png",
   "icon-512.png"
@@ -24,7 +27,7 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE && k !== PUSH_DATA).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
@@ -34,29 +37,46 @@ self.addEventListener("message", e => {
   if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
-// Push מהשרת: דחיפה ריקה שמעירה אותנו. פרטי התזכורת נשמרים במטמון
-// mt-push-data על ידי האפליקציה (src/push.js) — קוראים משם ומציגים.
+// Push מהשרת: דחיפה ריקה שמעירה אותנו. פרטי התזכורת נשמרים במטמון mt-push-data על ידי
+// האפליקציה (src/push.js). כל פריט נושא חתימה; "shown/<חתימה>" במטמון = כבר הוצג (כאן או
+// בטיימר של האפליקציה) — ולא מציגים שוב. מסמנים לפני ההצגה כדי ששני ההקשרים לא יציגו יחד.
+const shownKey = sig => sig ? "shown/" + encodeURIComponent(sig) : null;
+const notify = (item, extra = {}) => self.registration.showNotification(item.title, {
+  body: item.body,
+  tag: item.tag,
+  icon: "icon-192.png",
+  badge: "icon-192.png",
+  data: { url: item.url || "./" },
+  ...extra
+});
+
 self.addEventListener("push", e => {
   e.waitUntil((async () => {
-    let due = [];
+    const now = Date.now();
+    let cache, inWindow = null;
     try {
-      const cache = await caches.open("mt-push-data");
+      cache = await caches.open(PUSH_DATA);
       const res = await cache.match("reminders");
       const items = res ? await res.json() : [];
-      const now = Date.now();
       // חלון 30 דק' אחורה — מכסה איחור של ה-cron בלי להציג תזכורות עתיקות
-      due = items.filter(i => i.t <= now && i.t > now - 30 * 60 * 1000);
-    } catch { /* מטמון חסר/פגום — נציג הודעה כללית */ }
-    if (!due.length) due = [{ title: "המורה שלי", body: "יש תזכורת ממתינה — פתחי את האפליקציה" }];
-    for (const item of due) {
-      await self.registration.showNotification(item.title, {
-        body: item.body,
-        tag: item.tag,
-        icon: "icon-192.png",
-        badge: "icon-192.png",
-        data: { url: item.url || "./" }
-      });
+      inWindow = items.filter(i => i.t <= now && i.t > now - 30 * 60 * 1000);
+    } catch { /* מטמון חסר/פגום */ }
+    // push חייב להציג התראה גלויה (אחרת Chrome מציג הודעה גנרית משלו ו-iOS מבטל את המנוי)
+    if (!inWindow || !inWindow.length) {
+      return notify({ title: "המורה שלי", body: "יש תזכורת ממתינה — פתחי את האפליקציה" });
     }
+    let shown = 0;
+    for (const item of inWindow) {
+      const key = shownKey(item.sig);
+      if (key && await cache.match(key)) continue;
+      if (key) await cache.put(key, new Response(String(now)));
+      await notify(item);
+      shown++;
+    }
+    // הכל כבר הוצג (בדף, במסלול הגיבוי): מציגים שוב את האחרון באותו tag ובשקט — באנדרואיד החלפה במקום
+    // או חזרה בלי צליל; iOS מתעלם מ-tag ומ-silent ויציג שוב. נדיר — רק כש-push מגיע לפריט שהדף כבר הציג.
+    // לא להשמיט: push בלי התראה גלויה = הודעה גנרית של Chrome, וב-iOS ביטול המנוי אחרי 3 פעמים.
+    if (!shown) await notify(inWindow[inWindow.length - 1], { silent: true });
   })());
 });
 

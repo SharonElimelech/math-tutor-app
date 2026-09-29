@@ -1,3 +1,5 @@
+import { reminderSignature } from "./reminders.js";
+
 // התראות כשהאפליקציה סגורה: ה-cron בשרת שולח web push בזמן התזכורת, וה-service
 // worker מציג את ההתראה מהמטמון המקומי. טקסט התזכורת מסונכרן לשרת ולמטמון.
 
@@ -24,6 +26,8 @@ export function upcomingPushReminders(lessons, studentsById, leadMinutes = 30, n
       title: "תזכורת שיעור",
       body: `שיעור עם ${name} בשעה ${lesson.time}`,
       tag: `lesson-${lesson.id}`,
+      // מפתח הדדופ המשותף עם ה-service worker (ראו shown/ למטה); כולל תאריך+שעה
+      sig: reminderSignature(lesson),
       url: `./?view=home&lesson=${encodeURIComponent(lesson.id)}`
     });
   }
@@ -115,8 +119,48 @@ export async function syncPush(lessons, studentsById, leadMinutes) {
 export async function sendClosedAppTest(lessons, studentsById, leadMinutes) {
   const items = upcomingPushReminders(lessons, studentsById, leadMinutes);
   const t = Date.now() + 2 * MINUTE;
-  items.push({ t, title: "בדיקת התראות ✓", body: "מצוין — התזכורות מגיעות גם כשהאפליקציה סגורה", tag: "push-test" });
+  items.push({ t, title: "בדיקת התראות ✓", body: "מצוין — התזכורות מגיעות גם כשהאפליקציה סגורה", tag: "push-test", sig: `test:${t}` });
   items.sort((a, b) => a.t - b.t);
   await writeAndSync(await currentSub(), items);
   return t;
+}
+
+// ----- זיכרון "כבר הוצג" משותף לאפליקציה ול-service worker -----
+// שני מסלולים יכולים להציג תזכורות: ה-push דרך ה-SW (הרגיל) והטיימר בדף (גיבוי כשאין push בריא).
+// בלי זיכרון משותף כל אחד מציג פעם אחת — כלומר פעמיים. מפתח מטמון נפרד לכל חתימה
+// ("shown/<sig>", הגוף = זמן הסימון): בלי read-modify-write של מערך, כי שני ההקשרים
+// יכולים לכתוב באותו רגע. ה-SW משתמש באותו מפתח (service-worker.js).
+const SHOWN_PREFIX = "shown/";
+const shownKey = sig => SHOWN_PREFIX + encodeURIComponent(sig);
+const sigOfKey = req => {
+  const i = req.url.indexOf("/" + SHOWN_PREFIX);
+  return i < 0 ? null : decodeURIComponent(req.url.slice(i + 1 + SHOWN_PREFIX.length));
+};
+
+export async function shownSigs() {
+  try {
+    const cache = await caches.open(PUSH_CACHE);
+    return new Set((await cache.keys()).map(sigOfKey).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+export async function markShown(sig) {
+  try {
+    const cache = await caches.open(PUSH_CACHE);
+    await cache.put(shownKey(sig), new Response(String(Date.now())));
+  } catch { /* אין Cache API — נשאר הדדופ המקומי בלבד */ }
+}
+
+// ניקוי בעלייה: סימון רלוונטי רק בחלון של ה-SW (30 דק') — אחרי יום מוחקים, שהרשימה לא תתפח.
+export async function pruneShown(now = Date.now()) {
+  try {
+    const cache = await caches.open(PUSH_CACHE);
+    for (const req of await cache.keys()) {
+      if (!sigOfKey(req)) continue;
+      const at = Number(await (await cache.match(req))?.text());
+      if (!(at > now - 86400e3)) await cache.delete(req);
+    }
+  } catch { /* אין Cache API */ }
 }

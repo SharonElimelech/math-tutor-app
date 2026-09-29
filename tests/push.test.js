@@ -15,6 +15,8 @@ test("future lesson gets a reminder at start minus lead", () => {
   assert.equal(out[0].t, new Date("2026-07-04T15:30:00").getTime());
   assert.ok(out[0].body.includes("דנה"));
   assert.equal(out[0].tag, "lesson-l1");
+  // חתימה = מפתח הדדופ המשותף לאפליקציה ול-service worker; כוללת תאריך+שעה כדי ששיעור שהוזז יתזכר שוב
+  assert.equal(out[0].sig, "l1:2026-07-04:16:00");
 });
 
 test("done, past, and beyond-horizon lessons are excluded", () => {

@@ -124,6 +124,21 @@
   <!-- הודעות צפות -->
   <div id="toastWrap" class="toast-wrap" aria-live="polite" aria-atomic="false"></div>
 
-  <script type="module" src="app.js?v=73"></script>
+  <script>
+    // רישום ה-service worker מחוץ למודול: אחרי פריסה, SW ישן עדיין מגיש src/* מהמטמון, ו-app.js חדש
+    // שמייבא מהם עלול להיכשל בטעינה. ה-reload כש-SW החדש משתלט חייב לעבוד גם אז.
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js").catch(function (error) {
+        console.warn("Service worker registration failed", error);
+      });
+      var refreshing = false;
+      navigator.serviceWorker.addEventListener("controllerchange", function () {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      });
+    }
+  </script>
+  <script type="module" src="app.js?v=74"></script>
 </body>
 </html>

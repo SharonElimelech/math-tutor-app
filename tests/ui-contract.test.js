@@ -150,3 +150,43 @@ test("v4 income chart is SVG driven by design tokens, with hover and keyboard ac
   assert.match(source, /class="chart-bar [^>]*tabindex="0" role="listitem"/);
   assert.doesNotMatch(source, /getContext\("2d"\)/);
 });
+
+test("lesson reminders are shown once across the page and the service worker", () => {
+  const worker = read("service-worker.js");
+  const source = read("app.js");
+  const push = read("src/push.js");
+  // כל פריט push נושא חתימה — מפתח הדדופ המשותף
+  assert.match(push, /sig:/);
+  // SW: מפתח מטמון לכל חתימה (בלי read-modify-write), ומטמון ה-push שורד עדכון גרסה
+  assert.match(worker, /shown\//);
+  assert.match(worker, /k !== CACHE && k !== PUSH_DATA/);
+  // SW: כשהכל כבר הוצג — הצגה חוזרת שקטה, לא fallback גנרי
+  assert.match(worker, /silent: true/);
+  // אפליקציה: כשה-push בריא השרת הוא הבעלים של תזכורות השיעור; מה שה-SW הציג נכנס ל-notified
+  assert.match(source, /await shownSigs\(\)/);
+  assert.match(source, /serverOwnsLessons/);
+});
+
+test("service worker registration lives outside the app module", () => {
+  const html = read("index.html");
+  const source = read("app.js");
+  // SW ישן מגיש src/* מהמטמון; אם app.js החדש נכשל בטעינה, ה-reload ב-controllerchange עדיין חייב לרוץ
+  assert.match(html, /navigator\.serviceWorker\.register\("service-worker\.js"\)/);
+  assert.match(html, /controllerchange/);
+  assert.doesNotMatch(source, /serviceWorker\.register\(/);
+});
+
+test("index.html and the service worker precache the same app.js version and the WhatsApp module", () => {
+  const html = read("index.html");
+  const worker = read("service-worker.js");
+  const v = parseInt(html.split("app.js?v=")[1], 10);
+  assert.ok(worker.includes(`"app.js?v=${v}"`), `service worker must precache app.js?v=${v}`);
+  assert.ok(worker.includes("\"src/whatsapp.js\""), "service worker must precache src/whatsapp.js");
+});
+
+test("WhatsApp opens in the same browsing context on phones", () => {
+  const source = read("app.js");
+  // window.open(wa.me) פתח חלון דפדפן מעל האפליקציה המותקנת שנשאר לבן אחרי החזרה — במובייל מנווטים באותו הקשר
+  assert.doesNotMatch(source, /window\.open\(`https:\/\/wa\.me/);
+  assert.match(source, /whatsappLinks\(/);
+});
