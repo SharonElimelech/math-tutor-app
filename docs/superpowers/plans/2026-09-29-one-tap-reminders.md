@@ -393,7 +393,7 @@ git commit -m "feat(settings): morning reminder time and payment reminder mode"
 
 **Interfaces:**
 - Consumes: `plannedReminders` (Task 1), settings (Task 2).
-- Produces: `syncPush(lessons, studentsById, settings)` and `sendClosedAppTest(lessons, studentsById, settings)` (signature change: third argument is now the whole `settings` object). `showAppNotification(title, options, url = "./")`.
+- Produces: `syncPush(lessons, studentsById, settings)` and `sendClosedAppTest(lessons, studentsById, settings)` (signature change: third argument is now the whole `settings` object). `showAppNotification(title, options, url = "./")`. `pageDueItems(items, now, notified, pushHealthy, syncedAt = 0)` (pure, in `src/push.js`): the items the page shows itself — due and unshown; with healthy push only those with `t <= syncedAt` (the last sync already dropped them from the server).
 
 - [ ] **Step 1: Update `tests/push.test.js` (tests first)**
 
@@ -464,7 +464,18 @@ export async function sendClosedAppTest(lessons, studentsById, settings) {
 }
 ```
 
-Delete `upcomingPushReminders` and its comment block entirely.
+Delete `upcomingPushReminders` and its comment block entirely. Add after `plannedReminders`:
+
+```js
+// מה הדף מציג בעצמו. כשה-push בריא — רק פריטים שזמנם עבר לפני הסנכרון האחרון: הסנכרון שולח
+// לשרת רק עתיד, כלומר פריט כזה כבר ירד מרשומת השרת ואף אחד אחר לא יציג אותו. פריט שזמנו אחרי
+// הסנכרון עדיין בשרת — ה-cron ידחוף אותו וה-SW יציג. בלי push בריא הדף מציג כל פריט שהגיע זמנו.
+export function pageDueItems(items, now, notified, pushHealthy, syncedAt = 0) {
+  return items.filter(i => i.t <= now && !notified.has(i.sig) && (!pushHealthy || i.t <= syncedAt));
+}
+```
+
+and a unit test for it in `tests/push.test.js` (healthy push shows only items with `t <= syncedAt`; unhealthy shows every due item; already-notified items are skipped; `syncedAt` default 0 with healthy push shows nothing).
 
 - [ ] **Step 4: `src/reminders.js` — delete the three functions**
 
@@ -475,7 +486,7 @@ Delete `duePaymentReminders`, `dueLessonReminders`, `nextLessonReminderTimestamp
 In the `from "./src/reminders.js"` import list remove `dueLessonReminders`, `duePaymentReminders`, `nextLessonReminderTimestamp`. Change the push import to:
 
 ```js
-import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest, plannedReminders, shownSigs, markShown, pruneShown } from "./src/push.js";
+import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest, plannedReminders, pageDueItems, shownSigs, markShown, pruneShown } from "./src/push.js";
 ```
 
 - [ ] **Step 6: `app.js` — `showAppNotification` carries the deep link**
@@ -532,11 +543,13 @@ Replace the whole `checkReminders` function:
     try {
       // מה שה-service worker כבר הציג (push) נכנס ל-notified דרך המטמון המשותף — לא מציגים שוב.
       for (const sig of await shownSigs()) notified.add(sig);
-      // כשה-push בריא (מנוי + הסנכרון האחרון הצליח) השרת הוא הבעלים של כל התזכורות, גם כשהאפליקציה
-      // פתוחה. שני מסלולים שמציגים את אותה תזכורת = פעמיים. הדף מציג בעצמו רק כשאין push שאפשר לסמוך עליו.
-      if (lastPushSync()?.state === "ok" && await pushSubscribed()) return;
+      // כשה-push בריא (מנוי + הסנכרון האחרון הצליח) השרת הוא הבעלים של התזכורות, גם כשהאפליקציה
+      // פתוחה — שני מסלולים שמציגים את אותה תזכורת = פעמיים. חריג: פריט שזמנו עבר לפני הסנכרון
+      // האחרון כבר ירד מרשומת השרת (הסנכרון שולח רק עתיד), ואם ה-SW לא הציג אותו — רק הדף יכול.
+      const sync = lastPushSync();
+      const pushHealthy = sync?.state === "ok" && await pushSubscribed();
       const now = Date.now();
-      const due = plannedReminders(lessons, lessonIndex.studentsById, settings, now).filter(i => i.t <= now && !notified.has(i.sig));
+      const due = pageDueItems(plannedReminders(lessons, lessonIndex.studentsById, settings, now), now, notified, pushHealthy, sync?.at || 0);
       for (const item of due) {
         await showAppNotification(item.title, {
           tag: item.tag,
@@ -561,7 +574,8 @@ Replace the whole `checkReminders` function:
 In `tests/ui-contract.test.js`, in the test "lesson reminders are shown once across the page and the service worker", replace `assert.match(source, /serverOwnsLessons/);` with:
 
 ```js
-  assert.match(source, /lastPushSync\(\)\?\.state === "ok" && await pushSubscribed\(\)/);
+  assert.match(source, /const pushHealthy = sync\?\.state === "ok" && await pushSubscribed\(\)/);
+  assert.match(source, /pageDueItems\(/);
 ```
 
 - [ ] **Step 11: Run everything**

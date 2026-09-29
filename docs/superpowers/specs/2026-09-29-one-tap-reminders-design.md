@@ -47,7 +47,7 @@ plannedReminders(lessons, studentsById, settings, now, horizonDays = 60)
 - Cache API `mt-push-data`, מפתח לכל חתימה: `shown/<encodeURIComponent(sig)>`, גוף = זמן הסימון. בלי מערך אחד → בלי read-modify-write בין שני הקשרים.
 - שני המסלולים **מסמנים לפני ההצגה** (`markShown` באפליקציה, `cache.put` ב-SW).
 - SW `push`: פריטים בחלון 30 דק' אחורה שלא סומנו → מוצגים. אם הכל כבר סומן → מציג שוב את האחרון באותו `tag` עם `silent: true` (push חייב התראה גלויה: אחרת Chrome מציג הודעה גנרית, iOS מבטל את המנוי). מטמון לא קריא / חלון ריק → הודעה גנרית "יש תזכורת ממתינה".
-- אפליקציה `checkReminders`: בכל ריצה ממזג `shownSigs()` ל-`notified`. כש-`serverOwnsLessons` (מנוי push + `lastPushSync().state === "ok"`) — לא מציג פריטי שיעור/בוקר/תשלום בעצמה; השרת הבעלים. אחרת מציגה בעצמה ומסמנת `markShown` אחרי ההצגה. (שני מסלולים פעילים במקביל = כפילות; זה הלקח מ-v4.0.1.)
+- אפליקציה `checkReminders`: בכל ריצה ממזג `shownSigs()` ל-`notified`. כשה-push בריא (מנוי + `lastPushSync().state === "ok"`) השרת הבעלים — הדף מציג בעצמו **רק** פריטים שזמנם עבר לפני הסנכרון האחרון (`t <= lastPushSync().at`): הסנכרון שולח לשרת רק עתיד, כלומר פריט כזה כבר ירד מהרשומה ואף אחד אחר לא יציג אותו (למשל: תזכורת בוקר 08:00, האפליקציה נפתחה 08:02 לפני ה-tick של 08:05). בלי push בריא הדף מציג כל פריט שהגיע זמנו. אחרי הצגה — `rememberNotification` + `markShown`. (`pageDueItems` ב-`src/push.js`.)
 - `pruneShown()` בעלייה: מוחק סימונים שגילם > יום. פריט בלי `sig` מוצג תמיד.
 
 **נמחק בשלב הזה:** `dueLessonReminders`, `nextLessonReminderTimestamp`, `duePaymentReminders` ב-`src/reminders.js` והטסטים שלהם — ה-planner מחליף אותם. `scheduleNextReminder` מחשב את ה-`t` הבא מתוך `plannedReminders` (הפריט הראשון עם `t > now`).
