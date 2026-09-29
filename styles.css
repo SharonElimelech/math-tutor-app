@@ -1615,6 +1615,9 @@ input, select { min-height: 48px; }
 .hub-body { padding: 0 var(--sp-4) var(--sp-3); border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
 .hub-group { margin-top: var(--sp-4); }
 .hub-group + .hub-group { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+/* הדגשה רגעית של היעד שאליו הגיעו מהתראה (קבוצה ב-hub או כרטיס תשלום) */
+.is-highlight { box-shadow: 0 0 0 3px var(--focus-ring); border-radius: var(--r-md); transition: box-shadow .6s; }
+@media (prefers-reduced-motion: reduce) { .is-highlight { transition: none; } }
 /* כרטיסי התשלום המלאים בתוך מרכז התזכורות — מעט אוויר מתחת לכותרת הקבוצה */
 .hub-payment-queue { margin-top: 10px; }
 .hub-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }

@@ -2548,11 +2548,27 @@ const App = (() => {
   // ----- אתחול -----
   function handleLaunchParams() {
     const p = new URLSearchParams(location.search);
-    if (p.get("view")) go(p.get("view"));
+    const hub = p.get("hub");
+    const pay = p.get("pay");
+    if (p.get("view")) go(p.get("view"), (hub || pay) ? () => highlightHub(pay) : undefined);
     if (p.get("action") === "new-lesson") openLessonForm();
     // הגעה מהתראת שיעור — פתיחת אותו שיעור (אם עדיין קיים)
     const lessonId = p.get("lesson");
     if (lessonId && lessons.some(l => l.id === lessonId)) openLessonForm(lessonId);
+  }
+
+  // הגעה מ-push של בוקר/תשלום: פותחים את מרכז התזכורות ומדגישים לרגע את הקבוצה או את כרטיס
+  // התשלום של התלמיד. ה-<details> החי הוא מקור האמת למצב הפתיחה (ראו renderReminderHub), לכן
+  // פותחים אותו ישירות ולא דרך setHubOpen.
+  function highlightHub(studentId) {
+    const box = document.querySelector("#reminderHub .hub-box");
+    if (box) box.open = true;
+    const target = (studentId && document.getElementById(`hub-payment-student-${studentId}`)?.closest(".payment-account"))
+      || document.getElementById(studentId ? "hubMoneyTitle" : "hubLessonsTitle")?.closest(".hub-group");
+    if (!target) return;
+    target.classList.add("is-highlight");
+    target.scrollIntoView({ block: "center" });
+    setTimeout(() => target.classList.remove("is-highlight"), 2000);
   }
 
   function init() {

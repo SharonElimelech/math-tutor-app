@@ -199,3 +199,14 @@ test("reminder settings expose morning time and payment mode", () => {
   assert.match(source, /<option value="nextMorning"/);
   assert.match(source, /\["remindMinutes", "morningReminderTime", "payReminderMode"\]\.includes\(key\)\) reschedule\(\)/);
 });
+
+test("push deep links open the reminder hub and highlight the target", () => {
+  const source = read("app.js");
+  const styles = read("styles.css");
+  assert.match(source, /p\.get\("hub"\)/);
+  assert.match(source, /p\.get\("pay"\)/);
+  assert.match(source, /function highlightHub\(/);
+  assert.match(source, /hub-payment-student-\$\{/);
+  assert.match(styles, /\.is-highlight\s*\{/);
+  assert.match(styles, /prefers-reduced-motion: reduce\)[^}]*\.is-highlight/s);
+});
