@@ -40,14 +40,14 @@ plannedReminders(lessons, studentsById, settings, now, horizonDays = 60)
 
 | מסלול | מתי פעיל | מקור הפריטים |
 |---|---|---|
-| בתוך האפליקציה (`checkReminders`, טיימר + interval) | **גיבוי בלבד**: כשאין מנוי push או שהסנכרון האחרון נכשל (`serverOwnsLessons === false`) | `plannedReminders(...)` עם `t <= now` |
+| בתוך האפליקציה (`checkReminders`, טיימר + interval) | כשאין push בריא — כל פריט שהגיע זמנו; כשיש — רק פריטים שהסנכרון האחרון כבר הוריד מהשרת (`pageDueItems`) | `plannedReminders(...)` עם `t <= now` |
 | שרת → push → SW | תמיד (גם אפליקציה סגורה) | אותם פריטים, שמורים במטמון `mt-push-data`/`reminders` ובשרת |
 
 **זיכרון "כבר הוצג" משותף** — הונח ב-v4.0.1 (תיקון ההתראה הכפולה) ומשמש כאן כמו שהוא:
 - Cache API `mt-push-data`, מפתח לכל חתימה: `shown/<encodeURIComponent(sig)>`, גוף = זמן הסימון. בלי מערך אחד → בלי read-modify-write בין שני הקשרים.
-- שני המסלולים **מסמנים לפני ההצגה** (`markShown` באפליקציה, `cache.put` ב-SW).
+- ה-SW **מסמן לפני ההצגה** (`cache.put`); הדף מסמן **אחרי** הצגה מוצלחת (`markShown`) — כישלון הצגה לא מאבד את הפריט, והחלון הפתוח הוא אלפיות שנייה.
 - SW `push`: פריטים בחלון 30 דק' אחורה שלא סומנו → מוצגים. אם הכל כבר סומן → מציג שוב את האחרון באותו `tag` עם `silent: true` (push חייב התראה גלויה: אחרת Chrome מציג הודעה גנרית, iOS מבטל את המנוי). מטמון לא קריא / חלון ריק → הודעה גנרית "יש תזכורת ממתינה".
-- אפליקציה `checkReminders`: בכל ריצה ממזג `shownSigs()` ל-`notified`. כשה-push בריא (מנוי + `lastPushSync().state === "ok"`) השרת הבעלים — הדף מציג בעצמו **רק** פריטים שזמנם עבר לפני הסנכרון האחרון (`t <= lastPushSync().at`): הסנכרון שולח לשרת רק עתיד, כלומר פריט כזה כבר ירד מהרשומה ואף אחד אחר לא יציג אותו (למשל: תזכורת בוקר 08:00, האפליקציה נפתחה 08:02 לפני ה-tick של 08:05). בלי push בריא הדף מציג כל פריט שהגיע זמנו. אחרי הצגה — `rememberNotification` + `markShown`. (`pageDueItems` ב-`src/push.js`.)
+- אפליקציה `checkReminders`: בכל ריצה ממזג `shownSigs()` ל-`notified`. כשה-push בריא (מנוי + `lastPushSync().state === "ok"`) השרת הבעלים — הדף מציג בעצמו **רק** פריטים שזמנם עבר לפני הסנכרון האחרון (`t <= lastPushSync().at`): הסנכרון שולח לשרת רק עתיד, כלומר פריט כזה כבר ירד מהרשומה ואף אחד אחר לא יציג אותו (למשל: תזכורת בוקר 08:00, האפליקציה נפתחה 08:02 לפני ה-tick של 08:05). בלי push בריא הדף מציג כל פריט שהגיע זמנו. אחרי הצגה — `rememberNotification` + `markShown`. (`pageDueItems` ב-`src/push.js`.) חותמת הסנכרון (`lastPushSync().at`) היא ה-`now` שהסנכרון סינן לפיו, ואחרי כל סנכרון מוצלח רץ `checkReminders()` מיד.
 - `pruneShown()` בעלייה: מוחק סימונים שגילם > יום. פריט בלי `sig` מוצג תמיד.
 
 **נמחק בשלב הזה:** `dueLessonReminders`, `nextLessonReminderTimestamp`, `duePaymentReminders` ב-`src/reminders.js` והטסטים שלהם — ה-planner מחליף אותם. `scheduleNextReminder` מחשב את ה-`t` הבא מתוך `plannedReminders` (הפריט הראשון עם `t > now`).
@@ -68,7 +68,7 @@ plannedReminders(lessons, studentsById, settings, now, horizonDays = 60)
 ## Deep link (`handleLaunchParams`)
 
 - `hub=lessons` → `go("home")`, `setHubOpen(true)`, גלילה ל-`#hubLessonsTitle`, מחלקת `is-highlight` ל-2 שניות.
-- `pay=<studentId>` → `go("home")`, `setHubOpen(true)`, גלילה ל-`#hub-payment-student-<id>` (אם קיים; אחרת ל-`#hubMoneyTitle`), `is-highlight`.
+- `pay=<studentId>` → `go("home")`, ה-hub נפתח; אם לתלמיד יש שיעור שהסתיים ולא אושר — מדגישים את קבוצת האישור (קודם מאשרים, אז שולחים; שיעור לא מאושר לא נכלל בהודעת החוב); אחרת את `#hub-payment-student-<id>` (או `#hubMoneyTitle`), `is-highlight`.
 - `is-highlight`: CSS בלבד — רקע מודגש שדוהה ב-`transition`, מכבד `prefers-reduced-motion`.
 
 ## טיפול בשגיאות

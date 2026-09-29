@@ -104,7 +104,7 @@ export async function enablePush() {
   });
 }
 
-// מזהה מכשיר קבוע — מפתח הרשומה בשרת, כדי שמייל יעבוד גם בלי מנוי push
+// מזהה מכשיר קבוע — מפתח הרשומה בשרת (נשמר גם כשמנוי ה-push מתחלף)
 const CLIENT_ID_KEY = "mt_push_client";
 function clientId() {
   let id = localStorage.getItem(CLIENT_ID_KEY);
@@ -154,7 +154,7 @@ export async function pushSubscribed() {
   }
 }
 
-// המנוי הנוכחי אם קיים — נכשל בשקט, מייל לא תלוי במנוי.
+// המנוי הנוכחי אם קיים — נכשל בשקט; הסנכרון לשרת רץ גם בלי מנוי.
 async function currentSub() {
   if (!pushSupported()) return null;
   try {
