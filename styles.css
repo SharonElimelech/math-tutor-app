@@ -1,30 +1,45 @@
 /* =========================================================
-   "המורה שלי" — מערכת עיצוב High-End
-   תמיכה במצב כהה: JS מוסיף data-theme="light|dark" ל-<html>
+   "המורה שלי": לוח בקרה לבנדר וליים, כמעט העתק של TimeFrame
+   רקע לבנדר עם טקסט לבן, כרטיסים לבנים מעוגלים, סגול כהה יותר לכרטיס החודש
+   ולפס הכותרת של היומן, ליים ל"היום/עכשיו", חציל לפעולה הראשית.
+   מצב כהה: JS מוסיף data-theme="light|dark" ל-<html>
    ========================================================= */
 
 :root {
-  /* סטודיו לימודי — דיו כחול, זמן בזעפרן, הצלחה בטורקיז */
-  --brand-1: #0891b2;
-  --brand-2: #0e7490;
-  --brand-3: #059669;
-  --ink-1: #142035;
-  --ink-2: #0d1626;
-  --grad-brand: linear-gradient(145deg, #06a8c7 0%, #087d9b 100%);
-  --grad-hero: linear-gradient(145deg, #123247 0%, #0e2434 100%);
+  /* ספרות ואותיות לועזיות מ-Urbanist (כמו במקור), עברית מ-Rubik */
+  --font: "Urbanist", "Rubik", "Segoe UI", system-ui, Arial, sans-serif;
 
-  /* נייטרליים חמים */
-  --bg: #f1f4f8;
-  --bg-soft: #e8edf5;
+  --bg: #9291d0;        /* לבנדר; כהה בגוון אחד מהמקור כדי שטקסט לבן גדול יעמוד ב-3:1 */
+  --band: #7f7ec3;      /* כרטיס החודש ופס הכותרת של היומן */
   --surface: #ffffff;
-  --surface-2: #f8f9fc;
-  --text: #142035;
-  --muted: #45556e;
-  --faint: #647082; /* lightest shade clearing WCAG AA (4.55:1) on --bg; stays below --muted for hierarchy */
-  --border: #dbe2ec;
-  --chart-muted: #b9c4d5;
+  --surface-2: #f7f7fd;
+  --bg-soft: #f1f1fb;   /* מילוי פנימי בתוך כרטיס לבן */
+  --panel: #9a99d4;
+  --text: #1d1836;
+  --muted: #3b3561;
+  --faint: #6e6a90;     /* רק בתוך כרטיס לבן */
+  --border: #e7e6f6;    /* קווים בתוך כרטיס */
+  --on-bg: #ffffff;     /* טקסט ישירות על הלבנדר, כמו במקור */
+  --on-bg-muted: rgba(255, 255, 255, .88);
+  --line-on-bg: rgba(255, 255, 255, .32);
+  --chip-on-bg: rgba(255, 255, 255, .24); /* גלולה ועיגול לא פעילים על הלבנדר */
+  --chart-muted: #d6d5f0;
 
-  /* מרווחים — סולם אחיד לקצב אנכי עקבי */
+  --primary: #2d2447;   /* Daily / Add Sport במקור: גלולה ראשית, טאב וניווט פעילים */
+  --on-primary: #ffffff;
+  --accent: #d4f56b;    /* ליים: היום, שיעור קרוב. תמיד עם טקסט כהה */
+  --on-accent: #1d1836;
+  --accent-ink: #4c45a3; /* טקסט מודגש קטן על לבן, קו "עכשיו" */
+  --brand-1: var(--primary);
+  --brand-2: var(--accent-ink);
+  --brand-3: var(--accent-ink);
+
+  /* שיעורים ביומן: קרוב = ליים, התקיים = הסגול של המקור, לא שולם = ורוד */
+  --ev-paid: #8483c4;
+  --ev-paid-ink: #ffffff;
+  --ev-unpaid: #ffd3cc;
+  --ev-unpaid-ink: #8f1d16;
+
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -33,7 +48,7 @@
   --sp-6: 24px;
   --sp-8: 32px;
 
-  /* סולם טיפוגרפי קבוע (rem) — ממשק מוצר, לא fluid; יחס ~1.2 */
+  /* סולם טיפוגרפי קבוע (rem), יחס ~1.2 */
   --fs-xs: .75rem;
   --fs-sm: .8125rem;
   --fs-base: .9375rem;
@@ -42,86 +57,78 @@
   --fs-xl: 1.5rem;
   --fs-2xl: 1.875rem;
 
-  /* שכבת ניטרלי שנייה — סרגלים, מתגים, רצועת השבוע (נבדל מ-surface) */
-  --panel: #eaeff6;
-  --panel-border: #d4dce8;
-
-  /* אוצר־מילים של מצבים — אחיד לכל אלמנט אינטראקטיבי */
-  --hover: rgba(20, 32, 53, .045);
-  --active: rgba(20, 32, 53, .085);
-  --selected: color-mix(in srgb, var(--brand-1) 12%, transparent);
-  --selected-strong: color-mix(in srgb, var(--brand-1) 18%, transparent);
-  --focus-ring: var(--brand-1);
+  --hover: rgba(29, 24, 54, .05);
+  --active: rgba(29, 24, 54, .09);
+  --selected: color-mix(in srgb, var(--accent-ink) 12%, transparent);
+  --selected-strong: color-mix(in srgb, var(--accent-ink) 20%, transparent);
+  --focus-ring: var(--accent-ink);
   --disabled-o: .45;
-  --accent-ink: #0b6478; /* גוון מותג קריא לטקסט קטן על רקע מותג בהיר */
 
-  /* סמנטיים */
-  --green: #0b6b5e;
-  --green-bg: #e1f1ed;
-  --red: #b6324a;
-  --red-bg: #fae8ec;
-  --orange: #915700;
-  --orange-bg: #fff1d7;
+  --green: #1e7a38;
+  --green-bg: #e3f5e8;
+  --red: #c0352b;
+  --red-bg: #fde7e4;
+  --orange: #9a5b00;
+  --orange-bg: #fff1d6;
   --wa: #087c43;
+  --holiday: #3557b7;
+  --holiday-bg: #e6ecfb;
 
-  /* רקע גוף */
-  --body-glow-1: rgba(41, 71, 199, .08);
-  --body-glow-2: rgba(242, 168, 59, .06);
-
-  /* צללים רכים בשכבות */
-  --sh-sm: 0 1px 2px rgba(20, 32, 53, .05), 0 5px 12px rgba(20, 32, 53, .035);
-  --sh-md: 0 12px 28px rgba(20, 32, 53, .08);
-  --sh-lg: 0 24px 64px rgba(13, 22, 38, .18);
-  --sh-brand: 0 10px 22px rgba(54, 83, 212, .24);
+  /* כרטיסים שטוחים על הלבנדר; צל רק למה שצף (חלון, הודעה, גרירה) */
+  --sh-sm: none;
+  --sh-md: none;
+  --sh-lg: 0 16px 40px rgba(29, 24, 54, .22);
 
   --r-sm: 10px;
   --r-md: 14px;
-  --r-lg: 16px;
+  --r-lg: 22px;
+  --r-pill: 999px;
   --ease-out: cubic-bezier(.22, 1, .36, 1);
-  --ease-out-quint: cubic-bezier(.22, 1, .36, 1);
-
-  --nav-glass: rgba(255, 255, 255, .82);
-  --nav-glass-border: rgba(255, 255, 255, .6);
 }
 
-/* ---------- מצב כהה ---------- */
+/* ---------- מצב כהה: סגול-שחור עמוק, הליים הופך לצבע הפעולה ---------- */
 html[data-theme="dark"] {
-  --grad-hero: #101b2d;
+  --bg: #17142c;
+  --band: #26214a;
+  --surface: #211c3b;
+  --surface-2: #272146;
+  --bg-soft: #2c2650;
+  --panel: #1d1935;
+  --text: #f2f0fb;
+  --muted: #c0bbdd;
+  --faint: #9d97c4;
+  --border: #332d56;
+  --on-bg: #f3f1ff;
+  --on-bg-muted: rgba(243, 241, 255, .72);
+  --line-on-bg: rgba(255, 255, 255, .1);
+  --chip-on-bg: rgba(255, 255, 255, .08);
+  --chart-muted: #463f70;
 
-  --bg: #0f141b;
-  --bg-soft: #1b232e;
-  --surface: #171f29;
-  --surface-2: #1d2530;
-  --text: #e7ebf0;
-  --muted: #9aa4b2;
-  --faint: #8f9baa;
-  --border: #2a3340;
-  --chart-muted: #526176;
+  --primary: #d4f56b;
+  --on-primary: #17142c;
+  --on-accent: #17142c;
+  --accent-ink: #c9c8f5;
 
-  --green: #65d6c2;
-  --green-bg: #14301f;
-  --red: #f87171;
-  --red-bg: #361a1a;
-  --orange: #f5bc5a;
-  --orange-bg: #3a2a10;
+  --ev-paid: #4a4590;
+  --ev-paid-ink: #f3f1ff;
+  --ev-unpaid: #4d2430;
+  --ev-unpaid-ink: #ffc2bb;
 
-  --panel: #131a23;
-  --panel-border: #2f3a48;
-  --hover: rgba(255, 255, 255, .05);
-  --active: rgba(255, 255, 255, .09);
-  --selected: color-mix(in srgb, var(--brand-1) 22%, transparent);
-  --selected-strong: color-mix(in srgb, var(--brand-1) 32%, transparent);
-  --accent-ink: #7cd4ea; /* גוון בהיר וקריא על רקע כהה */
+  --hover: rgba(255, 255, 255, .06);
+  --active: rgba(255, 255, 255, .1);
+  --selected: color-mix(in srgb, var(--accent-ink) 16%, transparent);
+  --selected-strong: color-mix(in srgb, var(--accent-ink) 26%, transparent);
 
-  --body-glow-1: rgba(217, 119, 6, .10);
-  --body-glow-2: rgba(96, 130, 180, .07);
+  --green: #86e3a1;
+  --green-bg: #173225;
+  --red: #ff9d93;
+  --red-bg: #3a1d24;
+  --orange: #ffc078;
+  --orange-bg: #3a2a12;
+  --holiday: #9db7ff;
+  --holiday-bg: #1d2546;
 
-  --sh-sm: 0 1px 2px rgba(0, 0, 0, .3), 0 2px 6px rgba(0, 0, 0, .25);
-  --sh-md: 0 4px 12px rgba(0, 0, 0, .4), 0 8px 28px rgba(0, 0, 0, .3);
-  --sh-lg: 0 12px 32px rgba(0, 0, 0, .5);
-
-  --nav-glass: rgba(23, 31, 41, .82);
-  --nav-glass-border: rgba(255, 255, 255, .08);
+  --sh-lg: 0 16px 40px rgba(0, 0, 0, .5);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -139,7 +146,7 @@ button, summary, a, label, input, select, textarea, .seg-btn, .nav-btn { touch-a
 html { -webkit-text-size-adjust: 100%; }
 
 body {
-  font-family: "Assistant", "Segoe UI", system-ui, Arial, sans-serif;
+  font-family: var(--font);
   background: var(--bg);
   color: var(--text);
   padding-bottom: 96px;
@@ -150,19 +157,6 @@ body {
   min-height: 100vh;
   min-height: 100dvh; /* iOS Safari: גובה ויופורט אמיתי, בלי קפיצות משורת הכתובת */
   overflow-x: hidden;
-}
-
-/* הזוהר הדקורטיבי על שכבה קבועה נפרדת שנצבעת פעם אחת ואינה נצבעת מחדש בכל פריים
-   גלילה. background-attachment: fixed על ה-body היה גורם עיקרי לגמגום גלילה ב-iOS. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(1100px 560px at 100% -5%, var(--body-glow-1), transparent 60%),
-    radial-gradient(900px 500px at -10% 4%, var(--body-glow-2), transparent 55%);
 }
 
 /* ---------- כותרת: פס דק עם הקשר, לא כרטיס מותג ----------
@@ -178,26 +172,27 @@ body::before {
   gap: 12px;
   padding: 10px 16px 8px;
   padding-top: calc(10px + env(safe-area-inset-top));
-  background: color-mix(in srgb, var(--bg) 94%, transparent);
-  color: var(--text);
+  background: var(--bg);
+  color: var(--on-bg);
 }
 .app-brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .brand-mark {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
   flex: none;
-  border-radius: 10px;
-  background: var(--grad-brand);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(8, 145, 178, .28);
+  border-radius: 50%;
+  background: none;
+  color: var(--on-bg);
+  box-shadow: inset 0 0 0 2px var(--on-bg);
 }
 .brand-mark svg { width: 19px; height: 19px; stroke-width: 1.9; }
 .app-brand h1 {
-  font-family: "Heebo", "Assistant", sans-serif;
+  white-space: nowrap;
+  font-family: var(--font);
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -.01em;
   line-height: 1.15;
 }
@@ -209,26 +204,13 @@ body::before {
   flex: none;
   min-height: 32px;
   padding: 0 4px 0 12px;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--r-pill);
+  background: var(--chip-on-bg);
   font-size: var(--fs-sm);
 }
 .topbar-context:empty { display: none; }
-.topbar-context b { font-family: "Heebo", "Assistant", sans-serif; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
-.topbar-context span { padding: 3px 9px; border-radius: 999px; background: var(--selected); color: var(--accent-ink); font-size: var(--fs-xs); font-weight: 700; white-space: nowrap; }
-.header-icon-btn {
-  background: rgba(255,255,255,.16);
-  border: 1px solid rgba(255,255,255,.22);
-  color: #fff;
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  transition: transform .18s var(--ease-out), background .22s var(--ease-out);
-}
-.header-icon-btn svg { width: 20px; height: 20px; stroke-width: 1.9; }
-.header-icon-btn:active { transform: scale(.9); background: rgba(255,255,255,.28); }
+.topbar-context b { font-family: var(--font); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--on-bg); }
+.topbar-context span { padding: 3px 10px; border-radius: var(--r-pill); background: var(--primary); color: var(--on-primary); font-size: var(--fs-xs); font-weight: 700; white-space: nowrap; }
 
 
 main { width: 100%; padding: 6px 16px 120px; max-width: 760px; margin: 0 auto; }
@@ -244,9 +226,9 @@ main { width: 100%; padding: 6px 16px 120px; max-width: 760px; margin: 0 auto; }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .24s; }
 
 .view > h2 {
-  font-family: "Heebo", "Assistant", sans-serif;
+  font-family: var(--font);
   font-size: var(--fs-xl);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -.02em;
   line-height: 1.15;
   text-wrap: balance;
@@ -254,11 +236,9 @@ main { width: 100%; padding: 6px 16px 120px; max-width: 760px; margin: 0 auto; }
 }
 .view h3 {
   margin: var(--sp-6) 0 var(--sp-3);
-  font-size: .8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--faint);
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .view-head {
@@ -268,21 +248,20 @@ main { width: 100%; padding: 6px 16px 120px; max-width: 760px; margin: 0 auto; }
   gap: var(--sp-4);
   margin-bottom: var(--sp-6);
 }
-.view-head h2 { font-size: var(--fs-xl); font-weight: 800; letter-spacing: -.025em; line-height: 1.15; text-wrap: balance; }
-.view-head h2 { font-family: "Heebo", "Assistant", sans-serif; }
+.view-head h2 { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.025em; line-height: 1.15; text-wrap: balance; }
+.view-head h2 { font-family: var(--font); }
 .view-head-copy p { margin-top: var(--sp-1); color: var(--muted); font-size: .88rem; line-height: 1.5; }
 
 .btn-add {
-  background: var(--grad-brand);
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
   border: none;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 10px 18px;
   font-size: .92rem;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-  box-shadow: var(--sh-brand);
   transition: transform .2s var(--ease-out), box-shadow .25s var(--ease-out), filter .2s var(--ease-out);
   display: inline-flex;
   align-items: center;
@@ -294,9 +273,9 @@ main { width: 100%; padding: 6px 16px 120px; max-width: 760px; margin: 0 auto; }
 .seg-toggle {
   display: flex;
   gap: 4px;
-  background: var(--bg-soft);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--r-pill);
   padding: 4px;
   margin-bottom: 16px;
 }
@@ -304,16 +283,16 @@ main { width: 100%; padding: 6px 16px 120px; max-width: 760px; margin: 0 auto; }
   flex: 1;
   background: none;
   border: none;
-  border-radius: 11px;
+  border-radius: var(--r-pill);
   padding: 9px 8px;
   font-size: .9rem;
-  font-weight: 700;
+  font-weight: 500;
   font-family: inherit;
-  color: var(--muted);
+  color: var(--text);
   cursor: pointer;
   transition: background .22s var(--ease-out), color .22s var(--ease-out), box-shadow .22s var(--ease-out), transform .18s var(--ease-out);
 }
-.seg-btn.active { background: var(--surface); color: var(--text); box-shadow: var(--sh-sm); }
+.seg-btn.active { background: var(--primary); color: var(--on-primary); font-weight: 600; }
 .seg-btn:active { transform: scale(.98); }
 
 /* ---------- רשימות וכרטיסים ---------- */
@@ -338,7 +317,7 @@ main { width: 100%; padding: 6px 16px 120px; max-width: 760px; margin: 0 auto; }
 .tag {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 3px 11px;
   font-size: .76rem;
   font-weight: 700;
@@ -353,7 +332,7 @@ main { width: 100%; padding: 6px 16px 120px; max-width: 760px; margin: 0 auto; }
 /* ---------- כפתורים ---------- */
 .btn {
   border: none;
-  border-radius: 12px;
+  border-radius: var(--r-pill);
   padding: 9px 14px;
   font-size: .85rem;
   font-weight: 700;
@@ -368,26 +347,24 @@ main { width: 100%; padding: 6px 16px 120px; max-width: 760px; margin: 0 auto; }
 }
 .btn .ic { width: 17px; height: 17px; vertical-align: 0; }
 .btn:active { transform: scale(.96); }
-.btn-wa    { background: var(--wa); color: #fff; box-shadow: 0 4px 12px rgba(8, 124, 67, .2); }
-.btn-green { background: var(--green); color: #fff; box-shadow: 0 4px 12px rgba(11,107,94,.22); }
+.btn-wa    { background: var(--wa); color: #fff; }
+.btn-green { background: var(--green); color: #fff; }
 /* במצב כהה --green הוא מנטה בהיר, וטקסט לבן עליו יורד ל-1.76:1. טקסט כהה מחזיר
    את כל הכפתורים הירוקים (אישור שיעור, קביעת שיעור, סימון כשולם) מעל 4.5:1. */
-html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
-.btn-light { background: var(--bg-soft); color: var(--text); border: 1px solid color-mix(in srgb, var(--border) 76%, transparent); }
+html[data-theme="dark"] .btn-green { color: #0d1f11; }
+.btn-light { background: var(--bg-soft); color: var(--text); border: 0; }
 .btn-light:active { background: var(--border); }
 .btn-danger { background: var(--red-bg); color: var(--red); }
-.btn-block { width: 100%; padding: 14px; font-size: .98rem; margin-top: 10px; border-radius: 14px; }
+.btn-primary { background: var(--primary); color: var(--on-primary); }
+.btn-block { width: 100%; padding: 14px; font-size: .98rem; margin-top: 10px; border-radius: var(--r-pill); }
 
 /* ---------- מצב ריק ---------- */
 .empty {
   text-align: center;
-  color: var(--faint);
+  color: var(--muted);
   padding: 36px 16px;
   font-size: .95rem;
   line-height: 1.8;
-  background: color-mix(in srgb, var(--surface) 68%, transparent);
-  border: 1px dashed color-mix(in srgb, var(--border) 76%, transparent);
-  border-radius: var(--r-md);
 }
 .empty-action { display: flex; min-height: 220px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
 .empty-action > .ic { width: 28px; height: 28px; color: var(--brand-1); margin-bottom: 4px; }
@@ -403,9 +380,9 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   justify-content: space-between;
   margin: 0 4px 10px;
 }
-.day-label { margin: 0; color: var(--text); font: 800 1.02rem "Heebo", "Assistant", sans-serif; letter-spacing: -.01em; text-transform: none; }
+.day-label { margin: 0; color: var(--text); font: 700 1.02rem var(--font); letter-spacing: -.01em; text-transform: none; }
 .day-label .rel { color: var(--brand-1); }
-.day-count { font-size: .76rem; color: var(--faint); font-weight: 700; }
+.day-count { font-size: .76rem; color: var(--muted); font-weight: 700; }
 .day-lessons { display: flex; flex-direction: column; gap: 9px; }
 
 .lesson-row {
@@ -413,11 +390,10 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   align-items: center;
   gap: 12px;
   background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  border-radius: 14px;
+  border: 0;
+  border-radius: var(--r-md);
   padding: 12px 14px;
-  box-shadow: var(--sh-sm);
-  transition: transform .2s var(--ease-out), box-shadow .25s var(--ease-out), border-color .2s var(--ease-out);
+  transition: background .15s var(--ease-out);
 }
 .lesson-open {
   flex: 1;
@@ -437,9 +413,9 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
 .time-chip {
   background: var(--bg-soft);
   color: var(--text);
-  font-weight: 800;
+  font-weight: 700;
   font-size: .98rem;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 9px 8px;
   min-width: 58px;
   text-align: center;
@@ -447,7 +423,7 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   flex: none;
 }
 .time-chip .dur { display: block; font-size: .66rem; font-weight: 600; color: var(--faint); margin-top: 2px; }
-.lesson-row.is-today .time-chip { background: var(--orange-bg); color: var(--orange); }
+.lesson-row.is-today .time-chip { background: var(--accent); color: var(--on-accent); }
 .lesson-body { flex: 1; min-width: 0; cursor: pointer; }
 .lesson-name {
   font-weight: 700;
@@ -473,17 +449,17 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
 }
 .lesson-check svg { width: 18px; height: 18px; }
 .lesson-check:active { transform: scale(.9); }
-.lesson-check.done { background: var(--green); border-color: var(--green); color: #fff; }
+.lesson-check.done { background: var(--green); border-color: var(--green); color: var(--surface); }
 .lesson-wa { color: var(--wa); border-color: var(--wa); }
 
 .past-toggle {
   width: 100%;
   text-align: center;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 0;
+  border-radius: var(--r-pill);
   padding: 13px;
-  color: var(--muted);
+  color: var(--text);
   font-weight: 700;
   font-family: inherit;
   font-size: .9rem;
@@ -501,19 +477,12 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   box-shadow: var(--sh-sm);
   margin-bottom: 16px;
 }
-.cal-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.cal-head span { font-weight: 800; font-size: 1.05rem; }
 .cal-nav {
   background: var(--bg-soft);
   border: none;
-  border-radius: 10px;
+  border-radius: 50%;
   width: 44px; height: 44px;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   color: var(--text);
   cursor: pointer;
 }
@@ -528,7 +497,7 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
 }
 .cal-cell {
   aspect-ratio: 1;
-  border-radius: 10px;
+  border-radius: 50%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -543,53 +512,55 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   background: transparent;
   font-family: inherit;
 }
-.cal-cell.empty { cursor: default; }
+.cal-cell.empty { cursor: default; padding: 0; } /* אחרת יורש את הריפוד של מצב ה-.empty וקופץ בשורה הראשונה */
 .cal-cell.other { color: var(--faint); opacity: .4; }
 .cal-cell:not(.empty):active { transform: scale(.94); }
-.cal-cell.today { background: var(--orange-bg); color: var(--orange); }
-.cal-cell.sel { background: var(--brand-1); color: #fff; }
-.cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--brand-1); }
+.cal-cell.sel { background: var(--primary); color: var(--on-primary); }
+.cal-cell.today { background: var(--accent); color: var(--on-accent); }
+.cal-cell.today.sel { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--primary); }
+.cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-ink); }
 .cal-count {
   min-width: 16px; height: 16px;
   padding: 0 4px;
-  border-radius: 999px;
-  background: var(--brand-1);
-  color: #fff;
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  color: var(--on-primary);
   font-size: .62rem;
-  font-weight: 800;
+  font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   line-height: 1;
 }
-.cal-cell.sel .cal-count { background: #fff; color: var(--brand-1); }
-.cal-today { margin: 0 0 12px; }
-.cal-cell.sel .cal-dot { background: #fff; }
-.cal-cell.has-lessons:not(.sel):not(.today) { background: var(--surface-2); }
+.cal-cell.sel .cal-count { background: var(--on-primary); color: var(--primary); }
+.cal-cell.sel .cal-dot { background: var(--on-primary); }
 
-/* ============ יומן בסגנון Google Calendar ============ */
+/* ============ יומן ============ */
+/* סדר בסרגל: החודש בראש השורה, ואחריו "היום", החצים והוספת תלמיד */
 .cal-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-3);
+  gap: 6px;
+  margin-bottom: 6px;
 }
-.cal-toolbar-nav { display: flex; gap: var(--sp-2); }
+.cal-toolbar-nav { order: 1; display: flex; gap: 6px; }
 .cal-toolbar-label {
+  order: -1;
   flex: 1;
-  font-family: "Heebo", "Assistant", sans-serif;
-  font-weight: 800;
-  font-size: var(--fs-md);
+  min-width: 0;
+  font: 700 var(--fs-md) var(--font);
   letter-spacing: -.01em;
 }
 .btn-today {
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
+  background: none;
+  border: 0;
   color: var(--text);
-  border-radius: 999px;
-  min-height: 40px;
-  padding: 0 var(--sp-4);
-  font: 700 var(--fs-sm)/1 "Assistant", sans-serif;
+  border-radius: var(--r-pill);
+  min-height: 44px;
+  padding: 0 10px;
+  font: 600 var(--fs-sm)/1 var(--font);
+  text-decoration: underline;
+  text-underline-offset: 4px;
   cursor: pointer;
-  transition: background .18s var(--ease-out), border-color .18s var(--ease-out);
+  transition: background .18s var(--ease-out);
 }
 .btn-today:hover { background: var(--hover); }
 .btn-today:active { background: var(--active); }
@@ -598,55 +569,43 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
 .week-strip {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: var(--sp-1);
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--r-md);
-  padding: var(--sp-2);
+  gap: 2px;
+  padding: 2px 0 6px;
 }
 .week-day {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-height: 64px;
-  padding: var(--sp-2) 2px;
-  border: 1px solid transparent;
-  border-radius: var(--r-sm);
-  background: transparent;
+  padding: 4px 0;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
   color: var(--text);
   font-family: inherit;
   cursor: pointer;
-  transition: background .18s var(--ease-out), border-color .18s var(--ease-out), transform .15s var(--ease-out);
+  transition: background .15s var(--ease-out);
 }
 .week-day:hover { background: var(--hover); }
-.week-day:active { transform: scale(.96); }
-.week-dow { font-size: var(--fs-xs); font-weight: 700; color: var(--faint); }
+.week-dow { font-size: .6875rem; font-weight: 500; color: var(--faint); }
 .week-num {
-  font-size: var(--fs-md);
-  font-weight: 800;
-  font-family: "Heebo", "Assistant", sans-serif;
-  width: 34px; height: 34px;
+  width: 36px; height: 36px;
   display: flex; align-items: center; justify-content: center;
   border-radius: 50%;
+  font-size: 1rem;
+  font-weight: 600;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
-.week-dot {
-  width: 6px; height: 6px;
-  border-radius: 999px;
-  background: var(--brand-1);
-  display: flex; align-items: center; justify-content: center;
-}
+.week-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-ink); }
 .week-dot.is-empty { background: transparent; }
-.week-dot i {
-  font-style: normal;
-  font-size: 0;
-}
-.week-day.today .week-dow { color: var(--accent-ink); }
-.week-day.today .week-num { box-shadow: inset 0 0 0 2px var(--brand-1); color: var(--accent-ink); }
-.week-day.sel { background: var(--selected); border-color: color-mix(in srgb, var(--brand-1) 35%, transparent); }
-.week-day.sel .week-num { background: var(--brand-1); color: #fff; box-shadow: none; }
-.week-day.sel .week-dow { color: var(--accent-ink); }
+.week-dot i { font-style: normal; font-size: 0; }
+/* נבחר = חציל; היום = ליים, וכשהיום גם נבחר מקבל טבעת */
+.week-day.sel .week-num { background: var(--primary); color: var(--on-primary); }
+.week-day.today .week-num { background: var(--accent); color: var(--on-accent); }
+.week-day.today.sel .week-num { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--primary); }
+.week-day.sel .week-dow { color: var(--text); font-weight: 600; }
 
 /* אג'נדת יום — ציר שעות */
 .day-agenda {
@@ -672,7 +631,7 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   font-weight: 600;
   color: var(--faint);
   font-variant-numeric: tabular-nums;
-  background: var(--bg);
+  background: var(--surface);
   padding-inline-end: 4px;
 }
 .agenda-events {
@@ -691,28 +650,27 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   text-align: start;
   padding: 8px 10px;
   border-radius: var(--r-sm);
-  background: color-mix(in srgb, var(--brand-1) 14%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--brand-1) 32%, transparent);
-  color: var(--text);
+  background: var(--accent);
+  border: 0;
+  color: var(--on-accent);
   font-family: inherit;
   cursor: pointer;
   transition: filter .15s var(--ease-out), transform .15s var(--ease-out);
 }
 .agenda-block:hover { filter: brightness(1.03); }
 .agenda-block:active { transform: scale(.99); }
-.agenda-block.is-done { background: var(--surface-2); border-color: var(--border); }
-.agenda-time { font-size: var(--fs-xs); font-weight: 800; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
-.agenda-block.is-done .agenda-time { color: var(--faint); }
+.agenda-block.is-done { background: var(--bg-soft); }
+.agenda-time { font-size: var(--fs-xs); font-weight: 700; opacity: .8; font-variant-numeric: tabular-nums; }
 .agenda-info { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .agenda-name { font-size: var(--fs-sm); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.agenda-topic { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agenda-topic { font-size: var(--fs-xs); color: inherit; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .agenda-status {
   display: inline-flex; align-items: center; gap: 3px;
   font-size: var(--fs-xs); font-weight: 700;
   margin-top: 2px;
 }
-.agenda-status.unpaid { color: var(--red); }
-.agenda-status.done { color: var(--green); }
+.agenda-status.unpaid { color: var(--ev-unpaid-ink); }
+.agenda-status.done { color: inherit; }
 .agenda-add { margin-top: var(--sp-2); }
 
 /* בורר תלמיד עם חיפוש */
@@ -720,7 +678,7 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   max-height: 190px;
   overflow-y: auto;
   border: 1.5px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--r-md);
   margin-bottom: 16px;
   background: var(--surface-2);
 }
@@ -741,7 +699,7 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
 }
 .picker-row:last-child { border-bottom: none; }
 .picker-row:active { background: var(--bg-soft); }
-.picker-row.sel { background: var(--orange-bg); color: var(--orange); }
+.picker-row.sel { background: var(--selected); color: var(--text); font-weight: 600; }
 .picker-row.sel svg { width: 16px; height: 16px; }
 .picker-empty { padding: 14px; text-align: center; color: var(--faint); }
 .picker-row.picker-add { color: var(--green); }
@@ -752,7 +710,7 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   flex: 1;
   background: var(--bg-soft);
   border: 1.5px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 10px 6px;
   font-size: .88rem;
   font-weight: 700;
@@ -762,7 +720,7 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   transition: transform .18s var(--ease-out), background .2s var(--ease-out), border-color .2s var(--ease-out), color .2s var(--ease-out);
 }
 .quick-date:active { transform: scale(.96); }
-.quick-date.sel { background: var(--brand-1); border-color: var(--brand-1); color: #fff; }
+.quick-date.sel { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 
 /* ---------- חיפוש ---------- */
 .search-wrap { position: relative; margin-bottom: 16px; }
@@ -778,7 +736,8 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
 .search-box {
   margin-bottom: 0;
   background: var(--surface);
-  box-shadow: 0 1px 2px rgba(20,32,53,.04);
+  border-color: transparent;
+  border-radius: var(--r-pill);
   padding-right: 44px;
 }
 
@@ -791,14 +750,14 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   display: grid;
   place-items: center;
   flex: none;
-  border-radius: 11px;
-  background: color-mix(in srgb, var(--brand-1) 10%, var(--surface));
-  color: var(--brand-1);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
 }
 .settings-group-head .ic { width: 18px; height: 18px; }
-.settings-group-head h3 { margin: 0; color: var(--text); font: 800 1rem "Heebo", "Assistant", sans-serif; letter-spacing: -.01em; text-transform: none; }
-.settings-group-head p { margin-top: 1px; color: var(--faint); font-size: .76rem; }
-.settings-panel { overflow: hidden; border-radius: var(--r-md); box-shadow: var(--sh-sm); }
+.settings-group-head h3 { margin: 0; color: var(--text); font: 700 1rem var(--font); letter-spacing: -.01em; text-transform: none; }
+.settings-group-head p { margin-top: 1px; color: var(--muted); font-size: .76rem; }
+.settings-panel { overflow: hidden; border-radius: var(--r-lg); }
 .setting-row {
   display: flex;
   align-items: center;
@@ -822,14 +781,14 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
 .setting-row-wide input[type="text"] { max-width: none; width: 100%; }
 
 /* מתג סגמנט לבחירת ערכת נושא */
-.theme-seg { display: flex; gap: 4px; background: var(--bg-soft); border-radius: 12px; padding: 4px; }
+.theme-seg { display: flex; gap: 4px; background: var(--bg-soft); border-radius: var(--r-pill); padding: 4px; }
 .theme-seg button {
-  border: none; background: none; padding: 8px 12px; border-radius: 9px;
-  font-family: inherit; font-weight: 700; font-size: .82rem; color: var(--muted); cursor: pointer;
+  border: none; background: none; padding: 8px 12px; border-radius: var(--r-pill);
+  font-family: inherit; font-weight: 500; font-size: .82rem; color: var(--text); cursor: pointer;
   min-height: 44px;
 }
-.theme-seg button.active { background: var(--surface); color: var(--text); box-shadow: var(--sh-sm); }
-.settings-action-stack { padding: 12px; margin-top: 10px; border-radius: var(--r-md); background: var(--surface); box-shadow: var(--sh-sm); }
+.theme-seg button.active { background: var(--primary); color: var(--on-primary); font-weight: 600; }
+.settings-action-stack { padding: 12px; margin-top: 10px; border-radius: var(--r-lg); background: var(--surface); }
 .settings-action-stack .btn-block { margin-top: 8px; }
 .settings-action-stack .btn-block:first-child { margin-top: 0; }
 .settings-action-stack.compact { margin-top: 0; }
@@ -840,12 +799,11 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   align-items: center;
   gap: 14px;
   padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--brand-1) 22%, var(--border));
+  border: 1px solid var(--border);
   border-radius: var(--r-md);
-  background: color-mix(in srgb, var(--brand-1) 8%, var(--surface));
-  box-shadow: var(--sh-sm);
+  background: var(--surface);
 }
-.reminder-status-card h4 { margin: 8px 0 3px; color: var(--text); font: 800 1.05rem "Heebo", "Assistant", sans-serif; }
+.reminder-status-card h4 { margin: 8px 0 3px; color: var(--text); font: 700 1.05rem var(--font); }
 .reminder-status-card p { color: var(--muted); font-size: .84rem; line-height: 1.5; }
 .reminder-status-card input { margin: 0; text-align: center; }
 .status-pill {
@@ -853,11 +811,11 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   align-items: center;
   min-height: 28px;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--brand-2);
   font-size: .76rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 .reminder-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .reminder-actions .btn-block { margin: 0; }
@@ -871,58 +829,41 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
 .install-status strong, .install-status span { display: block; }
 .install-status strong { color: var(--text); font-size: .9rem; }
 .install-status span { color: var(--muted); font-size: .76rem; }
-.app-version { padding: 10px 0 0; color: var(--faint); font-size: .74rem; text-align: center; }
+.app-version { padding: 10px 0 0; color: var(--muted); font-size: .74rem; text-align: center; }
 
 /* ---------- ניווט תחתון צף ---------- */
 .bottom-nav {
   position: fixed;
-  bottom: calc(14px + env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(100% - 28px);
-  max-width: 560px;
-  background: var(--nav-glass);
-  /* טשטוש קל יותר: הרקע כבר אטום ~82%, וזה מוזיל משמעותית את עלות הריקומפוזיציה
-     של אלמנט fixed מעל תוכן נגלל ב-iOS, בלי שינוי מורגש במראה. */
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid var(--nav-glass-border);
-  border-radius: 18px;
+  bottom: 0;
+  inset-inline: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--line-on-bg);
   display: flex;
   justify-content: space-around;
-  padding: 8px 6px;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
   z-index: 30;
-  box-shadow: 0 14px 34px rgba(20, 32, 53, .14);
 }
 .nav-btn {
   flex: 1;
   background: none;
   border: none;
-  padding: 7px 2px;
+  padding: 2px;
   font-size: .68rem;
-  font-weight: 600;
+  font-weight: 500;
   font-family: inherit;
-  color: var(--faint);
+  color: var(--on-bg);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  border-radius: 14px;
+  border-radius: var(--r-md);
   transition: color .22s var(--ease-out), background .22s var(--ease-out), transform .18s var(--ease-out);
   position: relative;
 }
-.nav-btn svg { width: 22px; height: 22px; stroke-width: 1.75; transition: transform .25s var(--ease-out); }
-.nav-btn.active { color: var(--brand-1); }
-.nav-btn.active svg { transform: translateY(-2px) scale(1.1); }
-.nav-btn.active::after {
-  content: "";
-  position: absolute;
-  bottom: 3px;
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: var(--brand-1);
-}
+.nav-btn svg { width: 40px; height: 40px; padding: 9px; border-radius: 50%; background: var(--chip-on-bg); stroke-width: 1.75; transition: background .18s var(--ease-out), color .18s var(--ease-out); }
+.nav-btn.active { font-weight: 600; }
+.nav-btn.active svg { background: var(--primary); color: var(--on-primary); }
 
 /* ---------- ניווט חודשים ---------- */
 .month-nav {
@@ -930,17 +871,12 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px;
   margin-bottom: 18px;
-  box-shadow: var(--sh-sm);
 }
 .month-nav button {
-  background: var(--bg-soft);
+  background: var(--chip-on-bg);
   border: none;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 8px 16px;
   font-size: .88rem;
   font-weight: 700;
@@ -949,7 +885,7 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   cursor: pointer;
 }
 .month-nav button:active { transform: scale(.95); }
-.month-nav span { font-weight: 800; font-size: 1rem; }
+.month-nav span { font-weight: 700; font-size: 1rem; }
 
 #incomeChart {
   width: 100%;
@@ -961,8 +897,7 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
 /* ---------- חלון תחתון (bottom sheet) ---------- */
 .modal {
   position: fixed; inset: 0;
-  background: rgba(20, 16, 40, .45);
-  backdrop-filter: blur(3px);
+  background: rgba(24, 20, 43, .45);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -975,13 +910,13 @@ html[data-theme="dark"] .btn-green { color: #06231f; box-shadow: none; }
   background: var(--surface);
   width: 100%;
   max-width: 620px;
-  border-radius: 20px 20px 0 0;
+  border-radius: 24px 24px 0 0;
   padding: 14px 20px 28px;
   padding-bottom: calc(28px + env(safe-area-inset-bottom));
   max-height: 92vh;
   overflow-y: auto;
   position: relative;
-  box-shadow: 0 -10px 40px rgba(26, 21, 48, .2);
+  box-shadow: var(--sh-lg);
   animation: slideUp .38s var(--ease-out);
 }
 body.modal-open { overflow: hidden; }
@@ -989,7 +924,7 @@ body.modal-open { overflow: hidden; }
 .modal-grabber {
   width: 44px; height: 5px;
   background: var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-sm);
   margin: 2px auto 16px;
 }
 .modal-close {
@@ -1005,16 +940,16 @@ body.modal-open { overflow: hidden; }
   transition: background .2s var(--ease-out), transform .18s var(--ease-out);
 }
 .modal-close:active { background: var(--border); }
-.modal h3 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: -.02em; }
+.modal h3 { margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: -.02em; }
 .modal-title-block { display: flex; align-items: center; gap: 12px; padding: 2px 52px 18px 0; }
 .modal-title-block p { margin-top: 2px; color: var(--muted); font-size: .8rem; }
-.modal-title-icon { width: 40px; height: 40px; display: grid; place-items: center; flex: none; border-radius: 12px; background: var(--bg-soft); color: var(--brand-1); }
+.modal-title-icon { width: 40px; height: 40px; display: grid; place-items: center; flex: none; border-radius: var(--r-md); background: var(--bg-soft); color: var(--text); }
 .modal-title-icon .ic { width: 19px; height: 19px; }
-.form-section { padding: 16px; border-radius: var(--r-md); background: var(--surface-2); }
+.form-section { padding: 0; }
 .modal-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 12px; }
 .modal-actions .btn-block { margin: 0; }
 .profile-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 8px; margin-top: 12px; }
-.profile-summary span { display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: 12px; background: var(--bg-soft); color: var(--muted); font-size: .76rem; }
+.profile-summary span { display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: var(--r-md); background: var(--bg-soft); color: var(--muted); font-size: .76rem; }
 .profile-summary b { color: var(--text); font-size: 1rem; }
 .profile-summary .has-debt b { color: var(--red); }
 .danger-zone { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; padding: 14px; border-radius: var(--r-md); background: var(--red-bg); }
@@ -1031,8 +966,7 @@ body.modal-open { overflow: hidden; }
   display: flex; flex-direction: column; gap: 3px;
   margin-top: 12px; padding: 14px;
   border-radius: var(--r-md);
-  background: var(--selected);
-  border: 1px solid color-mix(in srgb, var(--brand-1) 22%, transparent);
+  background: var(--bg-soft);
 }
 .profile-next span { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: .76rem; }
 .profile-next strong { color: var(--text); font-size: .98rem; }
@@ -1048,7 +982,7 @@ body.modal-open { overflow: hidden; }
 .profile-section-head {
   display: flex; align-items: center; gap: 6px;
   margin: 20px 0 8px; color: var(--text);
-  font-family: "Heebo", sans-serif; font-weight: 700; font-size: .95rem;
+  font-family: var(--font); font-weight: 700; font-size: .95rem;
 }
 .profile-lessons { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .profile-lesson {
@@ -1058,7 +992,7 @@ body.modal-open { overflow: hidden; }
 }
 .profile-lesson-date { color: var(--muted); white-space: nowrap; font-size: .8rem; }
 .profile-lesson-topic { color: var(--text); overflow-wrap: anywhere; }
-.profile-pill { font-size: .72rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.profile-pill { font-size: .72rem; font-weight: 700; padding: 3px 9px; border-radius: var(--r-sm); white-space: nowrap; }
 .profile-pill.paid { background: color-mix(in srgb, var(--wa) 16%, transparent); color: var(--wa); }
 .profile-pill.due { background: var(--red-bg); color: var(--red); }
 .profile-more { margin-top: 8px; text-align: center; }
@@ -1066,13 +1000,13 @@ body.modal-open { overflow: hidden; }
 .confirm-dialog {
   width: min(420px, calc(100% - 32px));
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--r-lg);
   padding: 0;
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--sh-lg);
 }
-.confirm-dialog::backdrop { background: rgba(14, 23, 38, .58); backdrop-filter: blur(3px); }
+.confirm-dialog::backdrop { background: rgba(24, 20, 43, .5); }
 .confirm-dialog form { padding: 24px; text-align: center; }
 .confirm-mark {
   width: 44px;
@@ -1083,11 +1017,11 @@ body.modal-open { overflow: hidden; }
   place-items: center;
   background: var(--red-bg);
   color: var(--red);
-  font-family: "Heebo", sans-serif;
+  font-family: var(--font);
   font-size: 1.35rem;
-  font-weight: 800;
+  font-weight: 700;
 }
-.confirm-dialog h2 { font-family: "Heebo", sans-serif; font-size: 1.25rem; }
+.confirm-dialog h2 { font-family: var(--font); font-size: 1.25rem; }
 .confirm-dialog p { color: var(--muted); margin: 8px 0 20px; line-height: 1.65; }
 .confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
@@ -1095,28 +1029,28 @@ body.modal-open { overflow: hidden; }
 label {
   display: block;
   margin-bottom: 7px;
-  font-weight: 600;
+  font-weight: 500;
   font-size: .88rem;
-  color: var(--muted);
+  color: var(--text);
 }
 input, select {
   width: 100%;
   padding: 13px 14px;
-  border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
-  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   font-size: 1rem;
   font-family: inherit;
   margin-bottom: 16px;
-  background: var(--surface-2);
+  background: var(--surface);
   color: var(--text);
   transition: border-color .22s var(--ease-out), box-shadow .22s var(--ease-out), background .22s var(--ease-out);
 }
 input::placeholder { color: var(--faint); }
 input:focus, select:focus {
   outline: none;
-  border-color: var(--brand-1);
+  border-color: var(--accent-ink);
   background: var(--surface);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-1) 14%, transparent);
+  box-shadow: 0 0 0 3px var(--selected);
 }
 /* התאמת בוררי תאריך/שעה למצב כהה */
 html[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
@@ -1147,9 +1081,9 @@ html[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
   inset-inline-start: 12px;
   z-index: 1000;
   padding: 10px 16px;
-  background: #047857; /* darker than --brand-3 for WCAG AA contrast (~5:1) with #fff */
-  color: #fff;
-  border-radius: 10px;
+  background: var(--primary);
+  color: var(--on-primary);
+  border-radius: var(--r-sm);
   font-weight: 600;
   text-decoration: none;
   transition: top .15s ease;
@@ -1165,9 +1099,9 @@ html[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
   margin-bottom: 16px;
   background: var(--bg-soft);
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: var(--r-md);
 }
-.checkbox-row input { width: 20px; height: 20px; margin: 0; accent-color: var(--brand-1); }
+.checkbox-row input { width: 20px; height: 20px; margin: 0; accent-color: var(--primary); }
 .checkbox-row label { margin: 0; color: var(--text); font-weight: 600; }
 
 /* ---------- הודעות צפות (toast) ---------- */
@@ -1185,9 +1119,9 @@ html[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
   pointer-events: none;
 }
 .toast {
-  background: var(--ink-2);
-  color: #fff;
-  border-radius: 14px;
+  background: var(--primary);
+  color: var(--on-primary);
+  border-radius: var(--r-md);
   padding: 13px 16px;
   font-size: .9rem;
   font-weight: 600;
@@ -1200,19 +1134,19 @@ html[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
 .toast.has-action { pointer-events: auto; }
 .toast > span { flex: 1; }
 .toast button {
-  border: 1px solid rgba(255,255,255,.35);
-  border-radius: 8px;
-  padding: 5px 9px;
-  background: rgba(255,255,255,.12);
-  color: #fff;
+  border: 1px solid currentColor;
+  border-radius: var(--r-pill);
+  padding: 5px 10px;
+  background: none;
+  color: inherit;
   font: inherit;
   font-size: .78rem;
   cursor: pointer;
 }
 .toast.out { animation: toastOut .25s var(--ease-out) forwards; }
 .toast svg { width: 18px; height: 18px; flex: none; }
-.toast.ok { background: #166534; }
-.toast.err { background: #b91c1c; }
+.toast.ok { background: var(--green); color: var(--surface); }
+.toast.err { background: var(--red); color: var(--surface); }
 @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes toastOut { to { opacity: 0; transform: translateY(12px); } }
 
@@ -1222,23 +1156,21 @@ html[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
 /* ---------- כרטיס פתיחה / הכוונה ---------- */
 .onboard-card {
   background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 20px;
-  box-shadow: var(--sh-md);
   margin-bottom: 16px;
 }
-.onboard-card h4 { font-size: 1.15rem; font-weight: 800; margin-bottom: 6px; }
+.onboard-card h4 { font-size: 1.15rem; font-weight: 700; margin-bottom: 6px; }
 .onboard-card p { color: var(--muted); font-size: .92rem; margin-bottom: 14px; line-height: 1.7; }
 .onboard-steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .onboard-step { display: flex; align-items: center; gap: 12px; font-size: .95rem; font-weight: 600; }
 .onboard-step .num {
   width: 30px; height: 30px; flex: none;
   border-radius: 50%;
-  background: var(--orange-bg);
-  color: var(--orange);
+  background: var(--bg-soft);
+  color: var(--text);
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800;
+  font-weight: 700;
 }
 .onboard-step.done .num { background: var(--green-bg); color: var(--green); }
 .onboard-step.done span { color: var(--faint); text-decoration: line-through; }
@@ -1247,33 +1179,28 @@ html[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
 .money-panel { animation: fadeUp .3s var(--ease-out); }
 
 /* ---------- חגים בלוח ---------- */
-.cal-cell.holiday { background: rgba(124, 58, 237, .14); }
-html[data-theme="dark"] .cal-cell.holiday { background: rgba(167, 139, 250, .16); }
-.cal-cell.holiday:not(.sel) { color: #7c3aed; }
-html[data-theme="dark"] .cal-cell.holiday:not(.sel) { color: #c4b5fd; }
-.cal-cell .cal-dot.holiday-dot { background: #7c3aed; }
-.cal-cell.sel .cal-dot.holiday-dot { background: #fff; }
+.cal-cell.holiday { background: var(--holiday-bg); }
+.cal-cell.holiday:not(.sel) { color: var(--holiday); }
+.cal-cell .cal-dot.holiday-dot { background: var(--holiday); }
+.cal-cell.sel .cal-dot.holiday-dot { background: var(--on-accent); }
 .holiday-tag {
   display: inline-flex; align-items: center; gap: 4px;
-  background: rgba(124, 58, 237, .12);
-  color: #7c3aed;
-  border-radius: 999px;
+  background: var(--holiday-bg);
+  color: var(--holiday);
+  border-radius: var(--r-sm);
   padding: 3px 10px;
   font-size: .74rem;
   font-weight: 700;
 }
-html[data-theme="dark"] .holiday-tag { background: rgba(167, 139, 250, .16); color: #c4b5fd; }
 .holiday-banner {
   display: flex; align-items: center; gap: 8px;
-  background: rgba(124, 58, 237, .1);
-  color: #7c3aed;
-  border: 1px solid rgba(124, 58, 237, .2);
-  border-radius: 14px;
+  background: var(--holiday-bg);
+  color: var(--holiday);
+  border-radius: var(--r-md);
   padding: 12px 14px;
   font-weight: 700;
   margin-bottom: 12px;
 }
-html[data-theme="dark"] .holiday-banner { color: #c4b5fd; background: rgba(167, 139, 250, .1); border-color: rgba(167, 139, 250, .25); }
 .holiday-banner svg { width: 18px; height: 18px; flex: none; }
 
 /* ---------- כפתור "עוד אפשרויות" בטופס ---------- */
@@ -1281,7 +1208,7 @@ html[data-theme="dark"] .holiday-banner { color: #c4b5fd; background: rgba(167, 
   width: 100%;
   background: var(--bg-soft);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--r-md);
   padding: 13px;
   font-family: inherit;
   font-weight: 700;
@@ -1303,16 +1230,15 @@ html[data-theme="dark"] .holiday-banner { color: #c4b5fd; background: rgba(167, 
   align-items: stretch;
   justify-content: space-between;
   gap: 24px;
-  padding: 22px 24px;
-  margin-bottom: 24px;
-  border-radius: var(--r-md);
-  background: var(--ink-1);
-  color: #fff;
+  padding: 4px 0 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line-on-bg);
+  color: var(--text);
 }
 .payment-summary-main { display: flex; flex-direction: column; justify-content: center; gap: 2px; }
-.payment-summary-main span { color: #d3dbea; font-size: .82rem; font-weight: 600; }
+.payment-summary-main span { color: var(--muted); font-size: .82rem; font-weight: 500; }
 .payment-summary-main strong {
-  font-family: "Heebo", "Assistant", sans-serif;
+  font-family: var(--font);
   font-size: 2rem;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
@@ -1322,11 +1248,11 @@ html[data-theme="dark"] .holiday-banner { color: #c4b5fd; background: rgba(167, 
   align-items: center;
   gap: 18px;
   padding-right: 24px;
-  border-right: 1px solid rgba(255, 255, 255, .2);
+  border-right: 1px solid var(--line-on-bg);
 }
-.payment-summary-meta span { display: inline-flex; align-items: center; gap: 7px; color: #d3dbea; font-size: .86rem; }
-.payment-summary-meta b { color: #fff; font-size: 1rem; font-variant-numeric: tabular-nums; }
-.payment-summary-meta .ic { width: 17px; height: 17px; color: #f5c169; }
+.payment-summary-meta span { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .86rem; }
+.payment-summary-meta b { color: var(--text); font-size: 1rem; font-variant-numeric: tabular-nums; }
+.payment-summary-meta .ic { width: 17px; height: 17px; color: var(--accent-ink); }
 
 .payment-queue-head {
   display: flex;
@@ -1335,14 +1261,13 @@ html[data-theme="dark"] .holiday-banner { color: #c4b5fd; background: rgba(167, 
   gap: 16px;
   margin-bottom: 10px;
 }
-.payment-queue-head h3 { font-family: "Heebo", "Assistant", sans-serif; font-size: 1.08rem; }
+.payment-queue-head h3 { font-family: var(--font); font-size: 1.08rem; }
 .payment-queue-head span { color: var(--muted); font-size: .82rem; font-weight: 600; }
 .payment-queue { display: flex; flex-direction: column; gap: 14px; }
 
 .payment-account {
   overflow: hidden;
-  border: 0;
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   background: var(--surface);
 }
 .payment-account-head {
@@ -1351,7 +1276,7 @@ html[data-theme="dark"] .holiday-banner { color: #c4b5fd; background: rgba(167, 
   gap: 12px;
   min-height: 44px;
   padding: 14px 16px;
-  background: var(--surface-2);
+  background: var(--surface);
   cursor: pointer;
   list-style: none;
   -webkit-tap-highlight-color: transparent;
@@ -1362,7 +1287,7 @@ html[data-theme="dark"] .holiday-banner { color: #c4b5fd; background: rgba(167, 
 .payment-box[open] .payment-account-head { border-bottom: 1px solid var(--border); }
 .payment-avatar { width: 40px; height: 40px; font-size: .84rem; }
 .payment-account-copy { flex: 1; min-width: 0; }
-.payment-account-head h3 { margin: 0; font-family: "Heebo", "Assistant", sans-serif; font-size: 1.02rem; line-height: 1.25; }
+.payment-account-head h3 { margin: 0; font-family: var(--font); font-size: 1.02rem; line-height: 1.25; }
 .payment-account-copy > span { display: block; margin-top: 2px; color: var(--muted); font-size: .8rem; }
 .payment-expand { display: inline-flex; align-items: center; gap: 3px; margin-top: 2px; color: var(--muted); font-size: .72rem; font-weight: 600; }
 .payment-expand .ic-sub { width: 13px; height: 13px; opacity: 1; margin: 0; }
@@ -1377,9 +1302,9 @@ html[data-theme="dark"] .holiday-banner { color: #c4b5fd; background: rgba(167, 
 .payment-account-total b {
   display: block;
   color: var(--red);
-  font-family: "Heebo", "Assistant", sans-serif;
+  font-family: var(--font);
   font-size: 1.3rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }
@@ -1402,16 +1327,18 @@ html[data-theme="dark"] .holiday-banner { color: #c4b5fd; background: rgba(167, 
   min-height: 44px;
   padding: 8px 12px;
   border: 0;
-  border-radius: var(--r-sm);
-  background: var(--surface);
+  border-radius: var(--r-pill);
+  background: var(--green-bg);
   color: var(--green);
-  font: 700 .82rem "Assistant", sans-serif;
+  font: 700 .82rem var(--font);
   cursor: pointer;
   transition: background .2s var(--ease-out), border-color .2s var(--ease-out), transform .2s var(--ease-out);
 }
 .payment-mark .ic { width: 16px; height: 16px; }
 .payment-actions { display: flex; gap: 10px; padding: 14px 20px; }
 .payment-actions .btn { flex: 1; margin: 0; }
+/* וואטסאפ הוא הפעולה הראשית; סימון כשולם משני כדי ששני ירוקים לא יתחרו */
+.payment-actions .btn-green { background: var(--surface); color: var(--green); border: 1px solid var(--border); }
 
 .payment-empty {
   display: flex;
@@ -1447,7 +1374,7 @@ input, select { min-height: 48px; }
 :focus-visible {
   outline: 3px solid var(--brand-3);
   outline-offset: 2px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
 }
 .nav-btn:focus-visible, .lesson-check:focus-visible { outline-offset: -2px; }
 
@@ -1465,7 +1392,7 @@ input, select { min-height: 48px; }
 }
 .page-intro h2,
 .page-intro.compact h2 {
-  font-family: "Heebo", "Assistant", sans-serif;
+  font-family: var(--font);
   font-size: var(--fs-2xl);
   line-height: 1.12;
   letter-spacing: -.03em;
@@ -1483,7 +1410,7 @@ input, select { min-height: 48px; }
   top: 12px;
   bottom: 12px;
   width: 2px;
-  border-radius: 999px;
+  border-radius: var(--r-sm);
   background: var(--border);
 }
 .timeline-list .item { position: relative; }
@@ -1501,9 +1428,9 @@ input, select { min-height: 48px; }
 
 .required-note { display: inline; color: var(--red); font-size: .72rem; margin-right: 4px; }
 
-.agenda-item { display: flex; align-items: center; gap: 10px; min-height: 78px; padding: 10px 12px; border-radius: 14px; background: var(--surface); box-shadow: var(--sh-sm); transition: transform .2s var(--ease-out), box-shadow .25s var(--ease-out); }
+.agenda-item { display: flex; align-items: center; gap: 10px; min-height: 78px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
 .agenda-main { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; border: 0; background: transparent; color: var(--text); font: inherit; text-align: right; cursor: pointer; }
-.agenda-date { width: 70px; flex: none; padding: 8px 6px; border-radius: 11px; background: var(--bg-soft); text-align: center; }
+.agenda-date { width: 70px; flex: none; padding: 8px 6px; border-radius: var(--r-sm); background: var(--bg-soft); text-align: center; }
 .agenda-date b, .agenda-date small { display: block; }
 .agenda-date b { font-size: 1rem; font-variant-numeric: tabular-nums; }
 .agenda-date small { overflow: hidden; margin-top: 2px; color: var(--muted); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -1513,103 +1440,16 @@ input, select { min-height: 48px; }
 .agenda-copy span { overflow: hidden; margin-top: 3px; color: var(--muted); font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
 .agenda-actions { display: flex; align-items: center; gap: 6px; }
 
-.student-avatar { display: grid; place-items: center; flex: none; border-radius: 12px; background: color-mix(in srgb, var(--brand-1) 11%, var(--surface)); color: var(--accent-ink); font-weight: 800; }
-.debt-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 44px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); font-family: inherit; text-align: start; cursor: pointer; }
+.student-avatar { display: grid; place-items: center; flex: none; border-radius: 50%; background: var(--bg-soft); color: var(--text); font-weight: 600; }
+.debt-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 44px; padding: 14px 16px; border: 0; border-radius: var(--r-lg); background: var(--surface); font-family: inherit; text-align: start; cursor: pointer; }
 .debt-summary strong { display: block; color: var(--red); font-size: .95rem; }
 .debt-summary span { display: block; margin-top: 2px; color: var(--muted); font-size: .74rem; }
 .debt-summary-go { color: var(--muted); font-size: 1.2rem; }
-.debt-clear { display: flex; align-items: center; gap: 11px; padding: 16px; border-radius: 14px; background: var(--green-bg); color: var(--green); }
+.debt-clear { display: flex; align-items: center; gap: 11px; padding: 16px; border-radius: var(--r-md); background: var(--green-bg); color: var(--green); }
 .debt-clear > .ic { width: 24px; height: 24px; }
 .debt-clear strong, .debt-clear span { display: block; }
 .debt-clear strong { color: var(--text); font-size: .9rem; }
 .debt-clear span { font-size: .74rem; }
-
-/* ---------- מרכז התזכורות: יושב בראש היומן, מקופל עד שצריך אותו ---------- */
-.reminder-hub {
-  margin-bottom: var(--sp-4);
-  scroll-margin-top: 88px; /* קפיצה מהבאדג' לא נחתכת מתחת לכותרת הדביקה */
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--surface);
-  box-shadow: var(--sh-sm);
-  overflow: hidden;
-}
-/* מצב "אין מה לעשות" — פס רזה, לא כרטיס שתופס את ראש המסך */
-.reminder-hub.hub-clear {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 12px var(--sp-4);
-  border-color: color-mix(in srgb, var(--green) 25%, var(--border));
-  background: var(--green-bg);
-}
-.hub-clear > .ic { width: 22px; height: 22px; flex: none; color: var(--green); }
-.hub-clear h3 { margin: 0; color: var(--text); font: 700 .88rem "Assistant", sans-serif; }
-.hub-clear span span { display: block; color: var(--muted); font-size: .74rem; }
-
-/* ----- הכותרת המתקפלת ----- */
-.hub-summary {
-  display: grid;
-  gap: 10px;
-  padding: var(--sp-3) var(--sp-4);
-  cursor: pointer;
-  list-style: none;
-  -webkit-tap-highlight-color: transparent;
-}
-.hub-summary::-webkit-details-marker { display: none; }
-.hub-summary:hover { background: var(--hover); }
-.hub-summary:active { background: var(--active); }
-.hub-summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.hub-summary-top { display: flex; align-items: center; gap: 9px; }
-.hub-mark {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--brand-1) 12%, var(--surface));
-  color: var(--accent-ink);
-}
-.hub-mark .ic { width: 17px; height: 17px; }
-.hub-summary h3 {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  color: var(--text);
-  font: 800 1.02rem "Heebo", "Assistant", sans-serif;
-  letter-spacing: -.015em;
-}
-.hub-chevron { flex: none; color: var(--muted); }
-.hub-chevron .ic { width: 20px; height: 20px; }
-.hub-box[open] .hub-chevron { transform: rotate(180deg); }
-@media (prefers-reduced-motion: no-preference) {
-  .hub-chevron { transition: transform .18s var(--ease-out); }
-}
-
-/* אריחי המונים — הסיכום שנראה גם כשהכרטיס סגור */
-.hub-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: var(--sp-2); }
-.hub-stat {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 1px;
-  min-width: 0;
-  min-height: 57px; /* אריח "הכול תקין" נמוך יותר — נעילת גובה משאירה את השורה ישרה */
-  padding: 9px 12px;
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
-}
-.hub-stat b { color: var(--text); font: 800 1.15rem "Heebo", "Assistant", sans-serif; font-variant-numeric: tabular-nums; line-height: 1.2; }
-.hub-stat > span { color: var(--muted); font-size: .74rem; line-height: 1.35; }
-.hub-stat .ic-sub { width: 17px; height: 17px; }
-.hub-stat-live { background: color-mix(in srgb, var(--brand-1) 9%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-1) 22%, transparent); }
-.hub-stat-live b { color: var(--accent-ink); }
-.hub-stat-due { background: var(--red-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 22%, transparent); }
-.hub-stat-due b { color: var(--red); }
-.hub-stat-ok { flex-direction: row; align-items: center; gap: 7px; background: var(--green-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green) 22%, transparent); }
-.hub-stat-ok .ic-sub { flex: none; color: var(--green); }
 
 /* ----- הגוף שנפתח ----- */
 .hub-body { padding: 0 var(--sp-4) var(--sp-3); border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
@@ -1623,7 +1463,7 @@ input, select { min-height: 48px; }
 /* כרטיסי התשלום המלאים בתוך מרכז התזכורות — מעט אוויר מתחת לכותרת הקבוצה */
 .hub-payment-queue { margin-top: 10px; }
 .hub-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.hub-group-head h4 { margin: 0; color: var(--text); font: 700 .95rem "Assistant", sans-serif; }
+.hub-group-head h4 { margin: 0; color: var(--text); font: 700 .95rem var(--font); }
 .hub-count { flex: none; color: var(--muted); font-size: .8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .hub-count-due { color: var(--red); }
 .hub-count-done { color: var(--green); }
@@ -1642,7 +1482,7 @@ input, select { min-height: 48px; }
   border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 }
 .remind-row:last-child { border-bottom: 0; }
-.remind-avatar { width: 38px; height: 38px; border-radius: 12px; font-size: .82rem; }
+.remind-avatar { width: 38px; height: 38px; border-radius: 50%; font-size: .82rem; }
 /* מסך צר במיוחד: האווטאר הוא קישוט, והשם והפירוט צריכים את הרוחב יותר ממנו */
 @media (max-width: 359px) { .remind-avatar { display: none; } }
 .remind-info { min-width: 0; }
@@ -1664,7 +1504,7 @@ input, select { min-height: 48px; }
   min-width: 44px;
   padding: 8px 14px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--r-pill);
   background: var(--wa);
   color: #fff;
   font-family: inherit;
@@ -1690,7 +1530,7 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 .free-slots { margin-bottom: 14px; }
 .free-slots:empty { margin: 0; }
 .free-slots > label { display: block; margin-bottom: 6px; }
-.backup-nudge { display: flex; align-items: center; gap: 11px; margin-top: 16px; padding: 13px 16px; border: 1px solid color-mix(in srgb, var(--red) 25%, var(--border)); border-radius: 14px; background: color-mix(in srgb, var(--red) 6%, var(--surface)); }
+.backup-nudge { display: flex; align-items: center; gap: 11px; margin-top: 16px; padding: 13px 16px; border: 0; border-radius: var(--r-lg); background: var(--surface); }
 .backup-nudge > .ic { width: 22px; height: 22px; flex: none; color: var(--red); }
 .backup-nudge div { flex: 1; min-width: 0; }
 .backup-nudge strong, .backup-nudge span { display: block; }
@@ -1716,23 +1556,23 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 }
 .wg-corner { position: sticky; top: 0; z-index: 3; background: var(--surface); border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
 .wg-heads { position: sticky; top: 0; z-index: 3; background: var(--surface); display: grid; grid-template-columns: repeat(var(--wg-cols, 7), minmax(0, 1fr)); border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
-.wg-head { display: grid; place-items: center; gap: 1px; padding: 7px 0 6px; border: 0; border-inline-start: 1px solid color-mix(in srgb, var(--border) 45%, transparent); background: none; color: var(--muted); font-family: inherit; font-size: .68rem; font-weight: 700; cursor: pointer; }
-.wg-head b { min-width: 24px; padding: 2px 0; border-radius: 8px; color: var(--text); font-size: .85rem; font-variant-numeric: tabular-nums; }
-.wg-head.today b { background: var(--brand-1); color: #fff; }
+.wg-head { display: grid; place-items: center; gap: 1px; padding: 8px 0 6px; border: 0; border-inline-start: 1px solid color-mix(in srgb, var(--border) 45%, transparent); background: none; color: var(--faint); font-family: inherit; font-size: .68rem; font-weight: 500; cursor: pointer; }
+.wg-head b { order: -1; min-width: 24px; color: var(--faint); font-size: 1.125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* היום: מספר ויום כהים ומודגשים, כמו "05 Wed" במקור */
+.wg-head.today b, .wg-head.today span { color: var(--text); font-weight: 700; }
 .wg-rail { position: relative; }
-.wg-hour { height: 48px; padding-top: 2px; color: var(--muted); font-size: .62rem; font-variant-numeric: tabular-nums; text-align: center; border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
+.wg-hour { height: var(--wg-hour, 48px); padding-top: 2px; color: var(--muted); font-size: .62rem; font-variant-numeric: tabular-nums; text-align: center; border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
 .wg-hour:first-child { border-top: 0; }
 .wg-cols { display: grid; grid-template-columns: repeat(var(--wg-cols, 7), minmax(0, 1fr)); }
-.wg-col { position: relative; min-width: 0; border-inline-start: 1px solid color-mix(in srgb, var(--border) 45%, transparent); background: repeating-linear-gradient(to bottom, transparent 0 47px, color-mix(in srgb, var(--border) 40%, transparent) 47px 48px); }
+.wg-col { position: relative; min-width: 0; border-inline-start: 1px solid color-mix(in srgb, var(--border) 45%, transparent); background: repeating-linear-gradient(to bottom, transparent 0 calc(var(--wg-hour, 48px) - 1px), color-mix(in srgb, var(--border) 40%, transparent) calc(var(--wg-hour, 48px) - 1px) var(--wg-hour, 48px)); }
 .wg-add { position: absolute; inset: 0; border: 0; background: none; cursor: pointer; }
-.wg-col.today { background-color: color-mix(in srgb, var(--brand-1) 5%, transparent); }
 .wg-block {
   position: absolute; inset-inline: 1px; z-index: 1;
-  overflow: hidden; padding: 3px 4px; border: 0; border-radius: 7px;
-  background: color-mix(in srgb, var(--brand-1) 88%, #000 0%);
-  color: #fff; font-family: inherit; text-align: right; cursor: pointer;
+  overflow: hidden; padding: 3px 4px; border: 0; border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--on-accent); font-family: inherit; text-align: right; cursor: pointer;
 }
-.wg-block b { display: block; font-size: .6rem; font-weight: 800; font-variant-numeric: tabular-nums; opacity: .9; }
+.wg-block b { display: block; font-size: .6rem; font-weight: 700; font-variant-numeric: tabular-nums; opacity: .9; }
 .wg-block span { display: block; overflow: hidden; font-size: .68rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .wg-block.is-done { background: color-mix(in srgb, var(--muted) 28%, var(--surface)); color: var(--muted); }
 
@@ -1744,7 +1584,7 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 .push-diag { margin-top: 8px; font-size: .72rem; color: var(--faint); direction: rtl; }
 
 /* היומן בכיוון LTR כמו יומן גוגל — ראשון משמאל, ציר שעות משמאל */
-.week-grid, .week-strip, .cal-grid, .cal-head, .day-agenda, .cal-toolbar-nav { direction: ltr; }
+.week-grid, .week-strip, .cal-grid, .day-agenda, .cal-toolbar-nav { direction: ltr; }
 
 /* גרירת שיעור ביומן — לחיצה ארוכה ואז גרירה */
 #homeCalendar, #view-calendar { touch-action: pan-y; }
@@ -1758,11 +1598,11 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 .drag-src { opacity: .35; }
 
 /* קו "עכשיו" — כמו ביומן גוגל */
-.now-line { position: absolute; inset-inline: 0; z-index: 2; height: 2px; background: var(--red); pointer-events: none; }
+.now-line { position: absolute; inset-inline: 0; z-index: 2; height: 2px; background: var(--accent-ink); pointer-events: none; }
 .now-line::before { content: ""; position: absolute; top: -3px; inset-inline-start: -1px; width: 8px; height: 8px; border-radius: 50%; background: inherit; }
 
 /* שעת שיעור בודד בתא החודש */
-.cal-time { color: var(--brand-1); font-size: .58rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.cal-time { color: var(--brand-1); font-size: .58rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
 .cal-cell.sel .cal-time, .cal-cell.today .cal-time { color: inherit; }
 
 /* ---------- אישור שיעורים שהסתיימו (בתוך מרכז התזכורות) ---------- */
@@ -1792,7 +1632,7 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
   gap: 5px;
   min-height: 40px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   background: none;
   color: var(--muted);
   font-family: inherit;
@@ -1806,40 +1646,40 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 .confirm-extra .ic-sub { width: 14px; height: 14px; opacity: 1; margin: 0; }
 
 /* ---------- תלמידים ---------- */
-.student-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; width: 100%; min-height: 122px; padding: 16px; border: 0; border-radius: var(--r-md); background: var(--surface); color: var(--text); box-shadow: var(--sh-sm); font: inherit; text-align: right; cursor: pointer; transition: transform .2s var(--ease-out), box-shadow .25s var(--ease-out); }
+.student-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; width: 100%; min-height: 122px; padding: 16px; border: 0; border-radius: var(--r-lg); background: var(--surface); color: var(--text); font: inherit; text-align: right; cursor: pointer; transition: background .15s var(--ease-out); }
 .student-avatar { width: 48px; height: 48px; font-size: .9rem; }
 .student-card-main, .student-card-main > span { display: block; min-width: 0; }
 .student-card-top { display: flex !important; align-items: baseline; justify-content: space-between; gap: 12px; }
 .student-card-top strong { font-size: 1.02rem; }
 .student-card-top > span { color: var(--muted); font-size: .76rem; white-space: nowrap; }
 .student-contact { overflow: hidden; margin-top: 3px; color: var(--muted); font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
-.student-insights { display: flex !important; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.student-insights > span { display: inline-flex; align-items: center; gap: 3px; padding: 4px 9px; border-radius: 999px; background: var(--bg-soft); color: var(--muted); font-size: .69rem; font-weight: 700; }
+.student-insights { display: flex !important; flex-direction: column; gap: 4px; margin-top: 10px; }
+.student-insights > span { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: .76rem; font-weight: 500; }
 .student-insights .ic-sub { width: 12px; height: 12px; }
 .student-card:active { transform: scale(.99); }
-.student-insights .debt { background: var(--red-bg); color: var(--red); }
-.student-insights .clear { background: var(--green-bg); color: var(--green); }
+.student-insights .debt { color: var(--red); font-weight: 600; }
+.student-insights .clear { color: var(--green); }
 .student-card-arrow { color: var(--faint); font-size: 1.5rem; line-height: 1; transition: transform .2s var(--ease-out); }
 
 /* ---------- הכנסות ---------- */
-.income-overview { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(220px, .75fr); gap: 18px; padding: 22px; border-radius: var(--r-lg); background: var(--grad-hero); color: #fff; box-shadow: var(--sh-md); }
+.income-overview { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(220px, .75fr); gap: 18px; padding: 4px 0 20px; border-bottom: 1px solid var(--line-on-bg); color: var(--text); }
 .income-total { grid-row: span 2; display: flex; flex-direction: column; justify-content: center; }
-.income-total span, .income-total small { color: #cbd6e6; }
+.income-total span, .income-total small { color: var(--muted); }
 .income-total span { font-size: .78rem; font-weight: 600; }
-.income-total strong { margin: 4px 0; font: 800 2.15rem/1.1 "Heebo", "Assistant", sans-serif; font-variant-numeric: tabular-nums; }
+.income-total strong { margin: 4px 0; font: 700 2.15rem/1.1 var(--font); font-variant-numeric: tabular-nums; }
 .income-total small { font-size: .74rem; }
 .income-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.income-metrics > div { padding: 11px 12px; border-radius: 12px; background: rgba(255,255,255,.09); }
+.income-metrics > div { padding: 11px 12px; border-radius: var(--r-md); background: var(--surface); }
 .income-metrics span, .income-metrics strong { display: block; }
-.income-metrics span { color: #cbd6e6; font-size: .68rem; }
+.income-metrics span { color: var(--muted); font-size: .72rem; }
 .income-metrics strong { margin-top: 2px; font-size: .95rem; font-variant-numeric: tabular-nums; }
-.income-metrics .pending strong { color: #f5c169; }
-.collection-rate > div { display: flex; justify-content: space-between; color: #dce4f1; font-size: .72rem; }
-.rate-track { display: block; overflow: hidden; height: 6px; margin-top: 7px; border-radius: 999px; background: rgba(255,255,255,.12); }
-.rate-track i { display: block; height: 100%; border-radius: inherit; background: #76dbc8; }
-.income-breakdown, .income-chart-card { margin-top: 18px; padding: 18px; border-radius: var(--r-md); background: var(--surface); box-shadow: var(--sh-sm); }
+.income-metrics .pending strong { color: var(--red); }
+.collection-rate > div { display: flex; justify-content: space-between; color: var(--muted); font-size: .76rem; }
+.rate-track { display: block; overflow: hidden; height: 6px; margin-top: 7px; border-radius: var(--r-sm); background: var(--bg-soft); }
+.rate-track i { display: block; height: 100%; border-radius: inherit; background: var(--text); }
+.income-breakdown, .income-chart-card { margin-top: 18px; padding: 18px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
 .income-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.income-section-head h3 { margin: 0; color: var(--text); font: 800 1rem "Heebo", "Assistant", sans-serif; text-transform: none; letter-spacing: -.01em; }
+.income-section-head h3 { margin: 0; color: var(--text); font: 700 1rem var(--font); text-transform: none; letter-spacing: -.01em; }
 .income-section-head p { margin-top: 2px; color: var(--muted); font-size: .74rem; }
 .income-students { display: flex; flex-direction: column; }
 .income-student { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 11px 6px; border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent); appearance: none; background: none; border-top: 0; border-inline: 0; width: 100%; font: inherit; color: inherit; text-align: inherit; cursor: pointer; border-radius: var(--r-sm); transition: background .15s; }
@@ -1859,16 +1699,17 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 .cal-cell { font-variant-numeric: tabular-nums; }
 
 @media (hover: hover) and (pointer: fine) {
-  .lesson-row:hover { border-color: color-mix(in srgb, var(--brand-1) 32%, var(--border)); box-shadow: var(--sh-md); transform: translateY(-1px); }
+  .lesson-row:hover { background: var(--surface-2); }
   .btn:hover,
   .btn-add:hover,
-  .fab:hover { filter: brightness(1.04); transform: translateY(-1px); }
+  .fab:hover { filter: brightness(1.06); }
+  .btn-light:hover { filter: brightness(.97); }
   .payment-mark:hover { background: var(--green-bg); border-color: color-mix(in srgb, var(--green) 40%, var(--border)); }
   .agenda-item:hover,
-  .student-card:hover { box-shadow: var(--sh-md); transform: translateY(-2px); }
+  .student-card:hover { background: var(--surface-2); }
   .student-card:hover .student-card-arrow { transform: translateX(-3px); }
-  .debt-summary:hover { filter: brightness(.96); transform: translateY(-1px); }
-  .nav-btn:hover { color: var(--text); background: rgba(255,255,255,.08); }
+  .debt-summary:hover { background: var(--hover); }
+  .nav-btn:hover { color: var(--on-bg); }
 }
 
 @media (max-width: 520px) {
@@ -1898,18 +1739,17 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
   .income-total { grid-row: auto; }
   .income-total strong { font-size: 1.8rem; }
   .income-breakdown, .income-chart-card { padding: 15px; }
-  .form-section { padding: 14px; }
   .profile-summary { grid-template-columns: 1fr; }
   .danger-zone { align-items: stretch; flex-direction: column; }
   .danger-zone > .btn { width: 100%; }
   .lesson-danger > div:last-child { display: grid; grid-template-columns: 1fr 1fr; }
-  .payment-summary { flex-direction: column; gap: 14px; padding: 18px; }
+  .payment-summary { flex-direction: column; gap: 14px; }
   .payment-summary-main strong { font-size: 1.75rem; }
   .payment-summary-meta {
     justify-content: space-between;
     gap: 10px;
     padding: 14px 0 0;
-    border-top: 1px solid rgba(255, 255, 255, .2);
+    border-top: 1px solid var(--line-on-bg);
     border-right: 0;
   }
   .payment-summary-meta span { font-size: .79rem; }
@@ -1920,7 +1760,6 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 }
 
 @media (min-width: 760px) {
-  main { padding: 32px 28px; max-width: 1120px; }
   #studentsList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #paymentsList { max-width: 900px; }
   .modal-content { padding-inline: 28px; }
@@ -1929,74 +1768,12 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 }
 
 @media (min-width: 1080px) {
-  body { padding: 0 0 0; padding-right: 260px; }
-  .app-header {
-    position: fixed;
-    inset: 0 0 0 auto;
-    width: 260px;
-    margin: 0;
-    border-radius: 0;
-    padding: 32px 22px;
-    align-items: flex-start;
-    flex-direction: column;
-    justify-content: flex-start;
-    background: var(--grad-hero);
-    color: #fff;
-    box-shadow: 0 12px 30px rgba(13, 22, 38, .18);
-  }
-  .app-header::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: radial-gradient(260px 260px at 50% 0, rgba(54,88,220,.28), transparent 70%);
-  }
-  .app-brand { position: relative; align-items: flex-start; gap: 12px; }
-  .brand-mark { width: 44px; height: 44px; border-radius: 13px; background: rgba(255,255,255,.12); box-shadow: inset 0 1px rgba(255,255,255,.16); }
-  .brand-mark svg { width: 24px; height: 24px; }
-  .app-header h1 { font-size: 1.55rem; }
-  .app-brand > div > span { display: block; margin-top: 2px; color: #bfcbe0; font-size: .72rem; font-weight: 600; }
-  .topbar-context { display: none; }
-  main { padding-top: 40px; }
-  .header-icon-btn { width: 100%; border-radius: 12px; gap: 8px; }
-  .header-icon-btn::after { content: "הגדרות"; font-family: "Assistant", sans-serif; font-weight: 700; }
-  .bottom-nav {
-    position: fixed;
-    top: 106px;
-    right: 18px;
-    bottom: auto;
-    left: auto;
-    transform: none;
-    width: 224px;
-    max-width: none;
-    padding: 0;
-    border: 0;
-    box-shadow: none;
-    background: transparent;
-    backdrop-filter: none;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .nav-btn {
-    min-height: 48px;
-    padding: 11px 14px;
-    flex: none;
-    flex-direction: row;
-    justify-content: flex-start;
-    gap: 12px;
-    color: #aebbd0;
-    font-size: .9rem;
-  }
-  .nav-btn.active { color: #fff; background: rgba(255,255,255,.12); }
-  .nav-btn.active svg { transform: none; }
-  .nav-btn.active::after { right: 3px; bottom: auto; width: 3px; height: 24px; border-radius: 999px; background: var(--brand-3); }
-  main { max-width: 1180px; padding: 44px clamp(36px, 5vw, 72px); }
   #settingsBody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; align-items: start; }
   .settings-group { margin: 0; }
   .settings-wide { grid-column: 1 / -1; }
   .settings-data-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .modal { align-items: center; padding: 24px; }
-  .modal-content { border-radius: 24px; max-height: min(86vh, 820px); }
+  .modal-content { border-radius: var(--r-lg); max-height: min(86vh, 820px); }
   .modal-grabber { display: none; }
 }
 
@@ -2004,167 +1781,184 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
    v4 — מסך "היום", שורת "לטיפול", FAB, יומן לטלפון, גרף SVG
    ========================================================= */
 
-/* ---------- רצועת היום: תאריך, ברכה, מונה — שורה אחת, בלי כרטיס ---------- */
-.today-strip { margin: 6px 0 14px; }
-.today-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.today-lead { min-width: 0; }
-.today-date { display: block; color: var(--accent-ink); font-size: var(--fs-sm); font-weight: 700; letter-spacing: .01em; }
-.today-greeting {
-  margin: 2px 0 0;
-  font-family: "Heebo", "Assistant", sans-serif;
-  font-size: var(--fs-2xl);
-  font-weight: 800;
-  line-height: 1.1;
-  letter-spacing: -.03em;
-  text-wrap: balance;
-}
-.today-count {
-  flex: none;
-  min-width: 68px;
-  padding: 7px 10px 6px;
-  border-radius: 14px;
-  background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  text-align: center;
-}
-.today-count b { display: block; font: 800 1.5rem/1 "Heebo", "Assistant", sans-serif; color: var(--brand-1); font-variant-numeric: tabular-nums; }
-.today-count span { display: block; margin-top: 3px; color: var(--muted); font-size: .66rem; font-weight: 700; white-space: nowrap; }
-.today-count.is-free b { color: var(--faint); }
-.today-next {
-  display: flex;
+/* ---------- כותרת המסך על הלבנדר: ברכה ותאריך, שני מדדים ופעולה ראשית ---------- */
+.today-strip { margin: 8px 0 0; color: var(--on-bg); }
+.today-head { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; }
+.today-lead { flex: 1 1 220px; min-width: 0; }
+.today-greeting { margin: 0; font-size: 1.875rem; font-weight: 600; line-height: 1.15; letter-spacing: -.01em; text-wrap: balance; }
+.today-date { margin: 4px 0 0; color: var(--on-bg-muted); font-size: .875rem; }
+.today-stats { display: flex; align-items: stretch; }
+.today-stat { display: flex; flex-direction: column; gap: 2px; padding-inline: 20px; }
+.today-stat:first-child { padding-inline-start: 0; }
+.today-stat + .today-stat { border-inline-start: 1px solid var(--line-on-bg); }
+.today-stat > span { color: var(--on-bg-muted); font-size: .8125rem; }
+.today-stat b { font: 600 1.75rem/1.1 var(--font); font-variant-numeric: tabular-nums; }
+/* "+ שיעור" בכותרת, כמו Add Sport; בטלפון ה-FAB עושה את זה */
+.today-add {
+  display: none;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 24px 0 20px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  color: var(--on-primary);
+  font: 600 .9375rem var(--font);
+  cursor: pointer;
+  transition: filter .15s var(--ease-out), transform .15s var(--ease-out);
+}
+.today-add .ic { width: 20px; height: 20px; }
+.today-add:hover { filter: brightness(1.08); }
+.today-add:active { transform: scale(.97); }
+
+/* ---------- השיעור הבא: כרטיס לבן; כשהוא קרוב, הזמן היחסי נצבע בליים ---------- */
+.today-next {
+  display: block;
   width: 100%;
-  margin-top: 12px;
-  padding: 9px 12px;
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  border-radius: var(--r-md);
+  margin-top: 16px;
+  padding: 14px 16px 16px;
+  border: 0;
+  border-radius: var(--r-lg);
   background: var(--surface);
   color: var(--text);
   font: inherit;
   text-align: start;
   cursor: pointer;
-  box-shadow: var(--sh-sm);
-  transition: transform .18s var(--ease-out), box-shadow .2s var(--ease-out);
+  transition: background .15s var(--ease-out), transform .15s var(--ease-out);
 }
+.today-next:hover { background: var(--surface-2); }
 .today-next:active { transform: scale(.99); }
-.today-next-time {
-  flex: none;
-  min-width: 60px;
-  padding: 9px 0;
-  border-radius: 10px;
-  background: var(--grad-brand);
-  color: #fff;
-  text-align: center;
-  font: 800 1rem "Heebo", "Assistant", sans-serif;
-  font-variant-numeric: tabular-nums;
-}
-.today-next-copy { flex: 1; min-width: 0; }
+.today-next-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.today-next-label { color: var(--faint); font-size: .8125rem; font-weight: 500; }
+.today-next-when { padding: 3px 10px; border-radius: var(--r-pill); background: var(--bg-soft); font-size: .75rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.today-next.is-soon .today-next-when { background: var(--accent); color: var(--on-accent); }
+.today-next-main { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.today-next-time { flex: none; font: 700 1.625rem/1 var(--font); font-variant-numeric: tabular-nums; }
+.today-next-copy { flex: 1; min-width: 0; padding-inline-start: 14px; border-inline-start: 1px solid var(--border); }
 .today-next-copy strong, .today-next-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.today-next-copy strong { font-size: .95rem; }
-.today-next-copy span { margin-top: 1px; color: var(--muted); font-size: .76rem; }
-.today-next-go { color: var(--faint); font-size: 1.4rem; line-height: 1; }
+.today-next-copy strong { font-size: 1.0625rem; font-weight: 600; }
+.today-next-copy span { margin-top: 2px; color: var(--faint); font-size: .8125rem; }
+.today-next-go { flex: none; color: var(--faint); font-size: 1.5rem; line-height: 1; }
 
-/* ---------- "לטיפול": שורת צ'יפים אופקית במקום קופסה; לחיצה פותחת את הפירוט ---------- */
-.reminder-hub { margin-bottom: 12px; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
-.reminder-hub.hub-clear { padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--green) 25%, var(--border)); border-radius: 12px; background: var(--green-bg); }
-.hub-summary { display: flex; align-items: center; gap: 8px; padding: 0; border-radius: 12px; }
-.hub-summary:hover, .hub-summary:active { background: none; }
-.hub-lead { display: flex; align-items: center; gap: 6px; flex: none; }
-.hub-lead .hub-mark { width: 28px; height: 28px; border-radius: 9px; }
-.hub-lead .hub-mark .ic { width: 15px; height: 15px; }
-.hub-summary h3 { flex: none; font-size: .9rem; }
-.hub-stats {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  gap: 6px;
-  padding: 4px 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x proximity;
-}
-.hub-stats::-webkit-scrollbar { display: none; }
-.hub-stat {
-  flex: none;
-  flex-direction: row;
-  align-items: center;
-  gap: 5px;
-  min-height: 36px;
-  padding: 0 11px;
-  border-radius: 999px;
-  scroll-snap-align: start;
-}
-.hub-stat b { font-size: .92rem; }
-.hub-stat > span { font-size: .72rem; white-space: nowrap; }
-/* קצה הגלילה דוהה — רמז שיש עוד צ'יפים */
-.hub-stats { mask-image: linear-gradient(to left, transparent, #000 14px, #000 calc(100% - 4px)); -webkit-mask-image: linear-gradient(to left, transparent, #000 14px, #000 calc(100% - 4px)); }
-.hub-chevron { flex: none; }
-.hub-body {
-  margin-top: 10px;
-  padding: 2px var(--sp-4) var(--sp-3);
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  border-radius: var(--r-md);
+/* ---------- "לטיפול": כרטיס אחד, מונים מופרדים בקו; לחיצה פותחת את הפירוט ---------- */
+.reminder-hub {
+  margin-top: 12px;
+  scroll-margin-top: 88px; /* קפיצה מהתראה לא נחתכת מתחת לכותרת הדביקה */
+  border-radius: var(--r-lg);
   background: var(--surface);
-  box-shadow: var(--sh-sm);
+  overflow: hidden;
 }
+.reminder-hub.hub-clear { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+.hub-clear > .ic { width: 22px; height: 22px; flex: none; color: var(--green); }
+.hub-clear h3 { margin: 0; color: var(--text); font: 600 .9375rem var(--font); }
+.hub-clear span span { display: block; color: var(--faint); font-size: .75rem; }
+.hub-summary { display: block; padding: 14px 16px 16px; cursor: pointer; list-style: none; -webkit-tap-highlight-color: transparent; }
+.hub-summary::-webkit-details-marker { display: none; }
+.hub-summary:hover { background: var(--surface-2); }
+.hub-summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.hub-lead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hub-summary h3 { margin: 0; color: var(--text); font: 600 .9375rem var(--font); }
+.hub-chevron { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--bg-soft); color: var(--text); }
+.hub-chevron .ic { width: 16px; height: 16px; }
+.hub-box[open] .hub-chevron { transform: rotate(180deg); }
+@media (prefers-reduced-motion: no-preference) {
+  .hub-chevron { transition: transform .18s var(--ease-out); }
+}
+.hub-stats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); margin-top: 12px; }
+.hub-stat { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; padding: 0 12px; border-inline-start: 1px solid var(--border); }
+.hub-stat:first-child { padding-inline-start: 0; border-inline-start: 0; }
+.hub-stat b { color: var(--text); font: 700 1.375rem/1.15 var(--font); font-variant-numeric: tabular-nums; }
+.hub-stat > span { max-width: 100%; overflow: hidden; color: var(--faint); font-size: .75rem; text-overflow: ellipsis; white-space: nowrap; }
+.hub-stat-due b { color: var(--red); }
+.hub-stat-ok .ic-sub { width: 22px; height: 22px; margin: 2px 0 3px; opacity: 1; color: var(--green); }
+.hub-body { padding: 0 16px 16px; border-top: 1px solid var(--border); }
+/* בתוך "לטיפול" כרטיסי התשלום הם שורות ממולאות, לא כרטיס בתוך כרטיס */
+.hub-payment-queue .payment-account { border-radius: var(--r-md); background: var(--bg-soft); }
+.hub-payment-queue .payment-account-head { background: none; }
 
-/* ---------- סרגל היומן: חמישה מצבים ברוחב מלא, "תלמיד" עבר לסרגל הניווט ---------- */
-.home-cal-bar { margin-bottom: 10px; }
-.home-cal-seg { margin-bottom: 0; }
-.home-cal-seg .seg-btn { padding: 8px 4px; font-size: .82rem; white-space: nowrap; }
+/* ---------- יומן: מתג תצוגות כגלולות, והיומן בכרטיס עם מסגרת ופס כותרת סגולים ---------- */
+.home-calendar { margin-top: 24px; }
+.home-cal-bar { margin-bottom: 12px; }
+.home-cal-seg { gap: 6px; margin: 0; padding: 0; border-radius: 0; background: none; }
+.home-cal-seg .seg-btn { flex: 1 1 0; min-width: 0; padding: 0 6px; background: var(--chip-on-bg); color: var(--on-bg); font-size: .8125rem; white-space: nowrap; }
+.home-cal-seg .seg-btn.active { background: var(--primary); color: var(--on-primary); }
+/* מסגרת של 6px ופס כותרת סגולים סביב גוף לבן, כמו הלוח הגדול במקור.
+   גם הפנלים השכנים בזמן החלקה הם .cal-slide, כך שהכרטיס זז שלם. */
+.home-calendar .cal-slide {
+  padding: 0 12px 12px;
+  border-radius: 26px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 6px var(--band);
+  overflow: hidden;
+}
+.home-calendar .cal-toolbar { margin: 0 -12px 10px; padding: 12px 16px; background: var(--band); color: var(--on-bg); }
+.home-calendar .cal-toolbar-label { font-weight: 600; }
+.home-calendar .btn-today { color: var(--on-bg); }
+.home-calendar .btn-today:hover { background: var(--chip-on-bg); }
+.home-calendar .cal-nav,
+.home-calendar .cal-toolbar .cal-add-student { background: var(--chip-on-bg); color: var(--on-bg); }
+/* בתוך הכרטיס: שורות ממולאות במקום כרטיסים מקוננים */
+.home-calendar .lesson-row,
+.home-calendar .past-toggle { background: var(--bg-soft); }
+.home-calendar .lesson-row .time-chip { background: var(--surface); }
+.home-calendar .lesson-row.is-today .time-chip { background: var(--accent); }
+.home-calendar .week-grid { border: 0; border-radius: 0; background: none; }
 .cal-toolbar .cal-add-student {
+  order: 2;
+  min-height: 44px;
   margin: 0;
-  min-height: 40px;
-  padding: 0 12px;
-  border-radius: 999px;
+  padding: 0 14px;
   gap: 4px;
   font-size: var(--fs-sm);
 }
-.cal-toolbar .cal-add-student .ic { width: 16px; height: 16px; }
-@media (max-width: 420px) { .cal-toolbar .cal-add-student span { display: none; } .cal-toolbar .cal-add-student { padding: 0 11px; } }
+.cal-toolbar .cal-add-student .ic { width: 18px; height: 18px; }
+@media (max-width: 420px) {
+  .cal-toolbar .cal-add-student { width: 44px; padding: 0; }
+  .cal-toolbar .cal-add-student span { display: none; }
+}
 
-/* ---------- בלוקים ביומן: קריאים, עם פס סטטוס (שולם / טרם שולם) ---------- */
-.wg-block { padding: 3px 5px; border-radius: 6px; border-inline-start: 3px solid transparent; line-height: 1.25; }
-.wg-block b { font-size: .62rem; }
-.wg-block span { font-size: .72rem; }
-.wg-block i { display: block; overflow: hidden; font-style: normal; font-size: .68rem; font-weight: 600; opacity: .85; text-overflow: ellipsis; white-space: nowrap; }
-.week-grid.is-3d .wg-block { padding: 4px 8px; border-radius: 8px; }
+/* ---------- שיעורים ביומן: שם, שעה ואווטאר כמו הבלוקים במקור; קרוב בליים, התקיים בסגול, לא שולם בוורוד ---------- */
+.wg-block { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 4px 6px; border-radius: 8px; line-height: 1.25; }
+.wg-block > span:first-child { max-width: 100%; font-size: .72rem; font-weight: 600; }
+.wg-block b { font-size: .62rem; font-weight: 500; opacity: .85; white-space: nowrap; }
+.wg-block .wg-end { display: none; }
+.wg-block .wg-ava { display: none; place-items: center; width: 22px; height: 22px; margin-top: auto; border-radius: 50%; background: rgba(255, 255, 255, .82); color: #1d1836; font-size: .625rem; font-weight: 600; }
+.wg-block i { display: block; overflow: hidden; max-width: 100%; font-style: normal; font-size: .68rem; font-weight: 500; opacity: .85; text-overflow: ellipsis; white-space: nowrap; }
+.week-grid.is-3d .wg-block { padding: 5px 8px; border-radius: 10px; }
+.week-grid.is-3d .wg-block > span:first-child { font-size: .86rem; }
 .week-grid.is-3d .wg-block b { font-size: .68rem; }
-.week-grid.is-3d .wg-block span { font-size: .86rem; }
 .week-grid.is-3d .wg-head { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 0; font-size: .78rem; }
 .week-grid.is-3d .wg-head b { font-size: .95rem; padding: 2px 6px; }
-.wg-block.is-done { color: var(--text); }
-.wg-block.is-done.is-paid { background: color-mix(in srgb, var(--green) 18%, var(--surface)); border-inline-start-color: var(--green); }
-.wg-block.is-done.is-unpaid { background: color-mix(in srgb, var(--red) 16%, var(--surface)); border-inline-start-color: var(--red); }
-.wg-block.is-done b { opacity: .7; }
-.agenda-block { border-inline-start-width: 3px; }
-.agenda-block.is-paid { border-inline-start-color: var(--green); }
-.agenda-block.is-unpaid { border-inline-start-color: var(--red); background: color-mix(in srgb, var(--red) 7%, var(--surface)); }
+.wg-block.is-done,
+.wg-block.is-done.is-paid { background: var(--ev-paid); color: var(--ev-paid-ink); }
+.wg-block.is-done.is-unpaid { background: var(--ev-unpaid); color: var(--ev-unpaid-ink); }
+.agenda-block.is-done,
+.agenda-block.is-paid { background: var(--ev-paid); color: var(--ev-paid-ink); }
+.agenda-block.is-unpaid { background: var(--ev-unpaid); color: var(--ev-unpaid-ink); }
 
-/* ---------- FAB: הפעולה הראשית של המסך, בהישג אגודל, מעל הניווט ---------- */
+/* ---------- FAB: הפעולה הראשית של המסך, גלולת חציל בהישג אגודל ---------- */
 .fab {
   position: fixed;
   z-index: 31;
   inset-inline-end: 18px;
-  bottom: calc(88px + env(safe-area-inset-bottom));
+  bottom: calc(92px + env(safe-area-inset-bottom));
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 56px;
-  padding-inline: 16px 22px;
+  min-height: 54px;
+  padding-inline: 18px 22px;
   border: 0;
-  border-radius: 999px;
-  background: var(--grad-brand);
-  color: #fff;
-  font: 800 1rem "Heebo", "Assistant", sans-serif;
-  box-shadow: var(--sh-brand), 0 2px 6px rgba(13, 22, 38, .18);
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  color: var(--on-primary);
+  font: 600 1rem var(--font);
+  box-shadow: 0 8px 20px rgba(29, 24, 54, .28);
   cursor: pointer;
-  transition: transform .2s var(--ease-out), box-shadow .2s var(--ease-out), filter .2s var(--ease-out);
+  transition: transform .2s var(--ease-out), filter .2s var(--ease-out);
 }
-.fab svg { width: 24px; height: 24px; stroke-width: 2.4; }
-.fab:active { transform: scale(.94); }
+.fab svg { width: 22px; height: 22px; stroke-width: 2.4; }
+.fab:active { transform: scale(.95); }
 .fab:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 .fab[hidden] { display: none; }
 @media (prefers-reduced-motion: no-preference) {
@@ -2175,7 +1969,7 @@ body.modal-open .fab { display: none; }
 
 /* ---------- תלמידים: כרטיס עם פעולות מהירות (וואטסאפ, קביעת שיעור) ---------- */
 .student-card { display: flex; align-items: stretch; padding: 0; overflow: hidden; min-height: 0; grid-template-columns: none; }
-.student-card[data-debt] { box-shadow: var(--sh-sm), inset 4px 0 0 var(--red); }
+
 .student-open {
   flex: 1;
   min-width: 0;
@@ -2207,28 +2001,28 @@ body.modal-open .fab { display: none; }
   place-items: center;
   width: 44px;
   height: 44px;
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  border-radius: 12px;
-  background: var(--surface-2);
-  color: var(--muted);
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg-soft);
+  color: var(--text);
   cursor: pointer;
   transition: transform .15s var(--ease-out), background .18s var(--ease-out), color .18s var(--ease-out);
 }
 .student-quick .ic { width: 19px; height: 19px; }
 .student-quick:active { transform: scale(.92); }
 .student-quick.is-debt { background: color-mix(in srgb, var(--wa) 14%, var(--surface)); color: var(--wa); border-color: color-mix(in srgb, var(--wa) 30%, transparent); }
-html[data-theme="dark"] .student-quick.is-debt { color: #7ee2a8; }
+html[data-theme="dark"] .student-quick.is-debt { color: var(--green); }
 @media (hover: hover) and (pointer: fine) {
   .student-quick:hover { background: var(--selected); color: var(--accent-ink); }
 }
 
 /* ---------- הכנסות: מגמה מול חודש קודם + גרף SVG ---------- */
 .income-trend { display: block; margin-top: 6px; font-size: .74rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.income-trend.up { color: #8fe3cf; }
-.income-trend.down { color: #ffb4c0; }
-.income-trend.flat { color: #cbd6e6; }
+.income-trend.up { color: var(--green); }
+.income-trend.down { color: var(--red); }
+.income-trend.flat { color: var(--muted); }
 .income-chart { margin-top: 6px; }
-.chart-svg { display: block; width: 100%; height: auto; overflow: visible; font-family: "Assistant", sans-serif; }
+.chart-svg { display: block; width: 100%; height: auto; overflow: visible; font-family: var(--font); }
 .chart-grid { stroke: color-mix(in srgb, var(--border) 70%, transparent); stroke-dasharray: 3 5; }
 .chart-axis { stroke: var(--border); }
 .chart-hit { fill: transparent; }
@@ -2242,7 +2036,7 @@ html[data-theme="dark"] .student-quick.is-debt { color: #7ee2a8; }
 .chart-bar { cursor: default; outline: none; }
 .chart-tip { opacity: 0; pointer-events: none; transition: opacity .12s var(--ease-out); }
 .chart-tip rect { fill: var(--text); }
-.chart-tip text { fill: var(--bg); font-size: 17px; font-weight: 700; text-anchor: middle; font-variant-numeric: tabular-nums; }
+.chart-tip text { fill: var(--surface); font-size: 17px; font-weight: 700; text-anchor: middle; font-variant-numeric: tabular-nums; }
 .chart-bar:hover .chart-tip, .chart-bar:focus-visible .chart-tip { opacity: 1; }
 .chart-bar.is-current:hover .chart-value, .chart-bar.is-current:focus-visible .chart-value { opacity: 0; }
 .chart-bar:focus-visible path { stroke: var(--focus-ring); stroke-width: 2; }
@@ -2250,11 +2044,165 @@ html[data-theme="dark"] .student-quick.is-debt { color: #7ee2a8; }
 /* במובייל ה-FAB הוא "תלמיד חדש" — כפתור הכותרת היה כפילות */
 @media (max-width: 759px) { #view-students .view-head .btn-add { display: none; } }
 
-/* ---------- מסך רחב ---------- */
-@media (min-width: 760px) {
-  .today-greeting { font-size: 2.1rem; }
-  .fab { inset-inline-end: 28px; }
+/* ---------- כלי הכותרת: מתג כהה/בהיר, פעמון ואווטאר (הפינה העליונה של המקור) ---------- */
+.topbar-tools { display: flex; align-items: center; gap: 8px; margin-inline-start: auto; }
+.theme-toggle { display: flex; padding: 3px; border-radius: var(--r-pill); background: var(--chip-on-bg); }
+.theme-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--on-bg);
+  font: 500 .8125rem var(--font);
+  cursor: pointer;
+  transition: background .15s var(--ease-out), color .15s var(--ease-out);
 }
-@media (min-width: 1080px) {
-  .fab { inset-inline-end: 40px; bottom: 40px; }
+.theme-toggle button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
+.theme-toggle svg { width: 15px; height: 15px; }
+.topbar-bell,
+.topbar-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--chip-on-bg);
+  color: var(--on-bg);
+  cursor: pointer;
+}
+.topbar-bell svg { width: 20px; height: 20px; }
+.topbar-bell.has-dot::after { content: ""; position: absolute; top: 10px; inset-inline-end: 11px; width: 8px; height: 8px; border-radius: 50%; background: #ff7a59; }
+.topbar-avatar { background: var(--accent); color: var(--on-accent); font: 600 .875rem var(--font); }
+.topbar-avatar .ic { width: 20px; height: 20px; }
+.topbar-pills { display: flex; gap: 8px; }
+.tb-pill {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--chip-on-bg);
+  color: var(--on-bg);
+  font: 500 .875rem var(--font);
+  cursor: pointer;
+  transition: background .15s var(--ease-out);
+}
+.tb-pill.active { background: var(--primary); color: var(--on-primary); }
+
+/* ---------- לוח החודש בעמודת הצד (מסך רחב בלבד) ---------- */
+.mini-cal { display: none; padding: 16px 14px 14px; border-radius: 26px; background: var(--band); color: var(--on-bg); }
+.mini-cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.mini-cal-head h3 { margin: 0; color: var(--on-bg); font: 600 1rem var(--font); }
+.mini-cal-nav { display: flex; gap: 6px; direction: ltr; }
+.mini-cal-nav button { width: 30px; height: 30px; border: 0; border-radius: 50%; background: var(--chip-on-bg); color: var(--on-bg); font-size: 1rem; line-height: 1; cursor: pointer; }
+.mini-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 4px; direction: ltr; text-align: center; }
+.mini-cal-dow { padding-bottom: 4px; font-size: .6875rem; font-weight: 500; }
+.mini-cal-day { display: grid; place-items: center; height: 32px; padding: 0; border: 0; background: none; color: var(--on-bg); font: 500 .8125rem var(--font); font-variant-numeric: tabular-nums; cursor: pointer; }
+.mini-cal-day span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; }
+.mini-cal-day:hover span { background: var(--chip-on-bg); }
+/* השבוע שמוצג ביומן הגדול: רצועה, כמו הטווח המסומן במקור */
+.mini-cal-day.in-week { background: var(--chip-on-bg); }
+.mini-cal-day.in-week.row-start { border-radius: 999px 0 0 999px; }
+.mini-cal-day.in-week.row-end { border-radius: 0 999px 999px 0; }
+.mini-cal-day.today span { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+
+/* ---------- טקסט שיושב ישירות על הלבנדר: לבן, כמו בעיצוב המקור ---------- */
+.view-head h2, .page-intro h2, .payment-summary, .payment-queue-head h3,
+.income-overview, .settings-group-head h3, .month-nav > span,
+#studentsList > .empty, #studentsList > .empty h3 { color: var(--on-bg); }
+.view-head-copy p, .page-intro p, .payment-summary-main span, .payment-summary-meta span,
+.payment-queue-head span, .income-total span, .income-total small, .collection-rate > div,
+.settings-group-head p, .app-version, #studentsList > .empty p { color: var(--on-bg-muted); }
+.payment-summary-meta b, .payment-summary-meta .ic, .income-overview .income-trend { color: var(--on-bg); }
+.income-metrics > div { color: var(--text); }
+#view-money > .seg-toggle { background: var(--chip-on-bg); }
+#view-money > .seg-toggle .seg-btn:not(.active), .month-nav button { color: var(--on-bg); }
+
+/* במובייל ה-FAB הוא "תלמיד חדש" — כפתור הכותרת היה כפילות */
+@media (max-width: 759px) {
+  #view-students .view-head .btn-add { display: none; }
+  /* אין מקום בכותרת הצרה: ההקשר והאווטאר מופיעים רק במסך רחב */
+  .topbar-context, .topbar-avatar { display: none; }
+}
+
+/* =========================================================
+   מסך רחב (760px ומעלה): לוח בקרה כמו במקור
+   פס אייקונים צר בצד, כותרת עם מתג תצוגות ומתג כהה/בהיר,
+   ומתחת: עמודת צד (לוח חודש, השיעור הבא, "לטיפול") ולוח שבוע גדול.
+   ========================================================= */
+@media (min-width: 760px) {
+  body { padding-right: 92px; padding-bottom: 0; }
+  .app-header { padding: 22px 28px 14px; gap: 16px; }
+  .app-brand .brand-mark { position: fixed; top: 22px; right: 22px; z-index: 31; width: 48px; height: 48px; }
+  .app-brand .brand-mark svg { width: 24px; height: 24px; }
+  .app-brand h1 { font-size: 1.25rem; }
+  .topbar-context { flex: 1; justify-content: center; min-width: 0; min-height: 0; padding: 0; background: none; }
+  .tb-pill { min-height: 40px; padding: 0 14px; }
+  .bottom-nav {
+    inset: 0 0 0 auto;
+    width: 92px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 104px 0 24px;
+    border-top: 0;
+    border-left: 1px solid var(--line-on-bg);
+  }
+  /* רק עיגולים, כמו הפס במקור; השם נשאר ב-aria-label */
+  .nav-btn { flex: none; min-height: 0; padding: 0; gap: 0; font-size: 0; }
+  .nav-btn svg { width: 48px; height: 48px; padding: 13px; }
+  .nav-btn[data-view="settings"] { margin-top: 14px; }
+  .nav-btn[data-view="settings"]::before { content: ""; position: absolute; top: -15px; width: 36px; height: 1px; background: var(--line-on-bg); }
+  .fab { display: none; }
+  main { max-width: none; padding: 6px 28px 32px; }
+
+  /* מסך הבית: כותרת לכל הרוחב, עמודת צד מימין ולוח השבוע משמאל */
+  #view-home.active {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 16px 20px;
+    align-items: start;
+  }
+  #onboard { grid-column: 1 / -1; grid-row: 1; }
+  #todayStrip { grid-column: 1 / -1; grid-row: 2; }
+  #miniCal { grid-column: 1; grid-row: 3; }
+  #nextLesson { grid-column: 1; grid-row: 4; }
+  #reminderHub { grid-column: 1; grid-row: 5; }
+  #backupNudge { grid-column: 1; grid-row: 6; }
+  #homeCalendar { grid-column: 2; grid-row: 3 / span 5; margin-top: 0; }
+  .today-strip { margin: 0; }
+  .today-head { flex-wrap: nowrap; }
+  .today-stats { margin-inline-start: auto; }
+  .today-add { display: inline-flex; }
+  .mini-cal { display: block; }
+  #nextLesson .today-next { margin-top: 0; }
+  .reminder-hub { margin-top: 0; }
+  .home-cal-bar { display: none; } /* המתג עבר לכותרת העליונה */
+  .home-calendar .cal-slide { border-radius: 30px; }
+  .home-calendar .week-grid { grid-template-columns: 52px minmax(0, 1fr); max-height: calc(100dvh - 250px); }
+  .home-calendar .day-agenda { max-height: calc(100dvh - 330px); }
+  .wg-block .wg-ava { display: grid; }
+  /* פס הכותרת של הלוח צר יחסית: כפתורים קטנים יותר (עכבר), התאריך בשורה אחת */
+  .home-calendar .cal-toolbar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .home-calendar .btn-today { min-height: 36px; }
+  .home-calendar .cal-nav,
+  .home-calendar .cal-toolbar .cal-add-student { width: 36px; height: 36px; min-height: 36px; padding: 0; }
+  .home-calendar .cal-toolbar .cal-add-student span { display: none; }
+}
+/* בין 760 ל-1000 אין מקום לאווטאר ליד המתגים; ההגדרות זמינות מהפס בצד */
+@media (min-width: 760px) and (max-width: 999px) {
+  .topbar-avatar { display: none; }
+}
+@media (min-width: 1100px) {
+  .app-brand h1 { font-size: 1.5rem; }
+  .tb-pill { min-height: 44px; padding: 0 20px; }
+  #view-home.active { grid-template-columns: 280px minmax(0, 1fr); }
+  .wg-block .wg-end { display: inline; }
 }
