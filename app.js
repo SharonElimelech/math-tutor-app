@@ -43,6 +43,8 @@ const App = (() => {
     close: '<path d="M18 6 6 18M6 6l12 12"/>',
     checkCircle: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5L16 9"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    userPlus: '<path d="M15 20v-1.5a4 4 0 0 0-4-4H6.5a4 4 0 0 0-4 4V20"/><circle cx="8.75" cy="8" r="3.5"/><path d="M19 8v6M22 11h-6"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/>',
     edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
     whatsapp: '<path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.5L3 21l2-5.4A8.5 8.5 0 1 1 21 11.5z"/><path d="M8.6 9.6c0 3.8 2 5.8 5.8 6.3"/>',
     send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
@@ -940,7 +942,7 @@ const App = (() => {
   function applyCalScroll() {
     const el = document.querySelector(".week-grid, .day-agenda");
     if (!el) return;
-    const hourPx = el.classList.contains("week-grid") ? 48 : 64;
+    const hourPx = el.classList.contains("week-grid") ? wgHourPx() : 64;
     el.scrollTop = calScroll ?? smartCalTop(el, hourPx);
     el.onscroll = () => { calScroll = el.scrollTop; };
   }
@@ -960,6 +962,14 @@ const App = (() => {
   }
 
   const toMinutes = t => { const [h, m] = String(t || "0:0").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
+  // "17:00" + 60 דק' → "18:00"
+  const addMinutes = (time, mins) => {
+    const m = (toMinutes(time) + mins) % (24 * 60);
+    return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  };
+  // גובה שעה ברשת השבוע: במסך רחב שיעור גבוה מספיק לשם, לשעה ולאווטאר
+  const WIDE = "(min-width: 760px)";
+  const wgHourPx = () => (matchMedia(WIDE).matches ? 80 : 48);
   function weekDaysFor(dateStr) {
     const start = new Date(dateStr + "T00:00");
     start.setDate(start.getDate() - start.getDay()); // ראשון = תחילת שבוע
@@ -986,7 +996,7 @@ const App = (() => {
       </div>
       <span class="cal-toolbar-label">${label}</span>
       <button type="button" class="btn-today" onclick="App.calToday()">היום</button>
-      <button type="button" class="btn btn-light cal-add-student" onclick="App.openStudentForm()" aria-label="הוספת תלמיד חדש" title="תלמיד חדש">${icon("plus")}<span>תלמיד</span></button>
+      <button type="button" class="btn btn-light cal-add-student" onclick="App.openStudentForm()" aria-label="הוספת תלמיד חדש" title="תלמיד חדש">${icon("userPlus")}<span>תלמיד</span></button>
     </div>`;
   }
 
@@ -1061,7 +1071,7 @@ const App = (() => {
     });
     const byDay = new Map(days.map(ds => [ds, []]));
     lessonSorted().forEach(l => { if (byDay.has(l.date)) byDay.get(l.date).push(l); });
-    const HOUR_PX = 48;
+    const HOUR_PX = wgHourPx();
     const startH = 0, endH = 24; // יממה מלאה, כמו יומן גוגל
     weekGridStartH = startH;
     const railH = (endH - startH) * HOUR_PX;
@@ -1070,10 +1080,10 @@ const App = (() => {
       const d = new Date(ds + "T00:00");
       const cls = ["wg-head", ds === todayStr() ? "today" : ""].filter(Boolean).join(" ");
       const dow = span === 7 ? dows[d.getDay()] : d.toLocaleDateString("he-IL", { weekday: "short" });
-      return `<button type="button" class="${cls}" onclick="App.selectCalDay('${ds}')" aria-label="${escapeHtml(d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" }))}"><span>${dow}</span><b>${d.getDate()}</b></button>`;
+      return `<button type="button" class="${cls}" onclick="App.selectCalDay('${ds}')" aria-label="${escapeHtml(d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" }))}"><span>${dow}</span><b>${String(d.getDate()).padStart(2, "0")}</b></button>`;
     }).join("");
     let rail = "";
-    for (let hr = startH; hr < endH; hr++) rail += `<div class="wg-hour">${String(hr).padStart(2, "0")}</div>`;
+    for (let hr = startH; hr < endH; hr++) rail += `<div class="wg-hour">${String(hr).padStart(2, "0")}:00</div>`;
     const cols = days.map(ds => {
       const blocks = byDay.get(ds).map(l => {
         const s = studentById(l.studentId);
@@ -1084,7 +1094,7 @@ const App = (() => {
         // ברשת של 3 ימים יש מקום לשם מלא ולנושא; בשבוע מלא רק שם פרטי
         const label = span === 7 ? name.split(" ")[0] : name;
         const topic = span !== 7 && l.topic ? `<i>${escapeHtml(l.topic)}</i>` : "";
-        return `<button type="button" class="wg-block ${lessonStateClass(l)}" data-id="${l.id}" style="top:${Math.round(top)}px;height:${Math.round(h)}px" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור: ${escapeHtml(aria)}"><b>${fmtTime(l.time)}</b><span>${escapeHtml(label)}</span>${topic}</button>`;
+        return `<button type="button" class="wg-block ${lessonStateClass(l)}" data-id="${l.id}" style="top:${Math.round(top)}px;height:${Math.round(h)}px" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור: ${escapeHtml(aria)}"><span>${escapeHtml(label)}</span><b>${fmtTime(l.time)}<span class="wg-end">-${addMinutes(l.time, Number(l.duration) || 60)}</span></b>${topic}<span class="wg-ava" aria-hidden="true">${escapeHtml(initials(name))}</span></button>`;
       }).join("");
       const isToday = ds === todayStr();
       return `<div class="wg-col ${isToday ? "today" : ""}" data-day="${ds}">
@@ -1092,8 +1102,12 @@ const App = (() => {
         ${isToday ? nowLineHtml(startH, endH, HOUR_PX) : ""}${blocks}
       </div>`;
     }).join("");
-    const monthLabel = new Date(day + "T00:00").toLocaleDateString("he-IL", { month: "long", year: "numeric" });
-    return calToolbarHtml(monthLabel) + `<div class="week-grid ${span === 3 ? "is-3d" : ""}" data-start="${startH}" style="--wg-h:${railH}px;--wg-cols:${span}">
+    // כמו "January 05 - 2024" במקור: טווח הימים שעל המסך
+    const first = new Date(days[0] + "T00:00"), last = new Date(days[days.length - 1] + "T00:00");
+    const rangeLabel = first.getMonth() === last.getMonth()
+      ? `${first.getDate()}-${last.getDate()} ${first.toLocaleDateString("he-IL", { month: "long", year: "numeric" })}`
+      : `${first.toLocaleDateString("he-IL", { day: "numeric", month: "short" })} - ${last.toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric" })}`;
+    return calToolbarHtml(rangeLabel) + `<div class="week-grid ${span === 3 ? "is-3d" : ""}" data-start="${startH}" style="--wg-h:${railH}px;--wg-cols:${span};--wg-hour:${HOUR_PX}px">
       <div class="wg-corner"></div><div class="wg-heads">${heads}</div>
       <div class="wg-rail">${rail}</div>
       <div class="wg-cols">${cols}</div>
@@ -1110,7 +1124,7 @@ const App = (() => {
     if (y === null) {
       quickAddTime = "";
     } else {
-      const raw = weekGridStartH * 60 + (y / 48) * 60;
+      const raw = weekGridStartH * 60 + (y / wgHourPx()) * 60;
       const m = Math.max(0, Math.min(23 * 60 + 45, Math.round(raw / 15) * 15));
       quickAddTime = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
     }
@@ -1160,14 +1174,9 @@ const App = (() => {
       cells += `<button type="button" class="${cls}" data-day="${ds}" aria-label="${escapeHtml(`${day} ${calMonth.toLocaleDateString("he-IL", { month: "long" })}${title ? `, ${title}` : ""}`)}" onclick="App.selectCalDay('${ds}')">${day}${marker}</button>`;
     }
 
-    return `
-      <div class="cal-head">
-        <button class="cal-nav" aria-label="חודש קודם" onclick="App.calShift(-1)">‹</button>
-        <span>${calMonth.toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</span>
-        <button class="cal-nav" aria-label="חודש הבא" onclick="App.calShift(1)">›</button>
-      </div>
-      <button class="btn btn-light btn-block cal-today" onclick="App.calToday()">היום</button>
-      <div class="cal-grid">${cells}</div>`;
+    // אותו סרגל כמו בשבוע וביום, כך שהחודש לא מקבל כותרת וכפתור "היום" משלו
+    return calToolbarHtml(calMonth.toLocaleDateString("he-IL", { month: "long", year: "numeric" })) +
+      `<div class="cal-grid">${cells}</div>`;
   }
 
   // פירוט היום הנבחר מתחת ללוח החודשי
@@ -1191,7 +1200,7 @@ const App = (() => {
   function listViewHtml() {
     const list = lessonSorted();
     if (!list.length) {
-      return `<div class="empty empty-action">${icon("calendar")}<h3>היומן עדיין ריק</h3><p>קבעי שיעור ראשון כדי להתחיל לבנות את השבוע.</p><button class="btn btn-green" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
+      return `<div class="empty empty-action">${icon("calendar")}<h3>היומן עדיין ריק</h3><p>קבעי שיעור ראשון כדי להתחיל לבנות את השבוע.</p><button class="btn btn-primary" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
     }
     const today = todayStr();
     const upcoming = list.filter(l => l.date >= today);
@@ -1206,7 +1215,7 @@ const App = (() => {
       groupByDate(shown).forEach((ls, date) => { html += dayGroupHtml(date, ls); });
       if (upcoming.length > shown.length) html += more(upcoming.length - shown.length, "הצגת עוד שיעורים");
     } else {
-      html += `<div class="empty empty-action"><h3>אין שיעורים קרובים</h3><p>אפשר לקבוע עכשיו את המועד הבא.</p><button class="btn btn-green" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
+      html += `<div class="empty empty-action"><h3>אין שיעורים קרובים</h3><p>אפשר לקבוע עכשיו את המועד הבא.</p><button class="btn btn-primary" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
     }
     if (past.length) {
       html += `<button type="button" class="past-toggle" onclick="App.togglePast()" aria-expanded="${showPast}">${showPast ? "הסתרת" : "הצגת"} שיעורים שעברו (${past.length})</button>`;
@@ -1238,11 +1247,11 @@ const App = (() => {
     const step = (n, txt, done) =>
       `<div class="onboard-step ${done ? "done" : ""}"><span class="num">${done ? "✓" : n}</span><span>${txt}</span></div>`;
     const cta = !hasStudents
-      ? `<button class="btn btn-green btn-block" onclick="App.openStudentForm()">הוספת תלמיד ראשון</button>`
-      : `<button class="btn btn-green btn-block" onclick="App.openLessonForm()">קביעת שיעור ראשון</button>`;
+      ? `<button class="btn btn-primary btn-block" onclick="App.openStudentForm()">הוספת תלמיד ראשון</button>`
+      : `<button class="btn btn-primary btn-block" onclick="App.openLessonForm()">קביעת שיעור ראשון</button>`;
     onb.innerHTML = `
       <div class="onboard-card">
-        <h4>${hasStudents ? "כמעט שם!" : "ברוכה הבאה! 👋"}</h4>
+        <h4>${hasStudents ? "עוד צעד אחד" : "ברוכה הבאה"}</h4>
         <p>שלושה צעדים קטנים כדי להתחיל לנהל את השיעורים:</p>
         <div class="onboard-steps">
           ${step(1, "הוספת תלמיד", hasStudents)}
@@ -1352,36 +1361,55 @@ const App = (() => {
     return h < 5 ? "לילה טוב" : h < 12 ? "בוקר טוב" : h < 17 ? "צהריים טובים" : h < 22 ? "ערב טוב" : "לילה טוב";
   }
 
-  // רצועת "היום": תאריך, ברכה, כמה שיעורים היום והשיעור הבא — שורה אחת, בלי כרטיס
+  // כותרת מסך "היום": ברכה ותאריך, שני מדדים ו"+ שיעור" (כמו הכותרת של המקור),
+  // והשיעור הבא בכרטיס נפרד. מתרעננת כל 30 שניות (startInterval).
   function renderTodayStrip() {
     const el = document.getElementById("todayStrip");
     if (!el) return;
-    const today = todayStr();
-    const todayLessons = lessonIndex.onDate(today);
-    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-    const next = lessonSorted().find(l => !l.done && (l.date > today || (l.date === today && toMinutes(l.time) + (Number(l.duration) || 60) > nowMin)));
-    const nextStudent = next ? studentById(next.studentId) : null;
-    const dateLabel = new Date().toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
+    const now = new Date();
+    const count = lessonIndex.onDate(todayStr()).length;
+    const monthDone = lessonIndex.sortedLessons.filter(l => l.done && l.date.startsWith(monthKey(now)));
+    const earned = summarizeMonth(monthDone, lessonIndex.studentsById, lessonPrice).earned;
+    const dateLabel = now.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
     const greet = settings.teacherName ? `${greetingWord()}, ${escapeHtml(settings.teacherName)}` : greetingWord();
-    const count = todayLessons.length;
-    const nextHtml = next
-      ? `<button type="button" class="today-next" onclick="App.openLessonForm('${next.id}')" aria-label="השיעור הבא: ${escapeHtml(nextStudent?.name || "תלמיד")} ${escapeHtml(dayLabelPlain(next.date))} בשעה ${fmtTime(next.time)}">
-          <span class="today-next-time">${fmtTime(next.time)}</span>
-          <span class="today-next-copy"><strong>${escapeHtml(nextStudent?.name || "תלמיד")}</strong><span>${next.date === today ? "השיעור הבא היום" : `הבא · ${escapeHtml(dayLabelPlain(next.date))}`}${next.topic ? ` · ${escapeHtml(next.topic)}` : ""}</span></span>
-          <span class="today-next-go" aria-hidden="true">‹</span>
-        </button>`
-      : "";
-    el.innerHTML = `
+    renderKeepFocus(el, `
       <div class="today-head">
         <div class="today-lead">
-          <span class="today-date">${dateLabel}</span>
           <h2 class="today-greeting">${greet}</h2>
+          <p class="today-date">${dateLabel}</p>
         </div>
-        <div class="today-count ${count ? "" : "is-free"}" aria-label="${count ? `${count} שיעורים היום` : "אין שיעורים היום"}">
-          <b>${count || "—"}</b><span>${count === 1 ? "שיעור היום" : "שיעורים היום"}</span>
+        <div class="today-stats">
+          <div class="today-stat"><span>שיעורים היום</span><b>${count}</b></div>
+          <div class="today-stat"><span>הכנסה החודש</span><b>${cur(earned)}</b></div>
         </div>
-      </div>
-      ${nextHtml}`;
+        <button type="button" id="todayAdd" class="today-add" onclick="App.openLessonForm()">${icon("plus")} שיעור</button>
+      </div>`);
+    renderNextLesson(now);
+  }
+
+  function renderNextLesson(now) {
+    const el = document.getElementById("nextLesson");
+    if (!el) return;
+    const today = todayStr();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const next = lessonSorted().find(l => !l.done && (l.date > today || (l.date === today && toMinutes(l.time) + (Number(l.duration) || 60) > nowMin)));
+    if (!next) { el.innerHTML = ""; return; }
+    const name = escapeHtml(studentById(next.studentId)?.name || "תלמיד");
+    const dur = Number(next.duration) || 60;
+    const inMin = next.date === today ? toMinutes(next.time) - nowMin : Infinity;
+    // מה שקורה עכשיו או בשעה הקרובה מקבל את הליים; זמנים רחוקים נשארים שקטים
+    const when = inMin <= 0 ? `עד ${addMinutes(next.time, dur)}`
+      : inMin < 60 ? `בעוד ${inMin} דק׳`
+      : next.date === today ? "היום"
+      : escapeHtml(dayLabelPlain(next.date));
+    renderKeepFocus(el, `<button type="button" id="todayNext" class="today-next${inMin < 60 ? " is-soon" : ""}" onclick="App.openLessonForm('${next.id}')" aria-label="השיעור הבא: ${name} ${escapeHtml(dayLabelPlain(next.date))} בשעה ${fmtTime(next.time)}">
+        <span class="today-next-top"><span class="today-next-label">${inMin <= 0 ? "עכשיו" : "השיעור הבא"}</span><span class="today-next-when">${when}</span></span>
+        <span class="today-next-main">
+          <span class="today-next-time">${fmtTime(next.time)}</span>
+          <span class="today-next-copy"><strong>${name}</strong><span>${next.topic ? `${escapeHtml(next.topic)} · ` : ""}${dur} דק׳</span></span>
+          <span class="today-next-go" aria-hidden="true">‹</span>
+        </span>
+      </button>`);
   }
 
   // מסך "היום" = ברכה + "צריך טיפול" + היומן. הכול במסך אחד, היומן מתחיל כמה שיותר גבוה.
@@ -1389,6 +1417,7 @@ const App = (() => {
     const calDay = selectedDay || todayStr();
     renderOnboard();
     renderTodayStrip();
+    renderMiniCal();
     const seg = (m, label) =>
       `<button type="button" class="seg-btn ${homeCalMode === m ? "active" : ""}" aria-pressed="${homeCalMode === m}" onclick="App.setHomeCalMode('${m}')">${label}</button>`;
     const modeBar = `<div class="home-cal-bar">
@@ -1410,6 +1439,47 @@ const App = (() => {
     updateChrome("home");
   }
 
+  // מתג התצוגות בכותרת (מסך רחב), כמו Daily / Weekly / Monthly במקור
+  const HOME_MODES = [["day", "יום"], ["week", "שבוע"], ["month", "חודש"], ["list", "רשימה"]];
+  const homeModePills = () => `<div class="topbar-pills" role="group" aria-label="תצוגת יומן">${HOME_MODES.map(([m, label]) =>
+    `<button type="button" class="tb-pill${homeCalMode === m ? " active" : ""}" aria-pressed="${homeCalMode === m}" onclick="App.setHomeCalMode('${m}')">${label}</button>`).join("")}</div>`;
+
+  // לוח החודש בעמודת הצד (מסך רחב): בחירת יום מזיזה את היומן הגדול, והשבוע שמוצג בו מסומן ברצועה
+  function renderMiniCal() {
+    const el = document.getElementById("miniCal");
+    if (!el) return;
+    const year = calMonth.getFullYear(), month = calMonth.getMonth();
+    const startDow = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const week = new Set(weekDaysFor(selectedDay || todayStr()));
+    let cells = ["א", "ב", "ג", "ד", "ה", "ו", "ש"].map(d => `<span class="mini-cal-dow">${d}</span>`).join("");
+    for (let i = 0; i < startDow; i++) cells += "<span></span>";
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const ds = ymd(date);
+      const cls = ["mini-cal-day", ds === todayStr() ? "today" : "", week.has(ds) ? "in-week" : "",
+        date.getDay() === 0 ? "row-start" : "", date.getDay() === 6 ? "row-end" : ""].filter(Boolean).join(" ");
+      cells += `<button type="button" class="${cls}" onclick="App.selectCalDay('${ds}')" aria-label="${escapeHtml(date.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" }))}"><span>${day}</span></button>`;
+    }
+    el.innerHTML = `<div class="mini-cal-head"><h3>${calMonth.toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</h3>
+      <div class="mini-cal-nav"><button type="button" aria-label="החודש הקודם" onclick="App.miniShift(-1)">‹</button><button type="button" aria-label="החודש הבא" onclick="App.miniShift(1)">›</button></div></div>
+      <div class="mini-cal-grid">${cells}</div>`;
+  }
+  function miniShift(delta) {
+    calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + delta, 1);
+    renderMiniCal();
+  }
+
+  // הפעמון בכותרת: פותח את "לטיפול" במסך הבית
+  function openHub() {
+    const open = () => {
+      const box = document.querySelector("#reminderHub .hub-box");
+      if (box) box.open = true;
+      document.getElementById("reminderHub")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    };
+    if (activeViewName() === "home") open(); else go("home", open);
+  }
+
   // ----- כרום קבוע: הכותרת ההקשרית וכפתור הפעולה הצף -----
   // הכותרת מציגה הקשר של המסך (לא לוגו), וה-FAB הופך לפעולה הראשית של המסך הנוכחי.
   const FAB_BY_VIEW = {
@@ -1419,16 +1489,20 @@ const App = (() => {
   function updateChrome(view = activeViewName()) {
     const ctx = document.getElementById("topbarContext");
     if (ctx) {
-      const n = lessonIndex.onDate(todayStr()).length;
       const openCount = lessons.filter(l => l.done && !l.paid).length;
       ctx.innerHTML = view === "home"
-        ? `<b>${new Date().toLocaleDateString("he-IL", { day: "numeric", month: "short" })}</b><span>${n ? `${n} היום` : "יום פנוי"}</span>`
+        ? homeModePills() // במסך רחב: מתג התצוגות בראש העמוד, כמו Daily / Weekly / Monthly במקור
         : view === "students"
           ? `<b>${students.length}</b><span>${students.length === 1 ? "תלמיד" : "תלמידים"}</span>`
           : view === "money"
             ? `<b>${new Date().toLocaleDateString("he-IL", { month: "long" })}</b><span>${openCount ? `${openCount} פתוחים` : "הכול שולם"}</span>`
             : `<b>v${APP_VERSION}</b>`;
     }
+    // פעמון עם נקודה כשמשהו ממתין; האווטאר מציג ראשי תיבות של המורה, או אייקון כשאין שם
+    const bell = document.getElementById("topbarBell");
+    if (bell) bell.classList.toggle("has-dot", pendingConfirmations().length > 0 || pendingLessons().length > 0 || lessons.some(l => l.done && !l.paid));
+    const avatar = document.getElementById("topbarAvatar");
+    if (avatar) avatar.innerHTML = settings.teacherName ? escapeHtml(initials(settings.teacherName)) : icon("user");
     const fab = document.getElementById("fab");
     if (fab) {
       const spec = FAB_BY_VIEW[view];
@@ -1601,9 +1675,8 @@ const App = (() => {
     renderKeepFocus(el, `<section class="reminder-hub" aria-labelledby="hubTitle">
       <details class="hub-box"${hubOpen ? " open" : ""} ontoggle="App.setHubOpen(this.open)">
         <summary class="hub-summary">
-          <span class="hub-lead"><span class="hub-mark" aria-hidden="true">${icon("bell")}</span><h3 id="hubTitle">לטיפול</h3></span>
+          <span class="hub-lead"><h3 id="hubTitle">לטיפול</h3><span class="hub-chevron" aria-hidden="true">${icon("chevron")}</span></span>
           <span class="hub-stats">${stats}</span>
-          <span class="hub-chevron" aria-hidden="true">${icon("chevron")}</span>
         </summary>
         <div class="hub-body">
           ${confirmGroup}
@@ -2249,6 +2322,7 @@ const App = (() => {
     const changed = appliedTheme !== null && appliedTheme !== t;
     appliedTheme = t;
     root.setAttribute("data-theme", t);
+    document.querySelectorAll("[data-theme-choice]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.themeChoice === t)));
     if (changed) {
       root.classList.add("theme-switch");
       void root.offsetWidth; // מאלץ חישוב סגנון לפני שהמעברים חוזרים
@@ -2259,7 +2333,7 @@ const App = (() => {
       setTimeout(clear, 120);
     }
     const meta = document.getElementById("themeColorMeta");
-    if (meta) meta.setAttribute("content", t === "dark" ? "#0f141b" : "#1f2937");
+    if (meta) meta.setAttribute("content", t === "dark" ? "#17142c" : "#9291d0");
     // ציור מחדש של הגרף כדי שצבעי הטקסט יתעדכנו
     // ציור מחדש של הגרף רק אם מסך הכספים פעיל ולשונית הסיכום פתוחה
     const moneyView = document.getElementById("view-money");
@@ -2309,7 +2383,8 @@ const App = (() => {
   function startInterval() {
     if (intervalStarted) return;
     intervalStarted = true;
-    setInterval(() => void checkReminders(), 30 * 1000);
+    // גם "השיעור הבא" מתיישן: שיעור שנגמר מפנה מקום לבא, ו"בעוד X דק׳" צריך לרדת
+    setInterval(() => { void checkReminders(); if (activeViewName() === "home") renderTodayStrip(); }, 30 * 1000);
     scheduleNextReminder();
     void checkReminders();
     trySyncPush();
@@ -2584,6 +2659,8 @@ const App = (() => {
     initModalControls();
     initInstall();
     applyTheme();
+    // מעבר בין טלפון למסך רחב משנה את גובה השעה ברשת; מציירים מחדש כדי שהשיעורים יישבו נכון
+    matchMedia(WIDE).addEventListener("change", () => { if (activeViewName() === "home") renderHome(); });
     try { render(); } catch (e) { console.error(e); }
     if (startupDataError) {
       toast("הנתונים המקומיים לא היו תקינים. האפליקציה נפתחה במצב בטוח — אפשר לשחזר מגיבוי.", "err");
@@ -2655,7 +2732,7 @@ const App = (() => {
         p.innerHTML = neighborHtml(dir);
         container.appendChild(p);
         const rail = p.querySelector(".week-grid, .day-agenda");
-        if (rail) rail.scrollTop = calScroll ?? smartCalTop(rail, rail.classList.contains("week-grid") ? 48 : 64);
+        if (rail) rail.scrollTop = calScroll ?? smartCalTop(rail, rail.classList.contains("week-grid") ? wgHourPx() : 64);
         return p;
       });
     }
@@ -2802,7 +2879,7 @@ const App = (() => {
       const col = el.closest(".wg-col");
       if (col) {
         const startH = Number(col.closest(".week-grid")?.dataset.start || 8);
-        return { date: col.dataset.day, time: snapTime(startH * 60 + (topY - col.getBoundingClientRect().top) / 48 * 60) };
+        return { date: col.dataset.day, time: snapTime(startH * 60 + (topY - col.getBoundingClientRect().top) / wgHourPx() * 60) };
       }
       const agenda = el.closest(".day-agenda");
       if (agenda) {
@@ -2894,7 +2971,7 @@ const App = (() => {
     confirmLesson, confirmAndRepeat, skipLesson,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, quickAddStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, setRecurInterval, renderFreeSlots, pickFreeSlot, scheduleForStudent, togglePaid,
-    calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson, showMoreLessons,
+    calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson, showMoreLessons, miniShift, openHub,
     setMoneyTab, togglePaymentBox, sendWhatsApp, openWhatsAppChat, sendReceipt, sendLessonReminder, repeatLastLesson, markAllPaid, postponeLesson,
     exportData, importData, exportCalendar,
     changeMonth,
