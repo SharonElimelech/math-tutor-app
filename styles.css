@@ -1,43 +1,45 @@
 /* =========================================================
-   "המורה שלי": לוח בקרה לבנדר וליים, כמעט העתק של TimeFrame
-   רקע לבנדר עם טקסט לבן, כרטיסים לבנים מעוגלים, סגול כהה יותר לכרטיס החודש
-   ולפס הכותרת של היומן, ליים ל"היום/עכשיו", חציל לפעולה הראשית.
+   "המורה שלי": שולחן עבודה רגוע של מורה פרטי
+   רקע נייר קריר, כרטיסים לבנים, דיו כחול לפעולה ולבחירה,
+   צהוב מרקר רק ל"היום" ולמה שקורה עכשיו. ירוק = שולם, אדום = חוב.
    מצב כהה: JS מוסיף data-theme="light|dark" ל-<html>
    ========================================================= */
 
 :root {
-  /* ספרות ואותיות לועזיות מ-Urbanist (כמו במקור), עברית מ-Rubik */
-  --font: "Urbanist", "Rubik", "Segoe UI", system-ui, Arial, sans-serif;
+  /* IBM Plex Sans Hebrew: עברית וספרות מאותה משפחה, מקצועית ושקטה */
+  --font: "IBM Plex Sans Hebrew", "Rubik", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
 
-  --bg: #9291d0;        /* לבנדר; כהה בגוון אחד מהמקור כדי שטקסט לבן גדול יעמוד ב-3:1 */
-  --band: #7f7ec3;      /* כרטיס החודש ופס הכותרת של היומן */
+  --bg: #f3f5f9;        /* נייר קריר, נוטה לכחול הדיו */
+  --band: #f7f8fb;      /* פס כותרת היומן ולוח החודש */
   --surface: #ffffff;
-  --surface-2: #f7f7fd;
-  --bg-soft: #f1f1fb;   /* מילוי פנימי בתוך כרטיס לבן */
-  --panel: #9a99d4;
-  --text: #1d1836;
-  --muted: #3b3561;
-  --faint: #6e6a90;     /* רק בתוך כרטיס לבן */
-  --border: #e7e6f6;    /* קווים בתוך כרטיס */
-  --on-bg: #ffffff;     /* טקסט ישירות על הלבנדר, כמו במקור */
-  --on-bg-muted: rgba(255, 255, 255, .88);
-  --line-on-bg: rgba(255, 255, 255, .32);
-  --chip-on-bg: rgba(255, 255, 255, .24); /* גלולה ועיגול לא פעילים על הלבנדר */
-  --chart-muted: #d6d5f0;
+  --surface-2: #f8f9fc;
+  --bg-soft: #eef1f6;   /* מילוי פנימי בתוך כרטיס */
+  --panel: #ffffff;
+  --text: #121826;
+  --muted: #475266;
+  --faint: #667085;
+  --border: #e2e6ee;
+  --on-bg: #121826;     /* טקסט ישירות על הרקע */
+  --on-bg-muted: #556075;
+  --line-on-bg: #dfe3eb;
+  --chip-on-bg: #e7ebf2;
+  --chart-muted: #d3dae7;
 
-  --primary: #2d2447;   /* Daily / Add Sport במקור: גלולה ראשית, טאב וניווט פעילים */
+  --primary: #2447c7;   /* דיו כחול: פעולה ראשית, טאב וניווט פעילים */
   --on-primary: #ffffff;
-  --accent: #d4f56b;    /* ליים: היום, שיעור קרוב. תמיד עם טקסט כהה */
-  --on-accent: #1d1836;
-  --accent-ink: #4c45a3; /* טקסט מודגש קטן על לבן, קו "עכשיו" */
+  --accent: #ffd84a;    /* מרקר: היום, שיעור קרוב. תמיד עם טקסט כהה */
+  --on-accent: #1c1700;
+  --accent-ink: #2447c7;
   --brand-1: var(--primary);
-  --brand-2: var(--accent-ink);
+  --brand-2: #1a3596;
   --brand-3: var(--accent-ink);
 
-  /* שיעורים ביומן: קרוב = ליים, התקיים = הסגול של המקור, לא שולם = ורוד */
-  --ev-paid: #8483c4;
-  --ev-paid-ink: #ffffff;
-  --ev-unpaid: #ffd3cc;
+  /* שיעורים ביומן: עתידי = כחול בהיר, התקיים ושולם = אפור-ירוק, לא שולם = ורוד */
+  --ev-next: #dfe6fd;
+  --ev-next-ink: #172f86;
+  --ev-paid: #e2f1e7;
+  --ev-paid-ink: #175c2c;
+  --ev-unpaid: #fde2df;
   --ev-unpaid-ink: #8f1d16;
 
   --sp-1: 4px;
@@ -57,78 +59,86 @@
   --fs-xl: 1.5rem;
   --fs-2xl: 1.875rem;
 
-  --hover: rgba(29, 24, 54, .05);
-  --active: rgba(29, 24, 54, .09);
-  --selected: color-mix(in srgb, var(--accent-ink) 12%, transparent);
-  --selected-strong: color-mix(in srgb, var(--accent-ink) 20%, transparent);
+  --hover: rgba(18, 24, 38, .045);
+  --active: rgba(18, 24, 38, .08);
+  --selected: color-mix(in srgb, var(--accent-ink) 10%, transparent);
+  --selected-strong: color-mix(in srgb, var(--accent-ink) 18%, transparent);
   --focus-ring: var(--accent-ink);
   --disabled-o: .45;
 
-  --green: #1e7a38;
-  --green-bg: #e3f5e8;
-  --red: #c0352b;
-  --red-bg: #fde7e4;
-  --orange: #9a5b00;
-  --orange-bg: #fff1d6;
-  --wa: #087c43;
+  --green: #1d7a3a;
+  --green-bg: #e3f4e8;
+  --red: #c2352b;
+  --red-bg: #fde8e5;
+  --orange: #985a00;
+  --orange-bg: #fff2d8;
+  --wa: #0b7d45;
   --holiday: #3557b7;
   --holiday-bg: #e6ecfb;
 
-  /* כרטיסים שטוחים על הלבנדר; צל רק למה שצף (חלון, הודעה, גרירה) */
-  --sh-sm: none;
-  --sh-md: none;
-  --sh-lg: 0 16px 40px rgba(29, 24, 54, .22);
+  /* כרטיסים: קו דק וצל עדין מאוד; צל עמוק רק למה שצף (חלון, הודעה, גרירה) */
+  --sh-sm: 0 1px 2px rgba(18, 24, 38, .05);
+  --sh-md: 0 2px 8px rgba(18, 24, 38, .06);
+  --sh-lg: 0 18px 44px rgba(18, 24, 38, .18);
+  --scrim: rgba(12, 16, 26, .45);
 
   --r-sm: 10px;
   --r-md: 14px;
-  --r-lg: 22px;
+  --r-lg: 18px;
   --r-pill: 999px;
   --ease-out: cubic-bezier(.22, 1, .36, 1);
 }
 
-/* ---------- מצב כהה: סגול-שחור עמוק, הליים הופך לצבע הפעולה ---------- */
+/* ---------- מצב כהה: לילה כחול-פחם, הדיו מתבהר ---------- */
 html[data-theme="dark"] {
-  --bg: #17142c;
-  --band: #26214a;
-  --surface: #211c3b;
-  --surface-2: #272146;
-  --bg-soft: #2c2650;
-  --panel: #1d1935;
-  --text: #f2f0fb;
-  --muted: #c0bbdd;
-  --faint: #9d97c4;
-  --border: #332d56;
-  --on-bg: #f3f1ff;
-  --on-bg-muted: rgba(243, 241, 255, .72);
-  --line-on-bg: rgba(255, 255, 255, .1);
-  --chip-on-bg: rgba(255, 255, 255, .08);
-  --chart-muted: #463f70;
+  color-scheme: dark;
+  --bg: #0d1118;
+  --band: #151b26;
+  --surface: #161c27;
+  --surface-2: #1b2230;
+  --bg-soft: #212938;
+  --panel: #161c27;
+  --text: #edf0f6;
+  --muted: #b3bccc;
+  --faint: #8d97aa;
+  --border: #283142;
+  --on-bg: #edf0f6;
+  --on-bg-muted: #a7b0c2;
+  --line-on-bg: #222a39;
+  --chip-on-bg: #1f2735;
+  --chart-muted: #333d52;
 
-  --primary: #d4f56b;
-  --on-primary: #17142c;
-  --on-accent: #17142c;
-  --accent-ink: #c9c8f5;
+  --primary: #8ea6ff;
+  --on-primary: #0b1020;
+  --on-accent: #1c1700;
+  --accent-ink: #a8b9ff;
+  --brand-2: #b9c7ff;
 
-  --ev-paid: #4a4590;
-  --ev-paid-ink: #f3f1ff;
-  --ev-unpaid: #4d2430;
+  --ev-next: #22305e;
+  --ev-next-ink: #dbe3ff;
+  --ev-paid: #173225;
+  --ev-paid-ink: #b9ecc8;
+  --ev-unpaid: #44212a;
   --ev-unpaid-ink: #ffc2bb;
 
-  --hover: rgba(255, 255, 255, .06);
-  --active: rgba(255, 255, 255, .1);
-  --selected: color-mix(in srgb, var(--accent-ink) 16%, transparent);
-  --selected-strong: color-mix(in srgb, var(--accent-ink) 26%, transparent);
+  --hover: rgba(255, 255, 255, .05);
+  --active: rgba(255, 255, 255, .09);
+  --selected: color-mix(in srgb, var(--accent-ink) 14%, transparent);
+  --selected-strong: color-mix(in srgb, var(--accent-ink) 24%, transparent);
 
   --green: #86e3a1;
-  --green-bg: #173225;
+  --green-bg: #15301f;
   --red: #ff9d93;
-  --red-bg: #3a1d24;
+  --red-bg: #3a1c22;
   --orange: #ffc078;
-  --orange-bg: #3a2a12;
+  --orange-bg: #36280f;
   --holiday: #9db7ff;
   --holiday-bg: #1d2546;
 
-  --sh-lg: 0 16px 40px rgba(0, 0, 0, .5);
+  --sh-sm: none;
+  --sh-md: none;
+  --sh-lg: 0 18px 44px rgba(0, 0, 0, .55);
+  --scrim: rgba(0, 0, 0, .6);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -650,9 +660,9 @@ html[data-theme="dark"] .btn-green { color: #0d1f11; }
   text-align: start;
   padding: 8px 10px;
   border-radius: var(--r-sm);
-  background: var(--accent);
+  background: var(--ev-next);
   border: 0;
-  color: var(--on-accent);
+  color: var(--ev-next-ink);
   font-family: inherit;
   cursor: pointer;
   transition: filter .15s var(--ease-out), transform .15s var(--ease-out);
@@ -736,7 +746,7 @@ html[data-theme="dark"] .btn-green { color: #0d1f11; }
 .search-box {
   margin-bottom: 0;
   background: var(--surface);
-  border-color: transparent;
+  border-color: var(--border);
   border-radius: var(--r-pill);
   padding-right: 44px;
 }
@@ -897,7 +907,7 @@ html[data-theme="dark"] .btn-green { color: #0d1f11; }
 /* ---------- חלון תחתון (bottom sheet) ---------- */
 .modal {
   position: fixed; inset: 0;
-  background: rgba(24, 20, 43, .45);
+  background: var(--scrim);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -1006,7 +1016,7 @@ body.modal-open { overflow: hidden; }
   color: var(--text);
   box-shadow: var(--sh-lg);
 }
-.confirm-dialog::backdrop { background: rgba(24, 20, 43, .5); }
+.confirm-dialog::backdrop { background: var(--scrim); }
 .confirm-dialog form { padding: 24px; text-align: center; }
 .confirm-mark {
   width: 44px;
@@ -1569,8 +1579,8 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 .wg-block {
   position: absolute; inset-inline: 1px; z-index: 1;
   overflow: hidden; padding: 3px 4px; border: 0; border-radius: var(--r-sm);
-  background: var(--accent);
-  color: var(--on-accent); font-family: inherit; text-align: right; cursor: pointer;
+  background: var(--ev-next);
+  color: var(--ev-next-ink); font-family: inherit; text-align: right; cursor: pointer;
 }
 .wg-block b { display: block; font-size: .6rem; font-weight: 700; font-variant-numeric: tabular-nums; opacity: .9; }
 .wg-block span { display: block; overflow: hidden; font-size: .68rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
@@ -1619,6 +1629,8 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 .confirm-outcomes .btn { min-height: 44px; padding: 0 10px; font-size: .82rem; white-space: nowrap; }
 .confirm-outcomes .btn .ic { width: 16px; height: 16px; }
 .confirm-paid { grid-column: 1 / -1; }
+/* עם כפתור תזכורת: ארבע תוצאות בשתי שורות — שולם | טרם שולם + תזכורת, ומתחת טרם שולם | לא התקיים */
+.has-remind .confirm-paid { grid-column: auto; }
 /* "לא התקיים" — פעולה הרסנית, מסומנת בצבע וגם באייקון, לא בצבע בלבד */
 .confirm-skip { background: var(--red-bg); color: var(--red); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 22%, transparent); }
 .confirm-skip:active { background: color-mix(in srgb, var(--red) 16%, var(--surface)); }
@@ -1887,12 +1899,12 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
    גם הפנלים השכנים בזמן החלקה הם .cal-slide, כך שהכרטיס זז שלם. */
 .home-calendar .cal-slide {
   padding: 0 12px 12px;
-  border-radius: 26px;
+  border-radius: var(--r-lg);
   background: var(--surface);
-  box-shadow: inset 0 0 0 6px var(--band);
+  box-shadow: 0 0 0 1px var(--border), var(--sh-sm);
   overflow: hidden;
 }
-.home-calendar .cal-toolbar { margin: 0 -12px 10px; padding: 12px 16px; background: var(--band); color: var(--on-bg); }
+.home-calendar .cal-toolbar { margin: 0 -12px 10px; padding: 12px 16px; background: var(--band); border-bottom: 1px solid var(--border); color: var(--on-bg); }
 .home-calendar .cal-toolbar-label { font-weight: 600; }
 .home-calendar .btn-today { color: var(--on-bg); }
 .home-calendar .btn-today:hover { background: var(--chip-on-bg); }
@@ -1923,7 +1935,7 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 .wg-block > span:first-child { max-width: 100%; font-size: .72rem; font-weight: 600; }
 .wg-block b { font-size: .62rem; font-weight: 500; opacity: .85; white-space: nowrap; }
 .wg-block .wg-end { display: none; }
-.wg-block .wg-ava { display: none; place-items: center; width: 22px; height: 22px; margin-top: auto; border-radius: 50%; background: rgba(255, 255, 255, .82); color: #1d1836; font-size: .625rem; font-weight: 600; }
+.wg-block .wg-ava { display: none; place-items: center; width: 22px; height: 22px; margin-top: auto; border-radius: 50%; background: color-mix(in srgb, var(--surface) 80%, transparent); color: var(--text); font-size: .625rem; font-weight: 600; }
 .wg-block i { display: block; overflow: hidden; max-width: 100%; font-style: normal; font-size: .68rem; font-weight: 500; opacity: .85; text-overflow: ellipsis; white-space: nowrap; }
 .week-grid.is-3d .wg-block { padding: 5px 8px; border-radius: 10px; }
 .week-grid.is-3d .wg-block > span:first-child { font-size: .86rem; }
@@ -1953,7 +1965,7 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
   background: var(--primary);
   color: var(--on-primary);
   font: 600 1rem var(--font);
-  box-shadow: 0 8px 20px rgba(29, 24, 54, .28);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--primary) 32%, transparent);
   cursor: pointer;
   transition: transform .2s var(--ease-out), filter .2s var(--ease-out);
 }
@@ -2078,7 +2090,7 @@ html[data-theme="dark"] .student-quick.is-debt { color: var(--green); }
   cursor: pointer;
 }
 .topbar-bell svg { width: 20px; height: 20px; }
-.topbar-bell.has-dot::after { content: ""; position: absolute; top: 10px; inset-inline-end: 11px; width: 8px; height: 8px; border-radius: 50%; background: #ff7a59; }
+.topbar-bell.has-dot::after { content: ""; position: absolute; top: 10px; inset-inline-end: 11px; width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 2px var(--bg); }
 .topbar-avatar { background: var(--accent); color: var(--on-accent); font: 600 .875rem var(--font); }
 .topbar-avatar .ic { width: 20px; height: 20px; }
 .topbar-pills { display: flex; gap: 8px; }
@@ -2096,7 +2108,7 @@ html[data-theme="dark"] .student-quick.is-debt { color: var(--green); }
 .tb-pill.active { background: var(--primary); color: var(--on-primary); }
 
 /* ---------- לוח החודש בעמודת הצד (מסך רחב בלבד) ---------- */
-.mini-cal { display: none; padding: 16px 14px 14px; border-radius: 26px; background: var(--band); color: var(--on-bg); }
+.mini-cal { display: none; padding: 16px 14px 14px; border-radius: var(--r-lg); background: var(--surface); box-shadow: 0 0 0 1px var(--border), var(--sh-sm); color: var(--on-bg); }
 .mini-cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .mini-cal-head h3 { margin: 0; color: var(--on-bg); font: 600 1rem var(--font); }
 .mini-cal-nav { display: flex; gap: 6px; direction: ltr; }
@@ -2205,4 +2217,125 @@ html[data-theme="dark"] .student-quick.is-debt { color: var(--green); }
   .tb-pill { min-height: 44px; padding: 0 20px; }
   #view-home.active { grid-template-columns: 280px minmax(0, 1fr); }
   .wg-block .wg-end { display: inline; }
+}
+
+/* =========================================================
+   v5 — שכבת הליטוש: כרטיסים על רקע הנייר, ניווט, אייפון
+   ========================================================= */
+
+/* כרטיס על רקע הנייר: קו דק וצל עדין. בתוך כרטיס אחר — שורה ממולאת בלי מסגרת */
+.today-next, .reminder-hub, .payment-account, .student-card, .settings-panel,
+.debt-summary, .income-breakdown, .income-chart-card, #view-home .lesson-row {
+  box-shadow: 0 0 0 1px var(--border), var(--sh-sm);
+}
+.income-breakdown, .income-chart-card { border: 0; }
+.hub-payment-queue .payment-account, .home-calendar .lesson-row { box-shadow: none; }
+
+/* כותרת מסך שמקבלת פוקוס תוכניתי במעבר בין מסכים (לקורא מסך) — בלי מסגרת על המסך */
+[tabindex="-1"]:focus, [tabindex="-1"]:focus-visible { outline: none; }
+
+/* כותרת עליונה: אותו נייר כמו הרקע, קו דק כשהיא צפה מעל תוכן */
+.app-header { background: color-mix(in srgb, var(--bg) 92%, transparent); -webkit-backdrop-filter: saturate(1.4) blur(12px); backdrop-filter: saturate(1.4) blur(12px); }
+.brand-mark { background: var(--primary); color: var(--on-primary); box-shadow: none; }
+.topbar-bell { background: var(--surface); box-shadow: 0 0 0 1px var(--border); color: var(--text); }
+
+/* ניווט תחתון: משטח לבן, אייקון בלי עיגול, הפעיל מסומן בגלולה (צורה + צבע + משקל) */
+.bottom-nav {
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  backdrop-filter: saturate(1.4) blur(14px);
+  border-top: 1px solid var(--border);
+  padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+}
+.nav-btn { color: var(--faint); font-size: .72rem; gap: 2px; }
+.nav-btn svg { width: 60px; height: 32px; padding: 6px 18px; border-radius: var(--r-pill); background: none; stroke-width: 1.8; }
+.nav-btn.active { color: var(--primary); font-weight: 600; }
+.nav-btn.active svg { background: var(--selected-strong); color: var(--primary); }
+
+/* מתגים ופילטרים על הרקע: שקע אפור עם הבחירה הלבנה, לא גלולות כהות */
+.seg-toggle, #view-money > .seg-toggle { background: var(--chip-on-bg); }
+.seg-btn { color: var(--muted); }
+.seg-btn.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(18, 24, 38, .12); }
+html[data-theme="dark"] .seg-btn.active { background: var(--bg-soft); }
+.home-cal-seg .seg-btn { background: transparent; color: var(--muted); }
+.home-cal-seg { padding: 4px; border-radius: var(--r-pill); background: var(--chip-on-bg); gap: 2px; }
+.home-cal-seg .seg-btn.active { background: var(--surface); color: var(--text); }
+html[data-theme="dark"] .home-cal-seg .seg-btn.active { background: var(--bg-soft); }
+.month-nav button { background: var(--surface); box-shadow: 0 0 0 1px var(--border); }
+
+/* כותרות מסך */
+.view-head h2, .page-intro h2, .page-intro.compact h2 { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.01em; }
+.today-greeting { font-weight: 700; letter-spacing: -.015em; }
+
+/* כרטיס תלמיד: השם בשורה משלו, המחיר מתחתיו — בלי התנגשות בטלפון */
+.student-card-top strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.student-card { background: var(--surface); border: 0; border-radius: var(--r-lg); }
+.student-avatar { background: var(--selected); color: var(--accent-ink); }
+.student-open { min-height: 104px; }
+.student-quick-actions { border-inline-start-color: var(--border); }
+
+/* כפתורים */
+.btn-primary, .btn-add, .today-add, .fab { background: var(--primary); color: var(--on-primary); }
+.btn-light { background: var(--bg-soft); }
+
+/* אייפון: שדה מתחת ל-16px גורם לספארי להגדיל את הדף בכל נגיעה — ולא לחזור */
+input, select, textarea { font-size: max(16px, 1rem); }
+.setting-row input, .setting-row select, .search-box { font-size: 16px; }
+
+/* החלון התחתון: גובה אמיתי של המסך (כולל שורת הכתובת ומקלדת), גלילה בתוך החלון בלבד */
+.modal-content {
+  max-height: 92vh;
+  max-height: 92dvh;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-left: max(20px, env(safe-area-inset-left));
+  padding-right: max(20px, env(safe-area-inset-right));
+}
+body.modal-open { overflow: hidden; }
+
+/* מסך לרוחב באייפון עם נוץ': תוכן לא נחתך מתחת לחריץ */
+main { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.app-header { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.fab { inset-inline-end: max(18px, env(safe-area-inset-left)); }
+
+@media (min-width: 760px) {
+  .bottom-nav { background: var(--surface); border-top: 0; border-left: 1px solid var(--border); padding: 104px 0 24px; }
+  .nav-btn svg { width: 48px; height: 48px; padding: 13px; border-radius: 50%; }
+  main { padding: 6px 28px 32px; }
+  .app-header { padding: 22px 28px 14px; }
+}
+/* במצב כהה הכלל הכללי (טקסט כהה על מנטה) גבר על הכפתור המשני — טקסט כהה על משטח כהה */
+html[data-theme="dark"] .payment-actions .btn-green { color: var(--green); }
+.rate-track { height: 8px; background: var(--chip-on-bg); }
+.rate-track i { background: var(--green); }
+.income-metrics > div { box-shadow: 0 0 0 1px var(--border); }
+
+/* ספארי באייפון: בלי appearance:none שדות מקבלים צל פנימי ופינות משלו, ושדה תאריך/שעה ריק
+   מתכווץ לגובה אפס. select מקבל חץ משלנו (שני מעברי צבע — עובד בשתי הערכות). */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea {
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[type="date"], input[type="time"] { display: block; min-height: 48px; line-height: 1.3; text-align: right; }
+input::-webkit-date-and-time-value { text-align: right; min-height: 1.3em; }
+select {
+  padding-left: 36px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--faint) 50%),
+    linear-gradient(135deg, var(--faint) 50%, transparent 50%);
+  background-position: 18px 50%, 23px 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+@media (min-width: 760px) {
+  /* backdrop-filter הופך את הכותרת לבלוק מכיל של position:fixed — והסמל שבסרגל הצד נדחף לתוך הכותרת */
+  .app-header { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--bg); }
+  /* הסמל יושב בראש סרגל הצד אבל שייך לכותרת: הכותרת מעל הסרגל כדי שלא יוסתר */
+  .app-header { z-index: 31; }
+  /* עמודת הצד צרה (240–280px): כל תוצאה בשורה משלה, בלי טקסט שנחתך */
+  #reminderHub .confirm-outcomes { grid-template-columns: 1fr; }
+  #reminderHub .confirm-paid { grid-column: auto; }
+  #reminderHub .payment-actions { flex-direction: column; padding: 12px 14px; }
+  #reminderHub .remind-row { flex-wrap: wrap; }
 }
