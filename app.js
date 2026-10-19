@@ -2343,7 +2343,7 @@ const App = (() => {
       setTimeout(clear, 120);
     }
     const meta = document.getElementById("themeColorMeta");
-    if (meta) meta.setAttribute("content", t === "dark" ? "#17142c" : "#9291d0");
+    if (meta) meta.setAttribute("content", t === "dark" ? "#0d1118" : "#f3f5f9");
     // ציור מחדש של הגרף כדי שצבעי הטקסט יתעדכנו
     // ציור מחדש של הגרף רק אם מסך הכספים פעיל ולשונית הסיכום פתוחה
     const moneyView = document.getElementById("view-money");
