@@ -1278,6 +1278,15 @@ const App = (() => {
     });
   }
 
+  // "טרם שולם + תזכורת": סימון שהתקיים ולא שולם, ומיד תזכורת תשלום בוואטסאפ —
+  // בלי לחפש את התלמיד אחר כך בקבוצת התשלומים
+  function confirmAndRemind(id) {
+    const l = lessons.find(x => x.id === id);
+    if (!l) return;
+    confirmLesson(id, false);
+    if (l.done) sendWhatsApp(l.studentId);
+  }
+
   // "בוצע + עוד אחד": מסמן שבוצע ושולם, ומיד קובע שיעור המשך בשבוע הבא לפי האחרון
   function confirmAndRepeat(id) {
     const l = lessons.find(x => x.id === id);
@@ -1334,7 +1343,7 @@ const App = (() => {
       const priceText = price > 0 ? ` · ${cur(price)}` : "";
       // שתי שאלות: קרה או לא, ואם כן — שולם או לא. שלוש התוצאות הראשיות בשורה אחת,
       // והפעולות הנוספות (עוד שיעור, דחייה) כקישורים דקים מתחת שלא יתחרו עליהן.
-      return `<article class="confirm-row">
+      return `<article class="confirm-row${s?.phone ? " has-remind" : ""}">
         <div class="confirm-lead">
           <span class="student-avatar confirm-avatar" aria-hidden="true">${escapeHtml(initials(s?.name || "?"))}</span>
           <div class="confirm-info">
@@ -1344,6 +1353,7 @@ const App = (() => {
         </div>
         <div class="confirm-outcomes">
           <button class="btn btn-green confirm-paid" onclick="App.confirmLesson('${l.id}', true)" aria-label="השיעור של ${name} התקיים ושולם">${icon("check")} התקיים ושולם</button>
+          ${s?.phone ? `<button class="btn btn-wa confirm-remind" onclick="App.confirmAndRemind('${l.id}')" aria-label="השיעור של ${name} התקיים וטרם שולם — שליחת תזכורת תשלום בוואטסאפ">${icon("whatsapp")} טרם שולם · תזכורת</button>` : ""}
           <button class="btn btn-light confirm-unpaid" onclick="App.confirmLesson('${l.id}', false)" aria-label="השיעור של ${name} התקיים אך טרם שולם">התקיים · טרם שולם</button>
           <button class="btn confirm-skip" onclick="App.skipLesson('${l.id}')" aria-label="השיעור של ${name} לא התקיים — הסרה מהיומן">${icon("close")} לא התקיים</button>
         </div>
@@ -2968,7 +2978,7 @@ const App = (() => {
     go, setHubOpen, fabAction, closeModal, renderStudents,
     openStudentForm, openStudentProfile, saveStudentNotes, saveStudent, deleteStudent,
     openLessonForm, saveLesson, deleteLesson, deleteSeriesFuture, deleteStudentFuture, toggleDone,
-    confirmLesson, confirmAndRepeat, skipLesson,
+    confirmLesson, confirmAndRemind, confirmAndRepeat, skipLesson,
     setLessonDate, togglePast, renderStudentPicker, pickStudent, quickAddStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, setRecurInterval, renderFreeSlots, pickFreeSlot, scheduleForStudent, togglePaid,
     calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson, showMoreLessons, miniShift, openHub,
