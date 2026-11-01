@@ -124,7 +124,7 @@ export function serverItems(items, now) {
 // כתיבה למטמון (בשביל ה-SW) ושליחת התזכורות לשרת. זורק על כשל HTTP.
 // המטמון מקבל גם את 30 הדקות האחרונות (ה-SW מציג ממנו פריטים שכבר עברו כש-push מגיע);
 // השרת מקבל רק עתיד (serverItems).
-async function writeAndSync(sub, items, now = Date.now()) {
+async function writeAndSync(sub, items, now = Date.now(), wa = undefined) {
   try {
     const cache = await caches.open(PUSH_CACHE);
     await cache.put("reminders", new Response(JSON.stringify(items), {
@@ -137,7 +137,8 @@ async function writeAndSync(sub, items, now = Date.now()) {
     body: JSON.stringify({
       id: clientId(),
       sub: sub ? sub.toJSON() : null,
-      items: serverItems(items, now)
+      items: serverItems(items, now),
+      wa
     })
   });
   if (!res.ok) throw new Error(`sync-failed-${res.status}`);
@@ -167,9 +168,10 @@ async function currentSub() {
 
 // סנכרון: כל התזכורות המתוכננות למטמון + לשרת. רץ אחרי כל שמירה. מחזיר את ה-now שבו סונן —
 // חותמת הסנכרון ש-pageDueItems משווה אליה; זורק על כשל רשת/שרת.
-export async function syncPush(lessons, studentsById, settings) {
+// wa — הודעות הוואטסאפ האוטומטיות {key, items} (src/automation.js), או undefined כשהשליחה האוטומטית לא הוגדרה.
+export async function syncPush(lessons, studentsById, settings, wa = undefined) {
   const now = Date.now();
-  await writeAndSync(await currentSub(), plannedReminders(lessons, studentsById, settings, now), now);
+  await writeAndSync(await currentSub(), plannedReminders(lessons, studentsById, settings, now), now, wa);
   return now;
 }
 

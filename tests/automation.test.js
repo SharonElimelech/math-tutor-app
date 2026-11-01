@@ -1,0 +1,58 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { automationItems } from "../src/automation.js";
+import { cleanWa, takeDue } from "../push-server/worker.js";
+
+const t = (date, hhmm) => new Date(`${date}T${hhmm}:00`).getTime();
+const texts = {
+  daily: (l, s) => ({ phone: s.phone, text: `day ${l.id}` }),
+  pay: (l, s) => ({ phone: s.phone, text: `pay ${l.id}` }),
+  weekly: (s, list) => ({ phone: s.phone, text: `week ${list.map(l => l.id).join(",")}` })
+};
+const studentsById = new Map([["s1", { id: "s1", phone: "+972501234567" }]]);
+
+test("daily, payment and weekly messages get the right send windows", () => {
+  // 2026-11-07 is a Saturday; lessons on Thursday, Friday, and next Monday/Tuesday
+  const lessons = [
+    { id: "a", studentId: "s1", date: "2026-11-05", time: "16:00", duration: 60, done: false, paid: false },
+    { id: "b", studentId: "s1", date: "2026-11-06", time: "17:00", duration: 60, done: false, paid: true },
+    { id: "c", studentId: "s1", date: "2026-11-09", time: "16:00", duration: 60, done: false, paid: false },
+    { id: "d", studentId: "s1", date: "2026-11-10", time: "18:00", duration: 60, done: false, paid: false }
+  ];
+  const items = automationItems({ lessons, studentsById, now: t("2026-11-05", "08:00"), texts });
+  const byId = Object.fromEntries(items.map(i => [i.id, i]));
+
+  assert.equal(byId["d:a:2026-11-05:16:00"].after, t("2026-11-05", "09:30"));
+  assert.equal(byId["d:a:2026-11-05:16:00"].until, t("2026-11-05", "16:00"));
+  assert.equal(byId["p:a"].after, t("2026-11-05", "17:00"));
+  assert.ok(!byId["p:b"], "paid lesson gets no payment message");
+  const week = byId["w:2026-11-07:s1"];
+  assert.equal(week.text, "week c,d");
+  assert.equal(week.after, t("2026-11-07", "19:30"));
+  assert.equal(week.until, t("2026-11-08", "08:00"));
+});
+
+test("send times follow the settings", () => {
+  const lessons = [{ id: "a", studentId: "s1", date: "2026-11-05", time: "16:00", duration: 60, done: false, paid: true }];
+  const times = { daily: "08:00", weekDay: 3, weekly: "21:00" }; // Wednesday 2026-11-04
+  const items = automationItems({ lessons, studentsById, now: t("2026-11-04", "08:00"), texts, times });
+  const byId = Object.fromEntries(items.map(i => [i.id, i]));
+  assert.equal(byId["d:a:2026-11-05:16:00"].after, t("2026-11-05", "07:30"));
+  assert.equal(byId["w:2026-11-04:s1"].after, t("2026-11-04", "20:30"));
+});
+
+test("server hands out each due message once, even after a resync", () => {
+  const now = t("2026-11-05", "10:00");
+  const items = [
+    { id: "x", after: now - 1000, until: now + 1000, phone: "+972501234567", text: "hi" },
+    { id: "y", after: now + 5000, until: now + 9000, phone: "+972501234567", text: "later" }
+  ];
+  const stored = cleanWa(items, now);
+  const first = takeDue(stored, null, now);
+  assert.deepEqual(first.due, [{ phone: "+972501234567", text: "hi" }]);
+  // the app recomputes everything on the next save; the sent record lives apart and survives it
+  const resynced = cleanWa(items, now);
+  assert.deepEqual(takeDue(resynced, first.sent, now).due, []);
+  assert.deepEqual(takeDue(resynced, first.sent, now + 6000).due.map(d => d.text), ["later"]);
+});

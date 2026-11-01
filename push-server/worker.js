@@ -39,11 +39,42 @@ async function vapidAuth(endpoint, env) {
   return `vapid t=${head}.${payload}.${b64u(sig)}, k=${env.VAPID_PUBLIC_KEY}`;
 }
 
+// ----- שליחה אוטומטית בוואטסאפ (קיצור הדרך TutorAuto באייפון) -----
+// האפליקציה שולחת ב-/sync את כל ההודעות המתוכננות {id, after, until, phone, text} עם מפתח סודי
+// (KV "wa:<key>" — רק /sync כותב). הקיצור מושך GET /wa?key=... ומקבל רק מה שבחלון שלו כרגע;
+// מה שנמסר נרשם ב-"wasent:<key>" (רק GET כותב) — כך סנכרון ומשיכה באותו רגע לא דורסים זה את זה,
+// וסנכרון הבא (שמחשב הכול מחדש) או ריצה כפולה לא שולחים שוב. רישום נשמר עד שה-until של הפריט עבר.
+// ponytail: נמסר = נשלח (at-most-once). קיצור שנכשל באמצע — שולחים ידנית ממרכז התזכורות.
+const WA_KEY = /^[\w-]{20,80}$/;
+export function cleanWa(items, now) {
+  return (Array.isArray(items) ? items : [])
+    .filter(i => i && typeof i.id === "string" && Number(i.until) > now)
+    .map(i => ({
+      id: i.id.slice(0, 120), after: Number(i.after), until: Number(i.until),
+      phone: String(i.phone || "").slice(0, 20), text: String(i.text || "").slice(0, 1500)
+    }))
+    .slice(0, 500);
+}
+export function takeDue(items, sentBefore, now) {
+  const sent = Object.fromEntries(Object.entries(sentBefore || {}).filter(([, until]) => until > now));
+  const due = (items || []).filter(i => i.after <= now && now < i.until && !sent[i.id]);
+  for (const i of due) sent[i.id] = i.until;
+  return { due: due.map(({ phone, text }) => ({ phone, text })), sent };
+}
+
 export default {
   async fetch(req, env) {
     const reply = (body, status = 200) => new Response(body, { status, headers: corsFor(req) });
     if (req.method === "OPTIONS") return reply(null, 204);
     const url = new URL(req.url);
+    if (req.method === "GET" && url.pathname === "/wa") {
+      const key = url.searchParams.get("key") || "";
+      if (!WA_KEY.test(key)) return reply("bad key", 400);
+      const items = await env.SUBS.get("wa:" + key, "json");
+      const { due, sent } = takeDue(items, await env.SUBS.get("wasent:" + key, "json"), Date.now());
+      if (due.length) await env.SUBS.put("wasent:" + key, JSON.stringify(sent));
+      return Response.json(due, { headers: { "Cache-Control": "no-store" } });
+    }
     if (req.method !== "POST" || url.pathname !== "/sync") return reply("not found", 404);
 
     let body;
@@ -59,6 +90,10 @@ export default {
       .sort((a, b) => a.t - b.t)
       .slice(0, 500);
     await env.SUBS.put("sub:" + id, JSON.stringify({ sub: okSub, items: clean }));
+    // בלי wa בגוף (למשל בדיקת push) — רשומת הוואטסאפ לא משתנה
+    if (body.wa && WA_KEY.test(String(body.wa.key))) {
+      await env.SUBS.put("wa:" + body.wa.key, JSON.stringify(cleanWa(body.wa.items, Date.now())));
+    }
     return reply("ok");
   },
 

@@ -10,6 +10,16 @@ export const DEFAULT_SETTINGS = Object.freeze({
   theme: "auto",
   remindMinutes: 30,
   payInfo: "",
+  // תבניות הודעות וואטסאפ שהמורה ערכה; ריק = ההודעה המובנית
+  payMessage: "",
+  lessonMessage: "",
+  // שליחה אוטומטית בוואטסאפ דרך קיצור TutorAuto (הודעות מסונכרנות לשרת)
+  waAuto: false,
+  // שעות השליחה האוטומטית — חייבות להתאים לאוטומציות שבאייפון
+  autoDaily: "10:00",
+  autoPay: "20:00",
+  autoWeekDay: 6, // 0=ראשון … 6=שבת
+  autoWeekly: "20:00",
   // push של בוקר: "X שיעורים היום"; ריק = כבוי
   morningReminderTime: "08:00",
   // תזכורת תשלום להורה: אחרי כל שיעור / למחרת בבוקר / כבוי
@@ -78,6 +88,13 @@ export function normalizeSettings(input = {}) {
     theme,
     remindMinutes: number(source.remindMinutes, "remindMinutes", { fallback: DEFAULT_SETTINGS.remindMinutes, max: 10080 }),
     payInfo: text(source.payInfo, "payInfo", 300),
+    payMessage: text(source.payMessage, "payMessage", 1000),
+    lessonMessage: text(source.lessonMessage, "lessonMessage", 1000),
+    waAuto: source.waAuto === true,
+    autoDaily: source.autoDaily ? time(source.autoDaily, "autoDaily") : DEFAULT_SETTINGS.autoDaily,
+    autoPay: source.autoPay ? time(source.autoPay, "autoPay") : DEFAULT_SETTINGS.autoPay,
+    autoWeekDay: [0, 1, 2, 3, 4, 5, 6].includes(Number(source.autoWeekDay ?? NaN)) ? Number(source.autoWeekDay) : DEFAULT_SETTINGS.autoWeekDay,
+    autoWeekly: source.autoWeekly ? time(source.autoWeekly, "autoWeekly") : DEFAULT_SETTINGS.autoWeekly,
     morningReminderTime,
     payReminderMode
   };

@@ -12,6 +12,21 @@ export function normalizePhone(raw) {
   return phone;
 }
 
+// הודעה מתבנית שהמורה ערכה בהגדרות: {תלמיד} מוחלף בערך. משתנה ריק לוקח איתו את הרווח שלפניו —
+// "שלום {הורה}," בלי שם הורה יוצא "שלום,". משתנה לא מוכר נשאר כפי שנכתב.
+export function fillTemplate(template, vars) {
+  return String(template ?? "").replace(/([ \t]*)\{([^{}]+)\}/g, (match, space, key) => {
+    if (!Object.hasOwn(vars, key)) return match;
+    const value = String(vars[key] ?? "");
+    return value ? space + value : "";
+  });
+}
+
+// הרצת קיצור דרך באייפון עם רשימת הודעות כקלט טקסט (JSON). הקיצור קורא אותה ב"קבלת מילון מקלט".
+export function shortcutRunUrl(name, items) {
+  return `shortcuts://run-shortcut?name=${encodeURIComponent(name)}&input=text&text=${encodeURIComponent(JSON.stringify(items))}`;
+}
+
 export function whatsappLinks(rawPhone, msg = "") {
   const phone = normalizePhone(rawPhone);
   const text = msg ? encodeURIComponent(msg) : "";

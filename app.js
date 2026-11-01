@@ -23,8 +23,9 @@ import {
   reminderSignature,
   upcomingReminderLessons
 } from "./src/reminders.js";
-import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest, plannedReminders, pageDueItems, shownSigs, markShown, pruneShown } from "./src/push.js";
-import { whatsappLinks, normalizePhone } from "./src/whatsapp.js";
+import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest, plannedReminders, pageDueItems, shownSigs, markShown, pruneShown, PUSH_SERVER } from "./src/push.js";
+import { automationItems } from "./src/automation.js";
+import { whatsappLinks, normalizePhone, fillTemplate, shortcutRunUrl } from "./src/whatsapp.js";
 
 /* =========================================================
    "המורה שלי" – אפליקציה לניהול שיעורים פרטיים
@@ -872,9 +873,10 @@ const App = (() => {
   }
 
   // גרסת טקסט נקי (להודעות וואטסאפ)
-  function dayLabelPlain(dateStr) {
+  // ref — היום שממנו נמדד "היום/מחר" (הודעה אוטומטית נכתבת מראש ליום השליחה)
+  function dayLabelPlain(dateStr, ref = new Date()) {
     const d = new Date(dateStr + "T00:00");
-    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const t = new Date(ref); t.setHours(0, 0, 0, 0);
     const diff = Math.round((d - t) / 86400000);
     const wd = d.toLocaleDateString("he-IL", { weekday: "long" });
     const dm = d.toLocaleDateString("he-IL", { day: "numeric", month: "long" });
@@ -1552,6 +1554,11 @@ const App = (() => {
   // כמה עוד ממתינים לשליחה — המונה שבכותרת
   const pendingLessons = () => hubLessons()
     .filter(l => reminderPhone(studentById(l.studentId)) && !waSent.has(reminderSignature(l)));
+  // לשליחה בבת אחת: הממתינות; אם הכול כבר סומן כנשלח — כולן שוב (למשל אחרי קיצור שנכשל)
+  const bulkLessons = () => {
+    const pending = pendingLessons();
+    return pending.length ? pending : hubLessons().filter(l => reminderPhone(studentById(l.studentId)));
+  };
 
   // שלד שורה משותף לשיעורים ולגבייה — אווטאר, שם, שורת פירוט, פעולה אחת
   function remindRow({ name, meta, action }) {
@@ -1619,6 +1626,7 @@ const App = (() => {
 
     const lessonList = hubLessons();
     const lessonsToSend = pendingLessons().length;
+    const bulkCount = bulkLessons().length;
     const pending = pendingConfirmations();
     const debtors = debtorList();
     const unpaidAll = lessons.filter(l => l.done && !l.paid);
@@ -1653,7 +1661,10 @@ const App = (() => {
       count: lessonsToSend ? `${lessonsToSend} לשליחה` : "הכול נשלח",
       countClass: lessonsToSend ? "" : "hub-count-done",
       rows: lessonList.map(lessonReminderRow).join(""),
-      empty: "אין שיעורים היום או מחר שממתינים לתזכורת."
+      empty: "אין שיעורים היום או מחר שממתינים לתזכורת.",
+      footer: isIOS() && bulkCount
+        ? `<button type="button" class="btn btn-wa btn-block hub-send-all" onclick="App.sendAllViaShortcut()">${icon("whatsapp")} ${lessonsToSend ? `שליחה לכל ה-${bulkCount} בבת אחת` : `שליחה שוב לכל ה-${bulkCount}`}</button>`
+        : ""
     });
 
     const debtGroup = hubGroup({
@@ -1932,11 +1943,12 @@ const App = (() => {
     const unpaid = lessonIndex.unpaidForStudent(studentId);
     const owed = unpaid.reduce((sum, l) => sum + lessonPrice(l), 0);
     const greet = s.parentName ? `שלום ${s.parentName},` : "שלום,";
-    const msg =
-      `${greet}\n` +
-      `תזכורת ידידותית לגבי תשלום עבור השיעורים הפרטיים של ${s.name}.\n` +
-      `${unpaid.length === 1 ? "שיעור אחד שטרם שולם" : `סה"כ ${unpaid.length} שיעורים שטרם שולמו`}, בסך ${owed} ${settings.currency}.\n` +
-      `תודה רבה!` +
+    const msg = (settings.payMessage
+      ? fillTemplate(settings.payMessage, { הורה: s.parentName, תלמיד: s.name, שיעורים: unpaid.length, סכום: `${owed} ${settings.currency}` })
+      : `${greet}\n` +
+        `תזכורת ידידותית לגבי תשלום עבור השיעורים הפרטיים של ${s.name}.\n` +
+        `${unpaid.length === 1 ? "שיעור אחד שטרם שולם" : `סה"כ ${unpaid.length} שיעורים שטרם שולמו`}, בסך ${owed} ${settings.currency}.\n` +
+        `תודה רבה!`) +
       payInfoLine();
     if (!unpaid.length || !waOpen(s.phone, msg)) return false;
     rememberWaSent(debtSignature(studentId, unpaid));
@@ -1983,24 +1995,159 @@ const App = (() => {
     if (!l) return false;
     const s = studentById(l.studentId);
     if (!s) return false;
-    const toStudent = !!s.studentPhone;
-    const greet = toStudent ? `שלום ${s.name},` : (s.parentName ? `שלום ${s.parentName},` : "שלום,");
-    const when = dayLabelPlain(l.date);
-    const msg =
-      `${greet}\n` +
-      (toStudent
-        ? `תזכורת לשיעור ${when} בשעה ${l.time}.`
-        : `תזכורת לשיעור של ${s.name} ${when} בשעה ${l.time}.`) +
-      (l.topic ? `\nנושא: ${l.topic}.` : "") +
-      `\nנתראה!`;
-    if (!waOpen(reminderPhone(s), msg)) return false;
+    if (!waOpen(reminderPhone(s), lessonReminderText(l, s))) return false;
     rememberWaSent(reminderSignature(l));
     render();
     return true;
   }
 
-  // אין "שליחה לכולם": וואטסאפ פותח צ'אט אחד בכל פעם, ותור של חלונות קופצים
-  // רק נראה כמו שליחה מרוכזת. שולחים שורה-שורה, והמונה מראה כמה נשארו.
+  function lessonReminderText(l, s, when = dayLabelPlain(l.date)) {
+    const toStudent = !!s.studentPhone;
+    const greet = toStudent ? `שלום ${s.name},` : (s.parentName ? `שלום ${s.parentName},` : "שלום,");
+    return settings.lessonMessage
+      ? fillTemplate(settings.lessonMessage, { שם: toStudent ? s.name : s.parentName, תלמיד: s.name, הורה: s.parentName, יום: when, שעה: l.time, נושא: l.topic })
+      : `${greet}\n` +
+        (toStudent
+          ? `תזכורת לשיעור ${when} בשעה ${l.time}.`
+          : `תזכורת לשיעור של ${s.name} ${when} בשעה ${l.time}.`) +
+        (l.topic ? `\nנושא: ${l.topic}.` : "") +
+        `\nנתראה!`;
+  }
+
+  // שליחה לכולם באייפון: וואטסאפ לא נותן לאתר לשלוח לבד, אבל קיצור דרך של אפל כן. האפליקציה
+  // מעבירה לקיצור את כל התזכורות שממתינות בבת אחת, והוא שולח אותן בוואטסאפ אחת אחרי השנייה.
+  // שום דבר לא עובר דרך שרת. ponytail: מסמנים "נשלח" ברגע ההעברה — לקיצור אין דרך לדווח חזרה
+  // ל-PWA (x-success נפתח בספארי, לא באפליקציה המותקנת). מה שנכשל נשלח שוב מהשורה ("שוב").
+  // שם באנגלית: שם בעברית לא נמצא באייפון (כיווניות/הקלדה/קידוד) — "Shortcut not found"
+  const SHORTCUT_NAME = "TutorSend";
+  function sendAllViaShortcut() {
+    const list = bulkLessons();
+    if (!list.length) { toast("אין שיעורים קרובים עם מספר טלפון", "err"); return; }
+    const items = list.map(l => {
+      const s = studentById(l.studentId);
+      // name = מי שמקבל את ההודעה (כמו {שם}), לחיפוש באנשי הקשר אם וואטסאפ לא מקבל מספר
+      const name = s.studentPhone ? s.name : (s.parentName || s.name);
+      return { name, phone: `+${normalizePhone(reminderPhone(s))}`, text: lessonReminderText(l, s) };
+    });
+    location.href = shortcutRunUrl(SHORTCUT_NAME, items);
+    const signatures = list.map(reminderSignature);
+    signatures.forEach(rememberWaSent);
+    render();
+    // קיצור חסר/שגוי לא מדווח חזרה — "לא נשלחו" מחזיר את כולם לתור
+    toast(`${signatures.length} תזכורות הועברו לקיצור הדרך`, "ok", {
+      label: "לא נשלחו",
+      run: () => {
+        signatures.forEach(sig => waSent.delete(sig));
+        try { localStorage.setItem(WA_SENT_KEY, JSON.stringify([...waSent])); } catch { /* לא קריטי */ }
+        render();
+      }
+    }, 15000);
+  }
+
+  // ----- שליחה אוטומטית (קיצור TutorAuto + אוטומציות 10:00/20:00 באייפון) -----
+  // מפתח סודי במכשיר הזה — הקישור שהקיצור מושך ממנו. נוצר רק כשמפעילים.
+  // ponytail: מפתח לכל מכשיר; מחיקת נתוני הדפדפן = מפתח חדש = להדביק קישור חדש בקיצור.
+  const WA_KEY_STORE = "mt_wa_key";
+  const waKey = (create = false) => {
+    try {
+      let k = localStorage.getItem(WA_KEY_STORE);
+      if (!k && create) { k = crypto.randomUUID(); localStorage.setItem(WA_KEY_STORE, k); }
+      return k;
+    } catch { return null; }
+  };
+  const waAutoUrl = () => `${PUSH_SERVER}/wa?key=${waKey(true)}`;
+  const waPhone = raw => normalizePhone(raw) ? `+${normalizePhone(raw)}` : "";
+  const AUTO_SHORTCUT = "TutorAuto";
+
+  const autoTexts = {
+    daily: (l, s) => ({ phone: waPhone(reminderPhone(s)), text: lessonReminderText(l, s, dayLabelPlain(l.date, new Date(`${l.date}T12:00`))) }),
+    pay: (l, s) => {
+      const price = lessonPrice(l);
+      if (!price || settings.payReminderMode === "off") return null;
+      const amount = `${price} ${settings.currency}`;
+      const text = (settings.payMessage
+        ? fillTemplate(settings.payMessage, { הורה: s.parentName, תלמיד: s.name, שיעורים: 1, סכום: amount })
+        : `${s.parentName ? `שלום ${s.parentName},` : "שלום,"}\nתודה על השיעור של ${s.name}!\nתזכורת ידידותית לתשלום: ${amount}.`) +
+        payInfoLine() + `\n\nאם כבר שילמתם — אפשר להתעלם 🙂`;
+      // להורה; תלמיד בלי טלפון הורה (בוגר) — אליו
+      return { phone: waPhone(s.phone || s.studentPhone), text };
+    },
+    weekly: (s, list, saturday) => {
+      const toStudent = !!s.studentPhone;
+      const name = toStudent ? s.name : s.parentName;
+      const ref = new Date(`${saturday}T12:00`);
+      const lines = list.map(l => `• ${dayLabelPlain(l.date, ref)} בשעה ${l.time}${l.topic ? ` – ${l.topic}` : ""}`);
+      return {
+        phone: waPhone(reminderPhone(s)),
+        text: `${name ? `שלום ${name},` : "שלום,"}\n${toStudent ? "השיעורים שלך" : `השיעורים של ${s.name}`} בשבוע הקרוב:\n${lines.join("\n")}\nנתראה!`
+      };
+    }
+  };
+
+  // מה נשלח לשרת בסנכרון: כבוי עם מפתח קיים — רשימה ריקה (מנקה את השרת); כבוי בלי מפתח — כלום
+  function waAutoPayload() {
+    if (!settings.waAuto) { const key = waKey(); return key ? { key, items: [] } : undefined; }
+    const times = { daily: settings.autoDaily, weekDay: settings.autoWeekDay, weekly: settings.autoWeekly };
+    return { key: waKey(true), items: automationItems({ lessons, studentsById: lessonIndex.studentsById, now: Date.now(), texts: autoTexts, times }) };
+  }
+
+  function setWaAuto(on) {
+    settings.waAuto = !!on;
+    if (!saveSettings()) { render(); return; }
+    render();
+    // מאשרים רק אחרי שהשרת עודכן — כיבוי שלא הגיע לשרת עדיין ישלח
+    trySyncPush().then(ok => ok
+      ? toast(on ? "השליחה האוטומטית הופעלה" : "השליחה האוטומטית כובתה", "ok")
+      : toast("לא הצלחתי לעדכן את השרת — בדקי חיבור לאינטרנט ונסי שוב", "err"));
+  }
+
+  const WEEKDAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+  // השעות שצריך אוטומציה "שעה ביום" לכל אחת (השבועי רץ רק ביום שלו, אבל אוטומציה יומית בשעה הזו לא מזיקה)
+  const autoRunTimes = () => [...new Set([settings.autoDaily, settings.autoPay, settings.autoWeekly])].sort();
+
+  function waAutoSettingsHtml() {
+    const row = (id, label, sub, control) => `<div class="setting-row">
+        <div><label class="setting-label" for="${id}">${label}</label>${sub ? `<div class="setting-sub">${sub}</div>` : ""}</div>${control}</div>`;
+    const timeInput = (id, key) => `<input type="time" id="${id}" value="${settings[key]}" onblur="App.updateSetting('${key}', this.value)">`;
+    const payOff = settings.payReminderMode === "off";
+    return `<div class="settings-panel">
+      <div class="setting-row">
+        <div><label class="setting-label" for="set-waauto">שליחה אוטומטית</label><div class="setting-sub">האייפון שולח לבד בוואטסאפ בשעות שבחרת — בלי לגעת בטלפון</div></div>
+        <label class="setting-inline"><input type="checkbox" id="set-waauto" ${settings.waAuto ? "checked" : ""} onchange="App.setWaAuto(this.checked)"> ${settings.waAuto ? "פעיל" : "כבוי"}</label>
+      </div>
+      ${settings.waAuto ? `
+      ${row("set-auto-daily", "תזכורת לשיעורי היום", "לכל תלמיד שיש לו שיעור באותו יום", timeInput("set-auto-daily", "autoDaily"))}
+      ${row("set-auto-pay", "הודעת תשלום להורה", payOff
+        ? "כבוי — \"תזכורת תשלום להורה\" כבויה בהתראות"
+        : "על שיעור שהסתיים ולא סומן כשולם, עם פרטי התשלום ו\"אם כבר שילמתם — אפשר להתעלם\"", timeInput("set-auto-pay", "autoPay"))}
+      ${row("set-auto-weekday", "סיכום השבוע הקרוב", "הודעה אחת לכל תלמיד עם השיעורים של 7 הימים שאחרי",
+        `<div class="setting-inline"><select id="set-auto-weekday" onchange="App.updateSetting('autoWeekDay', this.value)" aria-label="יום הסיכום השבועי">
+          ${WEEKDAYS.map((d, i) => `<option value="${i}" ${settings.autoWeekDay === i ? "selected" : ""}>${d}</option>`).join("")}
+        </select>${timeInput("set-auto-weekly", "autoWeekly")}</div>`)}
+      <details class="shortcut-help" open>
+        <summary class="setting-label">הגדרה חד-פעמית באייפון</summary>
+        <ol class="setting-sub">
+          <li><button type="button" class="btn btn-light" onclick="App.copyWaAutoUrl()">העתקת הקישור האישי</button> — המפתח שלך, לא לשתף.</li>
+          <li><a href="shortcuts/${AUTO_SHORTCUT}.shortcut">התקנת קיצור ${AUTO_SHORTCUT}</a> ← "הוספת קיצור" ← כשהאייפון מבקש קישור, מדביקים את מה שהעתקת.</li>
+          <li>בקיצורים ← "אוטומציה" ← ‏+ ← "שעה ביום" ← בוחרים שעה, "כל יום" ← "הרצה מיידית" ← "הבא" ← ${AUTO_SHORTCUT}.</li>
+          <li>אוטומציה כזו לכל אחת מהשעות: <b>${autoRunTimes().join(" · ")}</b></li>
+        </ol>
+        <p class="setting-sub">שינית שעה כאן? לעדכן גם את האוטומציה באייפון. הודעה שלא נשלחה (למשל טלפון נעול) לא נשלחת שוב לבד — שולחים אותה ידנית ממרכז התזכורות.</p>
+      </details>` : ""}
+    </div>`;
+  }
+
+  async function copyWaAutoUrl() {
+    try { await navigator.clipboard.writeText(waAutoUrl()); toast("הקישור הועתק", "ok"); }
+    catch { prompt("העתיקי את הקישור:", waAutoUrl()); }
+  }
+
+  // מה שתיבת העריכה בהגדרות מציגה כשאין תבנית שמורה. שמירה בלי שינוי (או תיבה ריקה) חוזרת
+  // להודעה המובנית, שיודעת יותר מתבנית: יחיד/רבים בחוב, ושורת נושא רק כשיש נושא.
+  const MESSAGE_DEFAULTS = {
+    payMessage: `שלום {הורה},\nתזכורת ידידותית לגבי תשלום עבור השיעורים הפרטיים של {תלמיד}.\nסה"כ {שיעורים} שיעורים שטרם שולמו, בסך {סכום}.\nתודה רבה!`,
+    lessonMessage: `שלום {שם},\nתזכורת לשיעור של {תלמיד} {יום} בשעה {שעה}.\nנתראה!`
+  };
 
   // ========== גיבוי ושחזור ==========
   function exportData() {
@@ -2183,7 +2330,7 @@ const App = (() => {
         </div>
         <div class="setting-row">
           <div><label class="setting-label" for="set-time">שעת התחלה</label></div>
-          <input id="set-time" type="time" value="${settings.defaultTime}" onchange="App.updateSetting('defaultTime', this.value)">
+          <input id="set-time" type="time" value="${settings.defaultTime}" onblur="App.updateSetting('defaultTime', this.value)">
         </div>
         <div class="setting-row">
           <div><label class="setting-label" for="set-duration">משך (דקות)</label></div>
@@ -2208,7 +2355,7 @@ const App = (() => {
           <div class="setting-row">
             <div><label class="setting-label" for="set-morning">תזכורת בוקר</label><div class="setting-sub">push עם מספר השיעורים של היום — משם שולחים תזכורות לתלמידים</div></div>
             <div class="setting-inline">
-              <input type="time" id="set-morning" value="${settings.morningReminderTime}" onchange="App.updateSetting('morningReminderTime', this.value)">
+              <input type="time" id="set-morning" value="${settings.morningReminderTime}" onblur="App.updateSetting('morningReminderTime', this.value)">
               ${settings.morningReminderTime
                 ? `<button type="button" class="btn btn-light" onclick="App.updateSetting('morningReminderTime', '')" aria-label="כיבוי תזכורת הבוקר">כבוי</button>`
                 : `<span class="settings-help">כבוי</span>`}
@@ -2230,6 +2377,28 @@ const App = (() => {
             ? `<button class="btn btn-light btn-block" onclick="App.testNotification()">${icon("bell")} שליחת התראת בדיקה באפליקציה</button>`
             : `<button class="btn btn-light btn-block" onclick="App.enableNotifications()">${icon("bell")} הפעלת התראות באפליקציה</button>`}
         </div>
+      </section>
+
+      <section class="settings-group settings-wide">
+        <div class="settings-group-head"><span>${icon("whatsapp")}</span><div><h3>וואטסאפ</h3><p>שליחה אוטומטית, נוסח ההודעות ושליחה לכולם בלחיצה</p></div></div>
+        ${waAutoSettingsHtml()}
+        <details class="settings-panel settings-fold">
+        <summary class="setting-label">נוסח ההודעות</summary>
+        <p class="setting-sub">מחיקת כל הטקסט מחזירה את הנוסח המקורי.</p>
+        <div class="setting-row setting-row-wide">
+          <div><label class="setting-label" for="set-paymsg">תזכורת תשלום להורה</label><div class="setting-sub">אפשר לשלב: {הורה} {תלמיד} {שיעורים} {סכום}. פרטי התשלום מתווספים בסוף</div></div>
+          <textarea id="set-paymsg" rows="5" maxlength="1000" onchange="App.updateSetting('payMessage', this.value)">${escapeHtml(settings.payMessage || MESSAGE_DEFAULTS.payMessage)}</textarea>
+        </div>
+        <div class="setting-row setting-row-wide">
+          <div><label class="setting-label" for="set-lessonmsg">תזכורת שיעור</label><div class="setting-sub">אפשר לשלב: {שם} (מי שמקבל את ההודעה) {תלמיד} {הורה} {יום} {שעה} {נושא}</div></div>
+          <textarea id="set-lessonmsg" rows="4" maxlength="1000" onchange="App.updateSetting('lessonMessage', this.value)">${escapeHtml(settings.lessonMessage || MESSAGE_DEFAULTS.lessonMessage)}</textarea>
+        </div>
+        </details>
+        <details class="settings-panel settings-fold">
+          <summary class="setting-label">שליחה לכולם בלחיצה אחת (אייפון)</summary>
+          <p class="setting-sub">כפתור "שליחה לכל..." במרכז התזכורות שולח בוואטסאפ את כל התזכורות של היום ומחר דרך קיצור הדרך ${SHORTCUT_NAME}. מתקינים פעם אחת:</p>
+          <a class="btn btn-wa btn-block" href="shortcuts/${SHORTCUT_NAME}.shortcut">${icon("whatsapp")} התקנת קיצור ${SHORTCUT_NAME}</a>
+        </details>
       </section>
 
       <section class="settings-group">
@@ -2286,16 +2455,20 @@ const App = (() => {
   }
 
   function updateSetting(key, value) {
-    if (["defaultPrice", "defaultDuration", "remindMinutes"].includes(key)) {
+    if (["defaultPrice", "defaultDuration", "remindMinutes", "autoWeekDay"].includes(key)) {
       value = Math.max(0, parseInt(value) || 0);
     } else {
       value = String(value).trim();
     }
     if (key === "currency" && !value) value = "₪";
     if (key === "payInfo") value = value.slice(0, 300); // גבול האימות ב-normalizeSettings
+    if (["autoDaily", "autoPay", "autoWeekly"].includes(key) && !value) value = DEFAULT_SETTINGS[key];
+    if (key in MESSAGE_DEFAULTS) value = value === MESSAGE_DEFAULTS[key] ? "" : value.slice(0, 1000);
+    // בורר שעה נשמר ב-blur (כשסוגרים אותו ב"סיום"), וסגירה בלי שינוי לא שומרת ולא מקפיצה "נשמר"
+    if (settings[key] === value) return;
     settings[key] = value;
     if (!saveSettings()) { render(); return; }
-    if (["remindMinutes", "morningReminderTime", "payReminderMode"].includes(key)) reschedule();
+    if (["remindMinutes", "morningReminderTime", "payReminderMode", "payInfo", "payMessage", "lessonMessage", "currency", "autoDaily", "autoPay", "autoWeekDay", "autoWeekly"].includes(key)) reschedule();
     render();
     toast("נשמר", "ok");
   }
@@ -2487,12 +2660,13 @@ const App = (() => {
     // רץ תמיד — הסנכרון לא תלוי בתמיכת push בדפדפן (חשוב באייפון שאינו מותקן למסך הבית).
     // החותמת היא הזמן שהסנכרון סינן איתו (כך ש-pageDueItems רואה בדיוק מה השרת השמיט), והבדיקה
     // המיידית מציגה פריט שהסנכרון הזה בדיוק השמיט במקום לחכות לטיימר של 30 שניות.
-    syncPush(lessons, lessonIndex.studentsById, settings)
+    return syncPush(lessons, lessonIndex.studentsById, settings, waAutoPayload())
       .then(at => {
         rememberPushSync("ok", at);
         if (notifSupported && Notification.permission === "granted") void checkReminders();
+        return true;
       })
-      .catch(error => { rememberPushSync("fail"); console.warn("Push sync failed", error); });
+      .catch(error => { rememberPushSync("fail"); console.warn("Push sync failed", error); return false; });
   }
 
   // שורת סטטוס לתזכורות רקע (push) במסך ההגדרות
@@ -2982,7 +3156,7 @@ const App = (() => {
     setLessonDate, togglePast, renderStudentPicker, pickStudent, quickAddStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, setRecurInterval, renderFreeSlots, pickFreeSlot, scheduleForStudent, togglePaid,
     calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson, showMoreLessons, miniShift, openHub,
-    setMoneyTab, togglePaymentBox, sendWhatsApp, openWhatsAppChat, sendReceipt, sendLessonReminder, repeatLastLesson, markAllPaid, postponeLesson,
+    setMoneyTab, togglePaymentBox, sendWhatsApp, openWhatsAppChat, sendReceipt, sendLessonReminder, sendAllViaShortcut, setWaAuto, copyWaAutoUrl, repeatLastLesson, markAllPaid, postponeLesson,
     exportData, importData, exportCalendar,
     changeMonth,
     updateSetting, setTheme, clearAll,

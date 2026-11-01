@@ -982,7 +982,7 @@ body.modal-open { overflow: hidden; }
 .profile-next strong { color: var(--text); font-size: .98rem; }
 .profile-quick { grid-template-columns: 1fr 1fr; }
 .profile-notes { margin-top: 14px; }
-.profile-notes textarea {
+.profile-notes textarea, .setting-row-wide textarea {
   width: 100%; box-sizing: border-box; resize: vertical;
   padding: 12px; border-radius: var(--r-sm);
   border: 1px solid var(--border); background: var(--surface);
@@ -2339,3 +2339,10 @@ select {
   #reminderHub .payment-actions { flex-direction: column; padding: 12px 14px; }
   #reminderHub .remind-row { flex-wrap: wrap; }
 }
+
+.shortcut-help summary { cursor: pointer; }
+.shortcut-help ol { margin: 8px 0 0; padding-inline-start: 20px; line-height: 1.7; }
+.hub-send-all { margin-top: 10px; }
+.settings-fold { margin-top: 10px; }
+.settings-fold > summary { cursor: pointer; padding: 4px 0; }
+.settings-fold[open] > summary { margin-bottom: 8px; }

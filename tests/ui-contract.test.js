@@ -197,7 +197,7 @@ test("reminder settings expose morning time and payment mode", () => {
   assert.match(source, /App\.updateSetting\('morningReminderTime', this\.value\)/);
   assert.match(source, /App\.updateSetting\('payReminderMode', this\.value\)/);
   assert.match(source, /<option value="nextMorning"/);
-  assert.match(source, /\["remindMinutes", "morningReminderTime", "payReminderMode"\]\.includes\(key\)\) reschedule\(\)/);
+  assert.match(source, /\["remindMinutes", "morningReminderTime", "payReminderMode", [^\]]*\]\.includes\(key\)\) reschedule\(\)/);
 });
 
 test("push deep links open the reminder hub and highlight the target", () => {
