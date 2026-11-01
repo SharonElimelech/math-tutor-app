@@ -2346,3 +2346,162 @@ select {
 .settings-fold { margin-top: 10px; }
 .settings-fold > summary { cursor: pointer; padding: 4px 0; }
 .settings-fold[open] > summary { margin-bottom: 8px; }
+
+/* =========================================================
+   v6 — "מחברת משבצות": נייר שנהב עם רשת עדינה, דיו כחול-כהה,
+   ועט אדום אחד שמסמן רק מה שדורש תשומת לב (היום, חוב, דחוף).
+   שכבה אחרונה: טוקנים + רכיבים בודדים. בלי גרדיאנטים ובלי זוהר.
+   ========================================================= */
+:root {
+  --font-display: "Frank Ruhl Libre", "David Libre", Georgia, serif;
+  --bg: #f6f1e7;
+  --band: #f1ebdf;
+  --surface: #fffdf8;
+  --surface-2: #fbf7ef;
+  --bg-soft: #f1ebde;
+  --panel: #fffdf8;
+  --text: #1e2a44;
+  --muted: #4c5468;
+  --faint: #676c78;
+  --border: #e3dbca;
+  --on-bg: #1e2a44;
+  --on-bg-muted: #555c6e;
+  --line-on-bg: #e0d8c6;
+  --chip-on-bg: #ece5d6;
+  --chart-muted: #d9d0bd;
+  --grid-line: rgba(30, 42, 68, .055);
+
+  --primary: #1e2a44;      /* דיו: פעולה ראשית, ניווט פעיל */
+  --on-primary: #fffdf8;
+  --pen: #c8452d;          /* עט אדום — ההדגשה היחידה */
+  --accent: #c8452d;
+  --on-accent: #fffdf8;
+  --accent-ink: #1e2a44;
+  --brand-2: #141c30;
+  --logo-paper: #fffdf8;
+
+  --ev-next: #e7ebf3;   --ev-next-ink: #1e2a44;
+  --ev-paid: #e6eee3;   --ev-paid-ink: #2c5a37;
+  --ev-unpaid: #f8e2da; --ev-unpaid-ink: #9b301c;
+
+  --green: #2e6f45;  --green-bg: #e3ede2;
+  --red: #b23a22;    --red-bg: #f8e3dc;
+  --orange: #8a5a12; --orange-bg: #f5ead3;
+  --wa: #1f6e4a;
+  --holiday: #1e2a44; --holiday-bg: #e9e4d6;
+
+  --hover: rgba(30, 42, 68, .05);
+  --active: rgba(30, 42, 68, .09);
+  /* צל חם (נייר על שולחן), לא שחור */
+  --sh-sm: 0 1px 0 rgba(70, 52, 20, .06);
+  --sh-md: 0 2px 6px rgba(70, 52, 20, .07);
+  --sh-lg: 0 18px 40px rgba(40, 30, 12, .18);
+  --scrim: rgba(24, 22, 18, .42);
+
+  /* פינות הדוקות: כפתור = מלבן מעוגל, לא גלולה */
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 9px;
+}
+html[data-theme="dark"] {
+  --bg: #14171f; --band: #191d27; --surface: #1b202b; --surface-2: #202634; --bg-soft: #252c3a; --panel: #1b202b;
+  --text: #ece6d8; --muted: #bdb6a6; --faint: #958f82; --border: #2d3443;
+  --on-bg: #ece6d8; --on-bg-muted: #aaa496; --line-on-bg: #262c39; --chip-on-bg: #232a37; --chart-muted: #3a4252;
+  --grid-line: rgba(236, 230, 216, .035);
+  --primary: #ece6d8; --on-primary: #14171f;
+  --pen: #e8735a; --accent: #e8735a; --on-accent: #1a0d08; --accent-ink: #ece6d8; --brand-2: #fffaf0;
+  --logo-paper: #1b202b;
+  --ev-next: #253048; --ev-next-ink: #dfe5f2; --ev-paid: #1d3326; --ev-paid-ink: #bfe3c8; --ev-unpaid: #3f2219; --ev-unpaid-ink: #f6c2b4;
+  --green: #8fd0a4; --green-bg: #1b3024; --red: #f29a84; --red-bg: #3b2018; --orange: #e8bd76; --orange-bg: #34290f;
+  --wa: #2b7a55; --holiday: #d9d2c2; --holiday-bg: #262c39;
+}
+
+/* נייר משבצות */
+body {
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* כותרות ומספרים גדולים: סריף עברי (פרנק-רוהל) — הקול של המחברת; גוף: IBM Plex */
+.today-greeting, .view-head h2, #modalTitle, .app-brand h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.today-greeting { font-size: 2.125rem; line-height: 1.05; }
+.view-head h2 { font-size: 1.875rem; line-height: 1.1; }
+.today-stat b, .today-next-time {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* לוגו: סימן המחברת, בלי עיגול סביבו */
+.brand-mark, html[data-theme] .brand-mark { background: none; box-shadow: none; color: var(--text); border-radius: 0; }
+.brand-mark svg { width: 30px; height: 30px; }
+@media (min-width: 760px) { .app-brand .brand-mark svg { width: 40px; height: 40px; } }
+
+/* היום בלוח: מוקף בעט אדום, לא עיגול צבעוני מלא */
+.mini-cal-day.today span { background: transparent; color: var(--pen); box-shadow: inset 0 0 0 2px var(--pen); font-weight: 700; }
+
+/* כפתור צף: מלבן דיו, צל חם */
+.fab { border-radius: 12px; box-shadow: 0 6px 18px rgba(30, 42, 68, .22); }
+
+/* חלון תחתון: פינות מתונות */
+@media (max-width: 759px) { .modal-content { border-radius: 16px 16px 0 0; } }
+
+/* פרופיל תלמיד: שלושת המספרים בשורה אחת במקום שלושה כרטיסים זה מתחת לזה */
+.profile-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+
+/* טבעת פוקוס רק במקלדת — לא על כפתור הסגירה בכל פתיחת חלון */
+button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+
+/* לחיצה מורגשת */
+.btn, .fab, .seg-btn, .tb-pill, .nav-btn { transition: transform .12s var(--ease-out), background-color .2s, color .2s; }
+.btn:active, .seg-btn:active, .tb-pill:active { transform: translateY(1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .fab, .seg-btn, .tb-pill, .nav-btn { transition: none; }
+}
+
+/* ---------- v6: חלונות וטפסים ---------- */
+/* אריח אייקון ליד כותרת החלון — קישוט בלי מידע; הכותרת בסריף עושה את העבודה */
+.modal-title-icon { display: none; }
+.modal-title-block h3 { font-size: 1.5rem; line-height: 1.15; }
+.form-group-title {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 6px 0 10px; padding-top: 14px;
+  border-top: 1px dashed var(--border);
+  font: 700 1.05rem/1.2 var(--font-display); color: var(--text);
+}
+.form-group-title small { font: 400 .78rem var(--font); color: var(--faint); }
+.field-hint { margin: -10px 0 14px; color: var(--faint); font-size: .78rem; line-height: 1.4; }
+.input-suffix { position: relative; }
+.input-suffix input { padding-inline-end: 40px; }
+.input-suffix span { position: absolute; inset-inline-end: 14px; top: 13px; color: var(--faint); pointer-events: none; }
+input:focus, select:focus, textarea:focus { border-color: var(--text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 12%, transparent); }
+
+/* פרופיל: פעולות משניות כרשימה שקטה במקום ערימת כפתורים */
+.profile-more-actions { margin-top: 12px; border-top: 1px solid var(--border); }
+.list-action {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 13px 2px; border: 0; border-bottom: 1px solid var(--border);
+  background: none; color: var(--text); font: 500 .95rem var(--font); text-align: start; cursor: pointer;
+}
+.list-action .ic { width: 18px; height: 18px; color: var(--faint); flex: none; }
+.list-action span { flex: 1; }
+.list-action b { font: 700 1rem var(--font-display); font-variant-numeric: lining-nums tabular-nums; }
+.list-action.is-due .ic, .list-action.is-due b { color: var(--pen); }
+.list-action:active { background: var(--hover); }
+/* "חובה"/"בחירה נדרשת" — הערה שקטה, לא שגיאה לפני שקרתה */
+.required-note { color: var(--faint); font-weight: 500; }
+/* היום בלוח הקטן גם כשהוא נבחר: מילוי דיו + טבעת עט */
+.mini-cal-day.today.selected span, .mini-cal-day.today[aria-pressed="true"] span { background: var(--primary); color: var(--on-primary); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--pen); }
+/* פס השבוע ביומן: היום = טבעת עט אדום, נבחר = מילוי דיו, שניהם = מילוי + טבעת */
+.week-day.today .week-num { background: transparent; color: var(--pen); box-shadow: inset 0 0 0 2px var(--pen); }
+.week-day.sel .week-num { background: var(--primary); color: var(--on-primary); box-shadow: none; }
+.week-day.today.sel .week-num { background: var(--primary); color: var(--on-primary); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--pen); }
