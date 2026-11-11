@@ -2199,7 +2199,16 @@ const App = (() => {
 
   const WEEKDAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
   // השעות שצריך אוטומציה "שעה ביום" לכל אחת (השבועי רץ רק ביום שלו, אבל אוטומציה יומית בשעה הזו לא מזיקה)
-  const autoRunTimes = () => [...new Set([settings.autoDaily, settings.autoPay, settings.autoWeekly])].sort();
+  // הודעת התשלום מוכנה בשרת ברגע שהשיעור נגמר, אבל יוצאת רק כשהקיצור רץ — ואוטומציה באייפון רצה
+  // בשעה קבועה. לכן אוטומציה לכל שעת סיום של שיעור בשבוע הקרוב (+2 דק', שהאוטומציה לא תקדים את הסוף).
+  // ponytail: שינוי בלו"ז = שעות חדשות; הרשימה בהגדרות מתעדכנת לבד, את האוטומציות מעדכנים ידנית.
+  const lessonEndRunTimes = () => {
+    if (settings.payReminderMode === "off") return [];
+    const today = todayStr(), weekEnd = ymd(new Date(Date.now() + 7 * 86400e3));
+    return [...new Set(lessons.filter(l => !l.done && l.date >= today && l.date <= weekEnd)
+      .map(l => addMinutes(l.time, (Number(l.duration) || 60) + 2)))].sort();
+  };
+  const autoRunTimes = () => [...new Set([settings.autoDaily, ...lessonEndRunTimes(), settings.autoWeekly])].sort();
 
   function waAutoSettingsHtml() {
     const row = (id, label, sub, control) => `<div class="setting-row">
@@ -2216,7 +2225,7 @@ const App = (() => {
       ${row("set-auto-daily", "תזכורת לשיעורי היום", "לכל תלמיד שיש לו שיעור באותו יום", timeInput("set-auto-daily", "autoDaily"))}
       ${row("set-auto-pay", "הודעת תשלום להורה", payOff
         ? "כבוי — \"תזכורת תשלום להורה\" כבויה בהתראות"
-        : "על שיעור שהסתיים ולא סומן כשולם, עם פרטי התשלום ו\"אם כבר שילמתם — אפשר להתעלם\"", timeInput("set-auto-pay", "autoPay"))}
+        : "נשלחת להורה מיד בסוף השיעור, אם לא סומן כשולם — עם פרטי התשלום ו\"אם כבר שילמתם — אפשר להתעלם\"", `<span class="setting-inline">בסוף השיעור</span>`)}
       ${row("set-auto-weekday", "סיכום השבוע הקרוב", "הודעה אחת לכל תלמיד עם השיעורים של 7 הימים הבאים",
         `<div class="setting-inline"><select id="set-auto-weekday" onchange="App.updateSetting('autoWeekDay', this.value)" aria-label="יום הסיכום השבועי">
           ${WEEKDAYS.map((d, i) => `<option value="${i}" ${settings.autoWeekDay === i ? "selected" : ""}>${d}</option>`).join("")}
@@ -2239,7 +2248,13 @@ const App = (() => {
           </li>
           <li><button type="button" class="btn btn-light" onclick="App.testAutoShortcut()">בדיקה שהקיצור נמצא</button> — אם מופיע "לא נמצא": בקיצורים, לחיצה ארוכה על הקיצור ← "שינוי שם" ← <b dir="ltr">${AUTO_SHORTCUT}</b> בדיוק (בלי "1" בסוף). קיצור כפול מהתקנה קודמת — למחוק.</li>
           <li>בקיצורים ← "אוטומציה" ← ‏+ ← "שעה ביום" ← בוחרים שעה, "כל יום" ← "הרצה מיידית" ← "הבא" ← ${AUTO_SHORTCUT}.</li>
-          <li>אוטומציה כזו לכל אחת מהשעות: <b>${autoRunTimes().join(" · ")}</b></li>
+          <li>אוטומציה כזו לכל אחת מהשעות:
+            <ul class="shortcut-build">
+              <li><b>${settings.autoDaily}</b> — תזכורת לתלמידים שיש להם שיעור באותו יום</li>
+              ${lessonEndRunTimes().length ? `<li><b dir="ltr">${lessonEndRunTimes().join(" · ")}</b> — סוף השיעורים שלך: הודעת תשלום להורה</li>` : ""}
+              <li><b>${settings.autoWeekly}</b> — סיכום שבועי (נשלח רק ב${WEEKDAYS[settings.autoWeekDay]})</li>
+            </ul>
+            בכל ריצה נשלח רק מה שהגיע זמנו, ולכל אחד פעם אחת. ביום בלי שיעורים לא נשלח כלום. כדאי לכבות בכל אוטומציה "התראה בעת הרצה" <span dir="ltr">(Notify When Run)</span>.</li>
         </ol>
         <p class="setting-sub">שינית שעה כאן? לעדכן גם את האוטומציה באייפון. הודעה שלא נשלחה (למשל טלפון נעול) לא נשלחת שוב לבד — שולחים אותה ידנית ממרכז התזכורות.</p>
       </details>` : ""}
