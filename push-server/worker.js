@@ -16,7 +16,7 @@ const corsFor = req => {
   const origin = req.headers.get("Origin");
   return {
     "Access-Control-Allow-Origin": ORIGINS.includes(origin) ? origin : ORIGINS[0],
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Vary": "Origin"
   };
@@ -78,6 +78,7 @@ export default {
       if (due.length) await env.SUBS.put("wasent:" + key, JSON.stringify(sent));
       return Response.json(due, { headers: { "Cache-Control": "no-store" } });
     }
+    if (url.pathname === "/backup") return backup(req, url, env, reply);
     if (req.method !== "POST" || url.pathname !== "/sync") return reply("not found", 404);
 
     let body;
@@ -104,6 +105,38 @@ export default {
     ctx.waitUntil(deliverDue(env));
   }
 };
+
+// ----- גיבוי ענן (D1) -----
+// המכשיר מצפין את כל הנתונים במפתח שנגזר מקוד השחזור ושולח רק טקסט מוצפן, תחת גיבוב של הקוד.
+// השרת לא יכול לקרוא אותם, ומי שאין לו את הקוד לא יכול למצוא אותם. אין מחיקה ואין רשימה.
+// prev: בכל יום חדש הגרסה הקודמת נשמרת בצד — שמירה שגויה (נמחקו תלמידים) לא מוחקת את אתמול.
+// ponytail: שורה אחת (data+prev) ← כל אחד עד 900KB, מתחת למגבלת 2MB לשורה ב-D1
+const BACKUP_ID = /^[0-9a-f]{64}$/;
+const BACKUP_MAX = 900_000;
+const DAY = 86_400_000;
+async function backup(req, url, env, reply) {
+  if (req.method === "GET") {
+    const id = url.searchParams.get("id") || "";
+    if (!BACKUP_ID.test(id)) return reply("bad id", 400);
+    const row = await env.DB.prepare("SELECT data, at, prev, prev_at FROM backups WHERE id = ?1").bind(id).first();
+    if (!row) return reply("not found", 404);
+    return Response.json({ data: row.data, at: row.at, prev: row.prev, prevAt: row.prev_at },
+      { headers: { ...corsFor(req), "Cache-Control": "no-store" } });
+  }
+  if (req.method !== "POST") return reply("not found", 404);
+  let body;
+  try { body = await req.json(); } catch { return reply("bad json", 400); }
+  const { id, data } = body || {};
+  if (typeof id !== "string" || !BACKUP_ID.test(id)) return reply("bad id", 400);
+  if (typeof data !== "string" || !data || data.length > BACKUP_MAX || !/^[A-Za-z0-9+/=]+$/.test(data)) return reply("bad data", 400);
+  const now = Date.now();
+  await env.DB.prepare(`INSERT INTO backups (id, data, at) VALUES (?1, ?2, ?3)
+    ON CONFLICT(id) DO UPDATE SET
+      prev = CASE WHEN backups.at / ${DAY} < excluded.at / ${DAY} THEN backups.data ELSE backups.prev END,
+      prev_at = CASE WHEN backups.at / ${DAY} < excluded.at / ${DAY} THEN backups.at ELSE backups.prev_at END,
+      data = excluded.data, at = excluded.at`).bind(id, data, now).run();
+  return Response.json({ at: now }, { headers: corsFor(req) });
+}
 
 async function deliverDue(env) {
   const now = Date.now();

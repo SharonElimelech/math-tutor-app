@@ -11,3 +11,9 @@ id = "aac4e0266d82477d9b8ad899176f359b"
 
 [vars]
 VAPID_PUBLIC_KEY = "BHhFFPc6qcDFpasSyWrqfsMUdq4-InJTvr-ehC_1EVSSBlfNmG6rprnc0ONBPsqsMxnKuFY6ROfqMqCF9LW-wew"
+
+# גיבוי ענן מוצפן (סכמה: schema.sql)
+[[d1_databases]]
+binding = "DB"
+database_name = "mytutor-backup"
+database_id = "4503ba48-eb58-4339-81d7-f1ad200b90a1"

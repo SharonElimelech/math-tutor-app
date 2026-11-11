@@ -25,6 +25,7 @@ import {
 } from "./src/reminders.js";
 import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest, plannedReminders, pageDueItems, shownSigs, markShown, pruneShown, PUSH_SERVER } from "./src/push.js";
 import { automationItems } from "./src/automation.js";
+import { newCode, validCode, formatCode, fingerprint, cloudSave, cloudLoad } from "./src/cloud.js";
 import { whatsappLinks, normalizePhone, fillTemplate, shortcutRunUrl } from "./src/whatsapp.js";
 
 /* =========================================================
@@ -99,6 +100,7 @@ const App = (() => {
       DB.save(snapshot);
       lastSavedState = clone(snapshot);
       refreshIndex();
+      scheduleCloudBackup();
       return true;
     } catch (error) {
       restoreLastSavedState();
@@ -2228,9 +2230,19 @@ const App = (() => {
   function renderBackupNudge() {
     const el = document.getElementById("backupNudge");
     if (!el) return;
+    const hasData = students.length || lessons.length;
+    // גיבוי ענן פעיל — התזכורת היחידה היא לשמור את קוד השחזור (בלעדיו הגיבוי לא שווה כלום)
+    if (hasData && cloudCode() && lsGet(CLOUD_SAVED_KEY) !== "1") {
+      el.innerHTML = `<div class="backup-nudge">${icon("warn")}
+          <div><strong>קוד השחזור עוד לא נשמר</strong><span>הנתונים מגובים בענן. בלי הקוד אי אפשר לשחזר אותם.</span></div>
+          <button class="btn btn-light" onclick="App.shareCloudCode()">שמירת הקוד</button>
+        </div>`;
+      return;
+    }
+    if (lsJson(CLOUD_STATE_KEY)?.state === "ok") { el.innerHTML = ""; return; }
     const last = Number(localStorage.getItem(BACKUP_STAMP_KEY)) || 0;
     const stale = Date.now() - last > 14 * 24 * 60 * 60 * 1000;
-    el.innerHTML = stale && (students.length || lessons.length)
+    el.innerHTML = stale && hasData
       ? `<div class="backup-nudge">${icon("warn")}
           <div><strong>${last ? "עברו יותר משבועיים מהגיבוי האחרון" : "עוד לא נעשה גיבוי"}</strong><span>הנתונים שמורים רק במכשיר הזה.</span></div>
           <button class="btn btn-light" onclick="App.exportData()">גיבוי עכשיו</button>
@@ -2258,6 +2270,145 @@ const App = (() => {
       event.target.value = "";
     };
     reader.readAsText(file);
+  }
+
+  // ========== גיבוי ענן אוטומטי ==========
+  // כל שמירה מגובה מוצפנת לשרת כמה שניות אחריה. הגיבוי רק מעלה; שחזור — רק כשמבקשים, עם אישור.
+  // שלא יאבד מידע: נתונים ריקים לא מועלים (מחיקה/מכשיר חדש לא דורסים גיבוי מלא), מכשיר חדש מקבל
+  // קוד חדש = מקום חדש בשרת, השרת שומר גם את גרסת היום הקודם, ושחזור שומר בצד את מה שהיה במכשיר.
+  // ponytail: שני מכשירים עם אותו קוד — השמירה האחרונה גוברת (אין מיזוג).
+  const CLOUD_CODE_KEY = "mt_cloud_code";
+  const CLOUD_SAVED_KEY = "mt_cloud_code_saved"; // המורה שמרה את הקוד (שיתוף/העתקה)
+  const CLOUD_STATE_KEY = "mt_cloud_state";      // { state: ok|fail, at, sum }
+  const BEFORE_RESTORE_KEY = "mt_before_restore"; // מה שהיה במכשיר לפני השחזור האחרון מהענן
+  const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch { return false; } };
+  const lsJson = k => { try { return JSON.parse(lsGet(k)) || null; } catch { return null; } };
+  function cloudCode(create = false) {
+    let code = lsGet(CLOUD_CODE_KEY);
+    if (!code && create) { code = newCode(); lsSet(CLOUD_CODE_KEY, code); }
+    return code;
+  }
+  let cloudTimer = null;
+  function scheduleCloudBackup(delay = 4000) {
+    clearTimeout(cloudTimer);
+    cloudTimer = setTimeout(() => void backupToCloud(), delay);
+  }
+  async function backupToCloud() {
+    const snap = lastSavedState;
+    if (!snap.students.length && !snap.lessons.length) return;
+    const code = cloudCode(true);
+    const value = { ...snap, waKey: waKey() }; // גם הקישור של קיצור הדרך חוזר בשחזור
+    const sum = await fingerprint(code + JSON.stringify(value));
+    const last = lsJson(CLOUD_STATE_KEY);
+    if (last?.state === "ok" && last.sum === sum) return;
+    try {
+      lsSet(CLOUD_STATE_KEY, JSON.stringify({ state: "ok", at: await cloudSave(code, value), sum }));
+    } catch (error) {
+      console.warn("Cloud backup failed", error);
+      lsSet(CLOUD_STATE_KEY, JSON.stringify({ state: "fail", at: Date.now() }));
+    }
+    if (activeViewName() === "settings") renderSettings();
+    renderBackupNudge();
+  }
+
+  function cloudBackupHtml() {
+    const code = cloudCode();
+    const s = lsJson(CLOUD_STATE_KEY);
+    const when = at => new Date(at).toLocaleString("he-IL", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+    const status = !code ? `<p class="push-status warn">הגיבוי יתחיל אחרי שמוסיפים תלמיד.</p>`
+      : s?.state === "ok" ? `<p class="push-status ok">✓ מגובה בענן · עודכן ${when(s.at)}</p>`
+      : s?.state === "fail" ? `<p class="push-status err">הגיבוי לענן נכשל — אין חיבור? ינוסה שוב בשמירה הבאה.</p>`
+      : `<p class="push-status warn">מגבה…</p>`;
+    const undo = lsJson(BEFORE_RESTORE_KEY);
+    return `
+      <div class="cloud-backup">
+        <div class="setting-label">גיבוי אוטומטי בענן</div>
+        ${status}
+        ${code ? `<div class="cloud-code" dir="ltr">${escapeHtml(code)}</div>
+        <p class="settings-help">זה קוד השחזור. בלעדיו אי אפשר לשחזר את הגיבוי, וגם אנחנו לא יכולים לקרוא אותו. כדאי לשמור אותו בפתקים או לשלוח לעצמך.</p>` : ""}
+        <div class="settings-action-stack settings-data-actions">
+          ${code ? `<button class="btn btn-light btn-block" onclick="App.shareCloudCode()">${icon("note")} שמירת קוד השחזור</button>` : ""}
+          <button class="btn btn-light btn-block" onclick="App.openCloudRestore()">${icon("repeat")} שחזור מהענן עם קוד</button>
+          ${undo ? `<button class="btn btn-light btn-block" onclick="App.undoCloudRestore()">ביטול השחזור מ-${when(undo.at)}</button>` : ""}
+        </div>
+      </div>`;
+  }
+
+  async function shareCloudCode() {
+    const code = cloudCode();
+    if (!code) return;
+    const text = `קוד השחזור של "המורה שלי": ${code}\nבמכשיר חדש: הגדרות ← שחזור מהענן עם קוד.`;
+    try {
+      if (navigator.share) await navigator.share({ title: "קוד שחזור – המורה שלי", text });
+      else { await navigator.clipboard.writeText(text); toast("הקוד הועתק", "ok"); }
+    } catch (error) {
+      if (error?.name === "AbortError") return; // ביטול השיתוף — הקוד עוד לא נשמר
+      prompt("העתקת קוד השחזור:", code);
+    }
+    lsSet(CLOUD_SAVED_KEY, "1");
+    renderBackupNudge();
+  }
+
+  function openCloudRestore() {
+    openModal(`
+      <div class="modal-title-block">
+        <div><h3 id="modalTitle">שחזור מהענן</h3><p>מקלידים את קוד השחזור ששמרת (20 תווים)</p></div>
+      </div>
+      <div class="form-section">
+        <label for="f-cloud-code">קוד השחזור</label>
+        <input id="f-cloud-code" dir="ltr" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX">
+        <button class="btn btn-primary btn-block" onclick="App.restoreFromCloud()">חיפוש הגיבוי</button>
+      </div>`);
+  }
+
+  async function restoreFromCloud() {
+    const input = document.getElementById("f-cloud-code")?.value || "";
+    if (!validCode(input)) { toast("הקוד צריך להיות 20 תווים — אותיות ומספרים", "err"); return; }
+    let found;
+    try { found = await cloudLoad(input); }
+    catch (error) { console.warn(error); toast("אין חיבור לשרת. אפשר לנסות שוב.", "err"); return; }
+    if (!found) { toast("לא נמצא גיבוי לקוד הזה. כדאי לבדוק שהוקלד נכון.", "err"); return; }
+    closeModal();
+    const when = at => new Date(at).toLocaleString("he-IL", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+    const what = v => `${v.students?.length || 0} תלמידים ו-${v.lessons?.length || 0} שיעורים`;
+    let pick = null;
+    if (await askConfirmation(`נמצא גיבוי מ-${when(found.latest.at)}: ${what(found.latest.value)}. השחזור יחליף את מה שיש עכשיו במכשיר (מה שיש עכשיו נשמר בצד).`, "שחזור")) {
+      pick = found.latest.value;
+    } else if (found.previous && await askConfirmation(`יש גם גרסה קודמת מ-${when(found.previous.at)}: ${what(found.previous.value)}. לשחזר אותה?`, "שחזור הגרסה הקודמת")) {
+      pick = found.previous.value;
+    }
+    if (!pick) return;
+    let data;
+    try { data = parseBackup(pick); } catch (error) { toast("הגיבוי פגום: " + error.message, "err"); return; }
+    if (students.length || lessons.length) {
+      // עם הקוד שלו — ביטול השחזור חוזר למקום שלו בשרת ולא דורס את הגיבוי ששוחזר
+      lsSet(BEFORE_RESTORE_KEY, JSON.stringify({ ...lastSavedState, code: cloudCode(true), saved: lsGet(CLOUD_SAVED_KEY) === "1", waKey: waKey(), at: Date.now() }));
+    }
+    applyRestored(data, formatCode(input), pick.waKey, true);
+    toast("השחזור הושלם", "ok");
+  }
+
+  // המכשיר מאמץ את הקוד והקישור של הגיבוי — הגיבויים הבאים ממשיכים לאותו מקום, והקיצור באייפון ממשיך לעבוד
+  function applyRestored(data, code, key, saved) {
+    students = data.students; lessons = data.lessons; settings = data.settings;
+    lsSet(CLOUD_CODE_KEY, code);
+    lsSet(CLOUD_SAVED_KEY, saved ? "1" : "");
+    if (typeof key === "string" && key) lsSet(WA_KEY_STORE, key);
+    lsSet(CLOUD_STATE_KEY, "");
+    if (!save()) { render(); return; }
+    applyTheme(); render();
+  }
+
+  async function undoCloudRestore() {
+    const before = lsJson(BEFORE_RESTORE_KEY);
+    if (!before) return;
+    if (!await askConfirmation(`לחזור למה שהיה במכשיר לפני השחזור: ${before.students.length} תלמידים ו-${before.lessons.length} שיעורים?`, "ביטול השחזור")) return;
+    let data;
+    try { data = parseBackup(before); } catch (error) { toast("העותק פגום: " + error.message, "err"); return; }
+    applyRestored(data, before.code, before.waKey, before.saved);
+    try { localStorage.removeItem(BEFORE_RESTORE_KEY); } catch { /* לא קריטי */ }
+    toast("חזרת לנתונים שהיו לפני השחזור", "ok");
   }
 
   // ========== סיכום הכנסות ==========
@@ -2488,7 +2639,9 @@ const App = (() => {
       </section>
 
       <section class="settings-group settings-wide">
-        <div class="settings-group-head"><span>${icon("note")}</span><div><h3>נתונים וגיבוי</h3><p>המידע נשמר מקומית במכשיר הזה</p></div></div>
+        <div class="settings-group-head"><span>${icon("note")}</span><div><h3>נתונים וגיבוי</h3><p>המידע נשמר במכשיר ומגובה מוצפן לענן</p></div></div>
+        ${cloudBackupHtml()}
+        <div class="setting-label">גיבוי לקובץ</div>
         <div class="settings-action-stack settings-data-actions">
           <button class="btn btn-light btn-block" onclick="App.exportData()">${icon("note")} ייצוא גיבוי לקובץ</button>
           <button class="btn btn-light btn-block" onclick="document.getElementById('importFile').click()">${icon("repeat")} שחזור מקובץ גיבוי</button>
@@ -2912,6 +3065,9 @@ const App = (() => {
       startupDataError = null;
     }
     initReminders();
+    // מה שכבר במכשיר עולה לענן מיד בפתיחה, ושוב כשחוזר החיבור אחרי כישלון
+    scheduleCloudBackup(1500);
+    addEventListener("online", () => scheduleCloudBackup(0));
     initCalendarSwipe();
     initLessonDrag();
     handleLaunchParams();
@@ -3219,6 +3375,7 @@ const App = (() => {
     calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson, showMoreLessons, miniShift, openHub,
     setMoneyTab, togglePaymentBox, sendWhatsApp, openWhatsAppChat, sendReceipt, sendLessonReminder, sendAllViaShortcut, setWaAuto, copyWaAutoUrl, testAutoShortcut, repeatLastLesson, markAllPaid, postponeLesson,
     exportData, importData, exportCalendar,
+    shareCloudCode, openCloudRestore, restoreFromCloud, undoCloudRestore,
     changeMonth,
     updateSetting, setTheme, clearAll,
     enableNotifications, testNotification, testClosedPush,

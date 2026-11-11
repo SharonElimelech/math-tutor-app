@@ -1,11 +1,11 @@
 // Service Worker – מאפשר עבודה גם בלי אינטרנט (offline) והתקנה כאפליקציה
-const CACHE = "morti-v4.6.3";
+const CACHE = "morti-v4.7.1";
 // נתוני ה-push של האפליקציה (רשימת תזכורות + סימוני "הוצג") — חיים מעבר לעדכוני גרסה
 const PUSH_DATA = "mt-push-data";
 const ASSETS = [
   "index.html",
-  "styles.css?v=71",
-  "app.js?v=93",
+  "styles.css?v=72",
+  "app.js?v=94",
   "src/data.js",
   "src/push.js",
   "src/reminders.js",
@@ -14,6 +14,7 @@ const ASSETS = [
   "src/storage.js",
   "src/whatsapp.js",
   "src/automation.js",
+  "src/cloud.js",
   "manifest.json",
   "icon-192.png",
   "icon-512.png"
@@ -126,5 +127,7 @@ self.addEventListener("fetch", e => {
   }
 
   // משאבים חיצוניים (גופנים): רשת עם נפילה למטמון, בלי להחזיר HTML במקום נכס.
+  // קריאות לשרת (fetch מהקוד — destination ריק, למשל שחזור גיבוי) לא עוברות כאן: ישר לרשת, לעולם לא ממטמון.
+  if (!e.request.destination) return;
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
