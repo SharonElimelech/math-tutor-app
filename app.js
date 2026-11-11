@@ -2048,17 +2048,26 @@ const App = (() => {
   // כך שאין קיצור שני להתקין (TutorSend שלא הותקן = "לא נמצא"): ההודעות עולות לשרת עם חלון
   // של "עכשיו" ו-TutorAuto מושך אותן. בלי שליחה אוטומטית — TutorSend עם הרשימה בקישור, כמו קודם.
   let waNowItems = [];
+  let sendingAll = false;
   async function sendAllViaShortcut() {
+    if (sendingAll) return; // לחיצה כפולה בזמן הסנכרון
     const list = bulkLessons();
     if (!list.length) { toast("אין שיעורים קרובים עם מספר טלפון", "err"); return; }
     if (settings.waAuto) {
       const now = Date.now();
+      // תזכורת רגילה = אותו מזהה כמו תזכורת הבוקר האוטומטית (d:...), כך שהשרת שולח לכל שיעור פעם אחת:
+      // מה שהבוקר כבר שלח לא יוצא שוב, ומה שנשלח עכשיו לא יוצא שוב בבוקר. "שליחה שוב" — מזהה חדש בכוונה.
+      const again = !pendingLessons().length;
       waNowItems = list.map((l, i) => {
         const s = studentById(l.studentId);
-        return { id: `n:${now}:${i}`, after: now - 60e3, until: now + 20 * 60e3, phone: waPhone(reminderPhone(s)), text: lessonReminderText(l, s) };
+        const id = again ? `n:${now}:${i}` : `d:${l.id}:${l.date}:${l.time}`;
+        return { id, after: now - 60e3, until: now + 20 * 60e3, phone: waPhone(reminderPhone(s)), text: lessonReminderText(l, s) };
       });
       // קודם השרת, אחר כך הקיצור — אחרת הקיצור עלול למשוך לפני שההודעות הגיעו
-      if (!await trySyncPush()) { waNowItems = []; toast("אין חיבור לשרת. אפשר לנסות שוב.", "err"); return; }
+      sendingAll = true;
+      let ok = false;
+      try { ok = await trySyncPush(); } finally { sendingAll = false; }
+      if (!ok) { waNowItems = []; toast("אין חיבור לשרת. אפשר לנסות שוב.", "err"); return; }
       location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(AUTO_SHORTCUT)}`;
     } else {
       const items = list.map(l => {
@@ -2131,7 +2140,8 @@ const App = (() => {
     const times = { daily: settings.autoDaily, weekDay: settings.autoWeekDay, weekly: settings.autoWeekly };
     const now = Date.now();
     const items = automationItems({ lessons, studentsById: lessonIndex.studentsById, now, texts: autoTexts, times });
-    return { key: waKey(true), items: [...items, ...waNowItems.filter(i => i.until > now)] };
+    // "עכשיו" קודם: השרת חותך ב-500 לפי הסדר, ושליחה ידנית לא אמורה ליפול בחיתוך
+    return { key: waKey(true), items: [...waNowItems.filter(i => i.until > now), ...items] };
   }
 
   function setWaAuto(on) {

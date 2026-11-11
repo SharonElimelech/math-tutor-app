@@ -56,3 +56,18 @@ test("server hands out each due message once, even after a resync", () => {
   assert.deepEqual(takeDue(resynced, first.sent, now).due, []);
   assert.deepEqual(takeDue(resynced, first.sent, now + 6000).due.map(d => d.text), ["later"]);
 });
+
+test("send-all and the morning run share an id, so a lesson is reminded once", () => {
+  const now = t("2026-11-11", "08:00");
+  const msg = { phone: "+972501234567", text: "hi" };
+  // send-all now (20-minute window) + the morning reminder for the same lesson (09:30 until 16:00)
+  const items = [
+    { id: "d:a", after: now - 60e3, until: now + 20 * 60e3, ...msg },
+    { id: "d:a", after: t("2026-11-11", "09:30"), until: t("2026-11-11", "16:00"), ...msg }
+  ];
+  const first = takeDue(items, null, now);
+  assert.equal(first.due.length, 1);
+  assert.deepEqual(takeDue(items, first.sent, t("2026-11-11", "10:00")).due, []);
+  // both windows open at once (send-all after 09:30): still one message
+  assert.equal(takeDue(items, null, t("2026-11-11", "10:00")).due.length, 1);
+});

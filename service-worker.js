@@ -1,11 +1,11 @@
 // Service Worker – מאפשר עבודה גם בלי אינטרנט (offline) והתקנה כאפליקציה
-const CACHE = "morti-v4.6.2";
+const CACHE = "morti-v4.6.3";
 // נתוני ה-push של האפליקציה (רשימת תזכורות + סימוני "הוצג") — חיים מעבר לעדכוני גרסה
 const PUSH_DATA = "mt-push-data";
 const ASSETS = [
   "index.html",
   "styles.css?v=71",
-  "app.js?v=92",
+  "app.js?v=93",
   "src/data.js",
   "src/push.js",
   "src/reminders.js",

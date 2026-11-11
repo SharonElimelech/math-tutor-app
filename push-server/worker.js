@@ -57,8 +57,11 @@ export function cleanWa(items, now) {
 }
 export function takeDue(items, sentBefore, now) {
   const sent = Object.fromEntries(Object.entries(sentBefore || {}).filter(([, until]) => until > now));
-  const due = (items || []).filter(i => i.after <= now && now < i.until && !sent[i.id]);
-  for (const i of due) sent[i.id] = i.until;
+  const due = [];
+  for (const i of items || []) if (i.after <= now && now < i.until && !Object.hasOwn(sent, i.id)) { due.push(i); sent[i.id] = 0; }
+  // אותו מזהה בכמה חלונות ("שליחה לכולם" + ריצת הבוקר לאותו שיעור) — הרישום מחזיק עד החלון האחרון,
+  // אחרת הוא פג אחרי החלון הקצר והבוקר שולח שוב
+  for (const i of items || []) if (Object.hasOwn(sent, i.id) && sent[i.id] < i.until) sent[i.id] = i.until;
   return { due: due.map(({ phone, text }) => ({ phone, text })), sent };
 }
 
