@@ -31,12 +31,12 @@ test("planner: morning digest once per day with undone lessons, none when time i
   const [m] = byTag(plannedReminders(tomorrow, priced, settings, now), "morning-");
   assert.equal(m.t, ts("2026-07-05T08:00:00"));
   assert.equal(m.title, "תזכורות להיום");
-  assert.equal(m.body, "2 שיעורים היום — שלחי תזכורות לתלמידים");
+  assert.equal(m.body, "2 שיעורים היום — זמן לשלוח תזכורות");
   assert.equal(m.url, "./?view=home&hub=lessons");
   assert.equal(m.sig, "morning:2026-07-05");
   assert.equal(byTag(plannedReminders(tomorrow, priced, settings, now), "morning-").length, 1);
   // שיעור אחד — ניסוח ביחיד
-  assert.equal(byTag(plannedReminders([lesson({ id: "a", date: "2026-07-05" })], priced, settings, now), "morning-")[0].body, "שיעור אחד היום — שלחי תזכורת לתלמיד");
+  assert.equal(byTag(plannedReminders([lesson({ id: "a", date: "2026-07-05" })], priced, settings, now), "morning-")[0].body, "שיעור אחד היום — זמן לשלוח תזכורת");
   // הבוקר של היום כבר עבר (now = 12:00) — לא נכלל
   assert.equal(byTag(plannedReminders([lesson()], priced, settings, now), "morning-").length, 0);
   // כבוי
@@ -48,7 +48,7 @@ test("planner: payment reminder follows payReminderMode", () => {
   assert.equal(after.length, 1);
   assert.equal(after[0].t, ts("2026-07-04T17:00:00")); // 16:00 + 60 דק'
   assert.equal(after[0].title, "תזכורת תשלום");
-  assert.equal(after[0].body, "השיעור עם דנה הסתיים — שלחי תזכורת תשלום להורה");
+  assert.equal(after[0].body, "השיעור עם דנה הסתיים — זמן לשלוח תזכורת תשלום להורה");
   assert.equal(after[0].url, "./?view=home&pay=s1");
   assert.equal(after[0].sig, "pay:l1:2026-07-04:16:00");
   assert.equal(byTag(plannedReminders([lesson()], priced, { ...settings, payReminderMode: "nextMorning" }, now), "pay-")[0].t, ts("2026-07-05T08:00:00"));

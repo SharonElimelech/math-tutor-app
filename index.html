@@ -4,23 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f6f1e7" id="themeColorMeta">
-  <title>המורה שלי - ניהול שיעורים פרטיים</title>
+  <title>המורה שלי — ניהול שיעורים פרטיים</title>
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=73">
+  <link rel="stylesheet" href="styles.css?v=74">
   <link rel="apple-touch-icon" href="icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="המורה שלי">
 </head>
 <body>
-  <a href="#app" class="skip-link">דלג לתוכן הראשי</a>
+  <a href="#app" class="skip-link">דילוג לתוכן הראשי</a>
   <header class="app-header">
     <div class="app-brand">
       <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><rect x="3" y="3" width="26" height="26" rx="7" fill="var(--logo-paper)" stroke="currentColor" stroke-width="2.4"/><path d="M11.7 4v24M20.3 4v24M4 11.7h24M4 20.3h24" stroke="currentColor" stroke-width="1" opacity=".28"/><path d="M9.5 16.6l4.4 4.4 8.6-10" stroke="var(--pen)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-      <div><h1>המורה שלי</h1><span>ניהול הוראה פרטית</span></div>
+      <div><h1>המורה שלי</h1><span>ניהול שיעורים פרטיים</span></div>
     </div>
     <div id="topbarContext" class="topbar-context"></div>
     <div class="topbar-tools">
@@ -53,7 +53,7 @@
       <div class="search-wrap">
         <label class="sr-only" for="studentSearch">חיפוש תלמיד</label>
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="studentSearch" class="search-box" type="search" placeholder="חיפוש תלמיד..." oninput="App.renderStudents()">
+        <input id="studentSearch" class="search-box" type="search" placeholder="חיפוש תלמיד…" oninput="App.renderStudents()">
       </div>
       <div id="studentsList" class="list"></div>
     </section>
@@ -79,7 +79,7 @@
         <div id="incomeSummary"></div>
         <section class="income-chart-card" aria-labelledby="incomeChartTitle">
           <div class="income-section-head"><div><h3 id="incomeChartTitle">מגמת הכנסות</h3><p>ששת החודשים האחרונים</p></div></div>
-          <div id="incomeChart" class="income-chart" role="img" aria-label="גרף הכנסות ששת החודשים האחרונים"></div>
+          <div id="incomeChart" class="income-chart" role="img" aria-label="גרף הכנסות בששת החודשים האחרונים"></div>
         </section>
       </div>
     </section>
@@ -146,6 +146,6 @@
       });
     }
   </script>
-  <script type="module" src="app.js?v=95"></script>
+  <script type="module" src="app.js?v=96"></script>
 </body>
 </html>

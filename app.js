@@ -296,7 +296,7 @@ const App = (() => {
         <div id="err-name" class="field-error" style="display:none">צריך שם תלמיד</div>
         <label for="f-student-phone">טלפון התלמיד</label>
         <input id="f-student-phone" type="tel" inputmode="tel" value="${escapeHtml(s.studentPhone || "")}" placeholder="05X-XXXXXXX">
-        <p class="field-hint">לתזכורות שיעור בוואטסאפ. ריק — התזכורת תגיע להורה.</p>
+        <p class="field-hint">לתזכורות שיעור בוואטסאפ. אם השדה ריק, התזכורת תגיע להורה.</p>
         <div class="form-group-title">הורה <small>לתזכורות תשלום</small></div>
         <div class="row">
           <div><label for="f-parent">שם</label><input id="f-parent" value="${escapeHtml(s.parentName)}" placeholder="לדוגמה: רונית"></div>
@@ -395,7 +395,7 @@ const App = (() => {
         <span class="${owed > 0 ? "has-debt" : ""}"><b>${cur(owed)}</b> יתרה פתוחה</span>
         <span><b>${cur(totalPaid)}</b> נגבה בסך הכול</span>
       </div>
-      ${next ? `<div class="profile-next">${icon("calendar", "ic-sub")} <span>נושא הבא · ${dayLabelPlain(next.date)} ${fmtTime(next.time)}</span><strong>${next.topic ? escapeHtml(next.topic) : "טרם נקבע נושא"}</strong></div>` : ""}
+      ${next ? `<div class="profile-next">${icon("calendar", "ic-sub")} <span>השיעור הבא · ${dayLabelPlain(next.date)} ${fmtTime(next.time)}</span><strong>${next.topic ? escapeHtml(next.topic) : "טרם נקבע נושא"}</strong></div>` : ""}
       <div class="modal-actions profile-quick">
         <button class="btn btn-primary btn-block" onclick="App.scheduleForStudent('${id}')">${icon("calendar")} קביעת שיעור</button>
         <button class="btn btn-light btn-block" onclick="App.openStudentForm('${id}')">${icon("edit")} עריכה</button>
@@ -407,7 +407,7 @@ const App = (() => {
       </div>
       <div class="form-section profile-notes">
         <label for="f-notes">הערות פרטיות</label>
-        <textarea id="f-notes" rows="3" placeholder="חוזקות, קשיים, סגנון למידה, מה לתרגל בפעם הבאה...">${escapeHtml(s.notes || "")}</textarea>
+        <textarea id="f-notes" rows="3" placeholder="חוזקות, קשיים, סגנון למידה, מה לתרגל בפעם הבאה…">${escapeHtml(s.notes || "")}</textarea>
         <button class="btn btn-light" onclick="App.saveStudentNotes('${id}')">${icon("check")} שמירת הערה</button>
       </div>
       <div class="profile-section-head">${icon("note", "ic-sub")} היסטוריית שיעורים</div>
@@ -453,7 +453,7 @@ const App = (() => {
     }
     if (!save()) { render(); return; }
     render();
-    toast(id ? "התלמיד עודכן" : "תלמיד נוסף", "ok");
+    toast(id ? "התלמיד עודכן" : "התלמיד נוסף", "ok");
     // ליד חדש → ישר לקביעת שיעור, בלי לחפש שוב את התלמיד. אחרת סוגרים.
     if (newId && andSchedule) openLessonForm(null, newId);
     else closeModal();
@@ -471,13 +471,13 @@ const App = (() => {
   function renderStudents() {
     const el = document.getElementById("studentsList");
     const paint = html => renderKeepFocus(el, html);
-    if (!students.length) { paint( `<div class="empty empty-action">${icon("plus")}<h3>עדיין אין תלמידים</h3><p>הוסיפי תלמיד ראשון כדי לקבוע שיעור ולעקוב אחר תשלומים.</p><button class="btn btn-primary" onclick="App.openStudentForm()">הוספת תלמיד</button></div>`); return; }
+    if (!students.length) { paint( `<div class="empty empty-action">${icon("plus")}<h3>עדיין אין תלמידים</h3><p>מוסיפים תלמיד ראשון כדי לקבוע שיעורים ולעקוב אחר תשלומים.</p><button class="btn btn-primary" onclick="App.openStudentForm()">הוספת תלמיד</button></div>`); return; }
     const searchEl = document.getElementById("studentSearch");
     const q = searchEl ? searchEl.value.trim().toLowerCase() : "";
     const filtered = q
       ? students.filter(s => (s.name + " " + (s.parentName || "")).toLowerCase().includes(q))
       : students;
-    if (!filtered.length) { paint(`<div class="empty empty-action"><h3>לא נמצאו תלמידים</h3><p>נסי שם תלמיד או שם הורה אחר.</p></div>`); return; }
+    if (!filtered.length) { paint(`<div class="empty empty-action"><h3>לא נמצאו תלמידים</h3><p>אפשר לחפש לפי שם תלמיד או שם הורה.</p></div>`); return; }
     const today = todayStr();
     paint(filtered.map(s => {
       const upcoming = lessonIndex.forStudent(s.id).filter(l => l.date >= today && !l.done);
@@ -533,7 +533,7 @@ const App = (() => {
       </div>
       <div class="form-section">
       <label for="f-student-search">תלמיד <span class="required-note">בחירה נדרשת</span></label>
-      <input id="f-student-search" placeholder="הקלידי שם ובחרי תלמיד" autocomplete="off" oninput="App.renderStudentPicker()">
+      <input id="f-student-search" placeholder="חיפוש תלמיד לפי שם" autocomplete="off" oninput="App.renderStudentPicker()">
       <input type="hidden" id="f-student" value="${l.studentId}">
       <div id="studentPicker" class="student-picker"></div>
       <label>בחירה מהירה</label>
@@ -548,7 +548,7 @@ const App = (() => {
       </div>
       <div id="freeSlots" class="free-slots"></div>
       <label for="f-topic">נושא / הערות (לא חובה)</label>
-      <input id="f-topic" value="${escapeHtml(l.topic || "")}" placeholder="לדוגמה: גיאומטריה - משפט פיתגורס">
+      <input id="f-topic" value="${escapeHtml(l.topic || "")}" placeholder="לדוגמה: גיאומטריה — משפט פיתגורס">
 
       <button type="button" class="adv-toggle" onclick="App.toggleAdvanced(this)">
         עוד אפשרויות (משך, מחיר${!id ? ", חזרה" : ""}) ${icon("chevron", "ic")}
@@ -561,7 +561,7 @@ const App = (() => {
         ${!id ? `
           <div class="checkbox-row">
             <input type="checkbox" id="f-repeat" onchange="App.toggleRepeat(this.checked)">
-            <label for="f-repeat">שיעור חוזר כל שבוע</label>
+            <label for="f-repeat">שיעור חוזר</label>
           </div>
           <div id="repeatWrap" style="display:none">
             <input type="hidden" id="f-interval" value="7">
@@ -586,7 +586,7 @@ const App = (() => {
       <div class="modal-actions">
       <button class="btn btn-primary btn-block" onclick="App.saveLesson('${id || ""}')">${icon("check")} ${id ? "שמירת שינויים" : "קביעת שיעור"}</button>
       ${id && studentById(l.studentId) && (studentById(l.studentId).studentPhone || studentById(l.studentId).phone)
-        ? `<button class="btn btn-wa btn-block" onclick="App.sendLessonReminder('${id}')">${icon("whatsapp")} שליחת תזכורת לתלמיד</button>` : ""}
+        ? `<button class="btn btn-wa btn-block" onclick="App.sendLessonReminder('${id}')">${icon("whatsapp")} שליחת תזכורת בוואטסאפ</button>` : ""}
       ${id && studentById(l.studentId)
         ? `<button class="btn btn-light btn-block" onclick="App.openStudentForm('${l.studentId}')">${icon("edit")} עריכת פרטי התלמיד</button>` : ""}
       </div>
@@ -597,7 +597,7 @@ const App = (() => {
         <div class="danger-zone"><div><strong>מחיקת שיעור</strong><span>השיעור יוסר מהיומן</span></div><button class="btn btn-danger" onclick="App.deleteLesson('${id}')">מחיקה</button></div>
       `) : ""}
       ${id && futureCount > 1 ? `
-        <div class="danger-zone"><div><strong>כל השיעורים העתידיים של התלמיד</strong><span>${futureCount} שיעורים שטרם התקיימו יימחקו מהיומן</span></div><button class="btn btn-danger" onclick="App.deleteStudentFuture('${id}')">מחיקת הכל</button></div>
+        <div class="danger-zone"><div><strong>כל השיעורים העתידיים של התלמיד</strong><span>${futureCount} שיעורים שטרם התקיימו יימחקו מהיומן</span></div><button class="btn btn-danger" onclick="App.deleteStudentFuture('${id}')">מחיקת הכול</button></div>
       ` : ""}
     `);
     renderStudentPicker();
@@ -743,7 +743,7 @@ const App = (() => {
     if (conflicts.length) {
       const first = conflicts[0];
       const who = studentById(first.studentId)?.name || "שיעור אחר";
-      const more = conflicts.length > 1 ? ` ועוד ${conflicts.length - 1}` : "";
+      const more = conflicts.length === 2 ? " ועוד שיעור אחד" : conflicts.length > 2 ? ` ועוד ${conflicts.length - 1} שיעורים` : "";
       const proceed = await askConfirmation(
         `חופף לשיעור של ${who} ${dayLabelPlain(first.date)} בשעה ${first.time}${more}. לקבוע בכל זאת?`,
         "קביעה בכל זאת"
@@ -770,7 +770,7 @@ const App = (() => {
     // נדנוד עדין: רענון היומן שומר על תזכורות אמינות גם כשהאפליקציה סגורה.
     // ייבוא חוזר מעדכן לפי UID, בלי כפילויות.
     const hasFuture = lessons.some(l => !l.done && new Date(`${l.date}T${l.time || "00:00"}:00`).getTime() >= Date.now());
-    toast(successMessage, "ok", hasFuture ? { label: "הוסף ליומן", run: exportCalendar } : null);
+    toast(successMessage, "ok", hasFuture ? { label: "הוספה ליומן הטלפון", run: exportCalendar } : null);
   }
 
   function setLessonDate(offset, btn) {
@@ -802,7 +802,7 @@ const App = (() => {
     lessons.forEach(x => { if (x.seriesId === l.seriesId) x.openEnded = false; });
     if (!save()) { render(); return; }
     closeModal(); render();
-    toast(`נמחקו ${removed} שיעורים`);
+    toast(removed === 1 ? "נמחק שיעור אחד" : `נמחקו ${removed} שיעורים`);
   }
 
   // מחיקת כל השיעורים העתידיים של התלמיד — מכל הסדרות והמועדים הבודדים יחד
@@ -815,7 +815,7 @@ const App = (() => {
     if (!future.length) return;
     if (!await askConfirmation(
       `${future.length} השיעורים העתידיים של ${s?.name || "התלמיד"} יימחקו מהיומן. שיעורים שכבר התקיימו יישארו במעקב התשלומים.`,
-      "מחיקת כל העתידיים")) return;
+      "מחיקת כל השיעורים העתידיים")) return;
     const ids = new Set(future.map(x => x.id));
     lessons = lessons.filter(x => !ids.has(x.id));
     // עצירת סדרות פתוחות של התלמיד — שלא ייווצרו שיעורים חדשים אוטומטית
@@ -867,9 +867,6 @@ const App = (() => {
     return lessonIndex.sortedLessons;
   }
 
-  const dateTimeLine = l =>
-    `${icon("calendar", "ic-sub")} ${fmtDate(l.date)} &nbsp;·&nbsp; ${icon("clock", "ic-sub")} ${fmtTime(l.time)}`;
-
   // תווית יום יחסית ("היום", "מחר", שם היום)
   function dayLabel(dateStr) {
     const d = new Date(dateStr + "T00:00");
@@ -920,7 +917,7 @@ const App = (() => {
           </span>
         </button>
         ${canRemind ? `<button class="lesson-check lesson-wa" onclick="App.sendLessonReminder('${l.id}')" aria-label="שליחת תזכורת וואטסאפ ל-${escapeHtml(s.name)}" title="תזכורת בוואטסאפ">${icon("whatsapp")}</button>` : ""}
-        <button class="lesson-check ${l.done ? "done" : ""}" onclick="App.toggleDone('${l.id}')" aria-label="${l.done ? "ביטול סימון שיעור כבוצע" : "סימון שיעור כבוצע"}" aria-pressed="${l.done}" title="${l.done ? "בוצע" : "סמן כבוצע"}">${icon("check")}</button>
+        <button class="lesson-check ${l.done ? "done" : ""}" onclick="App.toggleDone('${l.id}')" aria-label="${l.done ? "ביטול סימון שיעור כבוצע" : "סימון שיעור כבוצע"}" aria-pressed="${l.done}" title="${l.done ? "בוצע" : "סימון כבוצע"}">${icon("check")}</button>
       </div>`;
   }
 
@@ -1025,7 +1022,7 @@ const App = (() => {
       const isToday = ds === todayStr();
       const isSel = ds === day;
       const cls = ["week-day", isToday ? "today" : "", isSel ? "sel" : ""].filter(Boolean).join(" ");
-      const label = `${d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" })}${n ? `, ${n} שיעורים` : ", אין שיעורים"}`;
+      const label = `${d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" })}${n === 1 ? ", שיעור אחד" : n ? `, ${n} שיעורים` : ", אין שיעורים"}`;
       return `<button type="button" class="${cls}" data-day="${ds}" aria-pressed="${isSel}"${isToday ? ' aria-current="date"' : ""} aria-label="${escapeHtml(label)}" onclick="App.selectCalDay('${ds}')">
         <span class="week-dow">${dows[d.getDay()]}</span>
         <span class="week-num">${d.getDate()}</span>
@@ -1108,7 +1105,7 @@ const App = (() => {
         // ברשת של 3 ימים יש מקום לשם מלא ולנושא; בשבוע מלא רק שם פרטי
         const label = span === 7 ? name.split(" ")[0] : name;
         const topic = span !== 7 && l.topic ? `<i>${escapeHtml(l.topic)}</i>` : "";
-        return `<button type="button" class="wg-block ${lessonStateClass(l)}" data-id="${l.id}" style="top:${Math.round(top)}px;height:${Math.round(h)}px" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור: ${escapeHtml(aria)}"><span>${escapeHtml(label)}</span><b>${fmtTime(l.time)}<span class="wg-end">-${addMinutes(l.time, Number(l.duration) || 60)}</span></b>${topic}<span class="wg-ava" aria-hidden="true">${escapeHtml(initials(name))}</span></button>`;
+        return `<button type="button" class="wg-block ${lessonStateClass(l)}" data-id="${l.id}" style="top:${Math.round(top)}px;height:${Math.round(h)}px" onclick="App.openLessonForm('${l.id}')" aria-label="עריכת שיעור: ${escapeHtml(aria)}"><span>${escapeHtml(label)}</span><b>${fmtTime(l.time)}<span class="wg-end">–${addMinutes(l.time, Number(l.duration) || 60)}</span></b>${topic}<span class="wg-ava" aria-hidden="true">${escapeHtml(initials(name))}</span></button>`;
       }).join("");
       const isToday = ds === todayStr();
       return `<div class="wg-col ${isToday ? "today" : ""}" data-day="${ds}">
@@ -1178,7 +1175,7 @@ const App = (() => {
         ds === selectedDay ? "sel" : "",
         h ? "holiday" : "",
         has ? "has-lessons" : ""].filter(Boolean).join(" ");
-      const title = [h ? h.name : "", has ? counts[ds] + " שיעורים" : ""].filter(Boolean).join(" · ");
+      const title = [h ? h.name : "", has ? (counts[ds] === 1 ? "שיעור אחד" : counts[ds] + " שיעורים") : ""].filter(Boolean).join(" · ");
       // שיעור בודד — מציגים את השעה שלו (כמו יומן גוגל); כמה שיעורים — מונה
       const marker = has
         ? (counts[ds] === 1 && firstTime[ds]
@@ -1214,7 +1211,7 @@ const App = (() => {
   function listViewHtml() {
     const list = lessonSorted();
     if (!list.length) {
-      return `<div class="empty empty-action">${icon("calendar")}<h3>היומן עדיין ריק</h3><p>קבעי שיעור ראשון כדי להתחיל לבנות את השבוע.</p><button class="btn btn-primary" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
+      return `<div class="empty empty-action">${icon("calendar")}<h3>היומן עדיין ריק</h3><p>קובעים שיעור ראשון ומתחילים לבנות את השבוע.</p><button class="btn btn-primary" onclick="App.openLessonForm()">קביעת שיעור</button></div>`;
     }
     const today = todayStr();
     const upcoming = list.filter(l => l.date >= today);
@@ -1265,7 +1262,7 @@ const App = (() => {
       : `<button class="btn btn-primary btn-block" onclick="App.openLessonForm()">קביעת שיעור ראשון</button>`;
     onb.innerHTML = `
       <div class="onboard-card">
-        <h4>${hasStudents ? "עוד צעד אחד" : "ברוכה הבאה"}</h4>
+        <h4>${hasStudents ? "עוד צעד אחד" : "ברוכים הבאים"}</h4>
         <p>שלושה צעדים קטנים כדי להתחיל לנהל את השיעורים:</p>
         <div class="onboard-steps">
           ${step(1, "הוספת תלמיד", hasStudents)}
@@ -1321,7 +1318,7 @@ const App = (() => {
     const conflicts = findConflicts(lessons, { dates: [date], time: l.time, duration: l.duration, excludeId: id });
     if (conflicts.length) {
       openLessonForm(id);
-      toast("המועד בעוד שבוע תפוס — בחרי מועד אחר", "err");
+      toast("המועד בעוד שבוע תפוס — צריך לבחור מועד אחר", "err");
       return;
     }
     const prev = l.date;
@@ -1372,8 +1369,8 @@ const App = (() => {
           <button class="btn confirm-skip" onclick="App.skipLesson('${l.id}')" aria-label="השיעור של ${name} לא התקיים — הסרה מהיומן">${icon("close")} לא התקיים</button>
         </div>
         <div class="confirm-extra">
-          <button type="button" onclick="App.confirmAndRepeat('${l.id}')" aria-label="סימון שבוצע ושולם וקביעת עוד שיעור בשבוע הבא">${icon("repeat", "ic-sub")} בוצע + קביעת עוד</button>
-          <button type="button" onclick="App.postponeLesson('${l.id}')" aria-label="דחיית השיעור בשבוע, לאותו יום ושעה">${icon("calendar", "ic-sub")} דחייה לשבוע</button>
+          <button type="button" onclick="App.confirmAndRepeat('${l.id}')" aria-label="סימון שבוצע ושולם וקביעת עוד שיעור בשבוע הבא">${icon("repeat", "ic-sub")} התקיים ושולם · עוד שיעור</button>
+          <button type="button" onclick="App.postponeLesson('${l.id}')" aria-label="דחיית השיעור בשבוע, לאותו יום ושעה">${icon("calendar", "ic-sub")} דחייה בשבוע</button>
         </div>
       </article>`;
     }).join("");
@@ -1519,7 +1516,7 @@ const App = (() => {
         : view === "students"
           ? `<b>${students.length}</b><span>${students.length === 1 ? "תלמיד" : "תלמידים"}</span>`
           : view === "money"
-            ? `<b>${new Date().toLocaleDateString("he-IL", { month: "long" })}</b><span>${openCount ? `${openCount} פתוחים` : "הכול שולם"}</span>`
+            ? `<b>${new Date().toLocaleDateString("he-IL", { month: "long" })}</b><span>${openCount === 1 ? "שיעור אחד לא שולם" : openCount ? `${openCount} לא שולמו` : "הכול שולם"}</span>`
             : `<b>v${APP_VERSION}</b>`;
     }
     // פעמון עם נקודה כשמשהו ממתין; האווטאר מציג ראשי תיבות של המורה, או אייקון כשאין שם
@@ -1667,7 +1664,7 @@ const App = (() => {
       countClass: "hub-count-due",
       body: `<div class="hub-confirm">${confirmRowsHtml(pending.slice(0, 5))}</div>`,
       footer: pending.length > 5
-        ? `<p class="hub-empty">ועוד ${pending.length - 5} ממתינים — אישור אחד חושף את הבא.</p>`
+        ? `<p class="hub-empty">${pending.length === 6 ? "ועוד שיעור אחד ממתין" : `ועוד ${pending.length - 5} ממתינים`} — אישור אחד חושף את הבא.</p>`
         : ""
     }) : "";
 
@@ -1679,7 +1676,7 @@ const App = (() => {
       rows: lessonList.map(lessonReminderRow).join(""),
       empty: "אין שיעורים היום או מחר שממתינים לתזכורת.",
       footer: isIOS() && bulkCount
-        ? `<button type="button" class="btn btn-wa btn-block hub-send-all" onclick="App.sendAllViaShortcut()">${icon("whatsapp")} ${lessonsToSend ? `שליחה לכל ה-${bulkCount} בבת אחת` : `שליחה שוב לכל ה-${bulkCount}`}</button>`
+        ? `<button type="button" class="btn btn-wa btn-block hub-send-all" onclick="App.sendAllViaShortcut()">${icon("whatsapp")} ${lessonsToSend ? (bulkCount === 1 ? "שליחת התזכורת" : `שליחה לכל ה-${bulkCount} בבת אחת`) : (bulkCount === 1 ? "שליחה שוב" : `שליחה שוב לכל ה-${bulkCount}`)}</button>`
         : ""
     });
 
@@ -1688,7 +1685,7 @@ const App = (() => {
       title: "תשלומים פתוחים",
       count: debtors.length ? cur(totalOwed) : "הכול שולם",
       countClass: debtors.length ? "hub-count-due" : "hub-count-done",
-      note: oldestAge >= 2 ? `${icon("warn", "ic-sub")} הוותיק כבר מחכה ${debtAgeLabel(oldestAge)}` : "",
+      note: oldestAge >= 2 ? `${icon("warn", "ic-sub")} החוב הוותיק ביותר מחכה כבר ${debtAgeLabel(oldestAge)}` : "",
       // כרטיס תשלום מלא לכל תלמיד — פתיחה חושפת כל שיעור עם כפתור "סימון כשולם",
       // בדיוק כמו במסך כספים, כדי שאפשר לגבות ישירות מהתזכורות בלי לעבור מסך.
       body: debtors.length
@@ -1880,7 +1877,7 @@ const App = (() => {
   async function markAllPaid(studentId) {
     const unpaid = [...lessonIndex.unpaidForStudent(studentId)];
     if (!unpaid.length) return;
-    if (!await askConfirmation(`לסמן ${unpaid.length} ${unpaid.length === 1 ? "שיעור" : "שיעורים"} כשולמו?`, "סימון כשולם")) return;
+    if (!await askConfirmation(unpaid.length === 1 ? "לסמן שיעור אחד כשולם?" : `לסמן ${unpaid.length} שיעורים כשולמו?`, "סימון כשולם")) return;
     const paidAt = todayStr();
     unpaid.forEach(l => { l.paid = true; l.paidAt = paidAt; });
     if (!save()) { render(); return; }
@@ -1905,7 +1902,7 @@ const App = (() => {
   // ponytail: באייפון מניחים שוואטסאפ מותקן — בלי fallback (בלעדיו iOS מציג "כתובת לא תקינה").
   const isMobile = () => /Android/i.test(navigator.userAgent) || isIOS();
   function waOpen(rawPhone, msg) {
-    if (!normalizePhone(rawPhone)) { toast("לתלמיד אין מספר טלפון. הוסיפי אותו במסך התלמידים.", "err"); return false; }
+    if (!normalizePhone(rawPhone)) { toast("לתלמיד אין מספר טלפון. אפשר להוסיף אותו במסך התלמידים.", "err"); return false; }
     const links = whatsappLinks(rawPhone, msg);
     if (!isMobile()) { window.open(links.web, "_blank", "noopener"); return true; }
     // אנדרואיד: intent:// עם fallback מובנה לאתר כשוואטסאפ לא מותקן — בלי טיימרים ובלי חלון נוסף
@@ -1933,7 +1930,7 @@ const App = (() => {
     const days = Math.floor((Date.now() - ts) / 86400000);
     if (days <= 0) return "נשלח היום";
     if (days === 1) return "נשלח אתמול";
-    return `נשלח לפני ${days} ימים`;
+    return days === 2 ? "נשלח לפני יומיים" : `נשלח לפני ${days} ימים`;
   }
   // חתימת חוב: משתנה כשהחוב משתנה — תזכורת שנשלחה על חוב ישן לא חוסמת חוב חדש
   const debtSignature = (studentId, unpaid) =>
@@ -1961,7 +1958,7 @@ const App = (() => {
     const msg = (settings.payMessage
       ? fillTemplate(settings.payMessage, { הורה: s.parentName, תלמיד: s.name, שיעורים: unpaid.length, סכום: `${owed} ${settings.currency}` })
       : `${hi(payToStudent(s) ? s.name : s.parentName)}\n` +
-        `תזכורת קטנה לגבי התשלום על השיעורים${payToStudent(s) ? "" : ` של ${first(s.name)}`}: ` +
+        `תזכורת קטנה לגבי התשלום על ${unpaid.length === 1 ? "השיעור" : "השיעורים"}${payToStudent(s) ? "" : ` של ${first(s.name)}`}: ` +
         `${unpaid.length === 1 ? "שיעור אחד" : `${unpaid.length} שיעורים`}, סה״כ ${owed} ${settings.currency}.`) +
       payInfoLine() + `\n\nתודה!`;
     if (!unpaid.length || !waOpen(payPhone(s), msg)) return false;
@@ -1976,7 +1973,7 @@ const App = (() => {
     const s = studentById(studentId);
     if (!s) return;
     const phone = s.phone || s.studentPhone;
-    if (!phone) { toast("אין מספר טלפון לתלמיד", "err"); return; }
+    if (!phone) { toast("לתלמיד אין מספר טלפון. אפשר להוסיף אותו במסך התלמידים.", "err"); return; }
     waOpen(phone, "");
   }
 
@@ -1996,7 +1993,7 @@ const App = (() => {
       `${hi(s.parentName)}\n` +
       `סיכום השיעורים של ${first(s.name)} ב${monthName}:\n` +
       `${lines.join("\n")}\n\n` +
-      `סה"כ ${monthLessons.length} ${monthLessons.length === 1 ? "שיעור" : "שיעורים"} · ${cur(total)}` +
+      `סה״כ ${monthLessons.length} ${monthLessons.length === 1 ? "שיעור" : "שיעורים"} · ${cur(total)}` +
       (paid < total ? `\nשולם ${cur(paid)} · נשאר לתשלום ${cur(total - paid)}` + payInfoLine() : `\nהכול שולם, תודה!`);
     waOpen(payPhone(s), msg);
   }
@@ -2085,8 +2082,8 @@ const App = (() => {
     signatures.forEach(rememberWaSent);
     render();
     // קיצור חסר/שגוי לא מדווח חזרה — "לא נשלחו" מחזיר את כולם לתור
-    toast(`${signatures.length} תזכורות הועברו לקיצור הדרך`, "ok", {
-      label: "לא נשלחו",
+    toast(signatures.length === 1 ? "תזכורת אחת הועברה לקיצור הדרך" : `${signatures.length} תזכורות הועברו לקיצור הדרך`, "ok", {
+      label: "סימון כלא נשלחו",
       run: () => {
         signatures.forEach(sig => waSent.delete(sig));
         try { localStorage.setItem(WA_SENT_KEY, JSON.stringify([...waSent])); } catch { /* לא קריטי */ }
@@ -2187,7 +2184,7 @@ const App = (() => {
     // מאשרים רק אחרי שהשרת עודכן — כיבוי שלא הגיע לשרת עדיין ישלח
     trySyncPush().then(ok => ok
       ? toast(on ? "השליחה האוטומטית הופעלה" : "השליחה האוטומטית כובתה", "ok")
-      : toast("לא הצלחתי לעדכן את השרת — בדקי חיבור לאינטרנט ונסי שוב", "err"));
+      : toast("לא ניתן לעדכן את השרת. כדאי לבדוק את החיבור לאינטרנט ולנסות שוב.", "err"));
   }
 
   const WEEKDAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -2210,7 +2207,7 @@ const App = (() => {
       ${row("set-auto-pay", "הודעת תשלום להורה", payOff
         ? "כבוי — \"תזכורת תשלום להורה\" כבויה בהתראות"
         : "על שיעור שהסתיים ולא סומן כשולם, עם פרטי התשלום ו\"אם כבר שילמתם — אפשר להתעלם\"", timeInput("set-auto-pay", "autoPay"))}
-      ${row("set-auto-weekday", "סיכום השבוע הקרוב", "הודעה אחת לכל תלמיד עם השיעורים של 7 הימים שאחרי",
+      ${row("set-auto-weekday", "סיכום השבוע הקרוב", "הודעה אחת לכל תלמיד עם השיעורים של 7 הימים הבאים",
         `<div class="setting-inline"><select id="set-auto-weekday" onchange="App.updateSetting('autoWeekDay', this.value)" aria-label="יום הסיכום השבועי">
           ${WEEKDAYS.map((d, i) => `<option value="${i}" ${settings.autoWeekDay === i ? "selected" : ""}>${d}</option>`).join("")}
         </select>${timeInput("set-auto-weekly", "autoWeekly")}</div>`)}
@@ -2235,14 +2232,14 @@ const App = (() => {
 
   async function copyWaAutoUrl() {
     try { await navigator.clipboard.writeText(waAutoUrl()); toast("הקישור הועתק", "ok"); }
-    catch { prompt("העתיקי את הקישור:", waAutoUrl()); }
+    catch { prompt("העתקת הקישור:", waAutoUrl()); }
   }
 
   // מה שתיבת העריכה בהגדרות מציגה כשאין תבנית שמורה. שמירה בלי שינוי (או תיבה ריקה) חוזרת
   // להודעה המובנית, שיודעת יותר מתבנית: יחיד/רבים בחוב, ושורת נושא רק כשיש נושא.
   const MESSAGE_DEFAULTS = {
-    payMessage: `היי {הורה},\nתזכורת קטנה לגבי התשלום על השיעורים של {תלמיד}: {שיעורים} שיעורים, סה״כ {סכום}.`,
-    lessonMessage: `היי {שם},\nרק להזכיר — ל{תלמיד} יש שיעור {יום} ב-{שעה}.\nאם משהו משתנה, רק לכתוב לי.`
+    payMessage: `היי {הורה},\nתזכורת קטנה לגבי התשלום על השיעורים של {תלמיד}. סה״כ לתשלום: {סכום}.`,
+    lessonMessage: `היי {שם},\nרק להזכיר — יש שיעור {יום} ב-{שעה}.\nאם משהו משתנה, רק לכתוב לי.`
   };
 
   // ========== גיבוי ושחזור ==========
@@ -2300,7 +2297,7 @@ const App = (() => {
         applyTheme(); render();
         toast("השחזור הושלם בהצלחה", "ok");
       } catch (err) {
-        toast("שגיאה בקריאת הקובץ: " + err.message, "err");
+        toast("הקובץ אינו קובץ גיבוי תקין.", "err");
       }
       event.target.value = "";
     };
@@ -2353,7 +2350,7 @@ const App = (() => {
     const when = at => new Date(at).toLocaleString("he-IL", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
     const status = !code ? `<p class="push-status warn">הגיבוי יתחיל אחרי שמוסיפים תלמיד.</p>`
       : s?.state === "ok" ? `<p class="push-status ok">✓ מגובה בענן · עודכן ${when(s.at)}</p>`
-      : s?.state === "fail" ? `<p class="push-status err">הגיבוי לענן נכשל — אין חיבור? ינוסה שוב בשמירה הבאה.</p>`
+      : s?.state === "fail" ? `<p class="push-status err">הגיבוי לענן נכשל — אין חיבור? ננסה שוב בשמירה הבאה.</p>`
       : `<p class="push-status warn">מגבה…</p>`;
     const undo = lsJson(BEFORE_RESTORE_KEY);
     return `
@@ -2375,7 +2372,7 @@ const App = (() => {
     if (!code) return;
     const text = `קוד השחזור של "המורה שלי": ${code}\nבמכשיר חדש: הגדרות ← שחזור מהענן עם קוד.`;
     try {
-      if (navigator.share) await navigator.share({ title: "קוד שחזור – המורה שלי", text });
+      if (navigator.share) await navigator.share({ title: "קוד שחזור — המורה שלי", text });
       else { await navigator.clipboard.writeText(text); toast("הקוד הועתק", "ok"); }
     } catch (error) {
       if (error?.name === "AbortError") return; // ביטול השיתוף — הקוד עוד לא נשמר
@@ -2415,7 +2412,7 @@ const App = (() => {
     }
     if (!pick) return;
     let data;
-    try { data = parseBackup(pick); } catch (error) { toast("הגיבוי פגום: " + error.message, "err"); return; }
+    try { data = parseBackup(pick); } catch (error) { toast("הגיבוי פגום ואי אפשר לשחזר אותו.", "err"); return; }
     if (students.length || lessons.length) {
       // עם הקוד שלו — ביטול השחזור חוזר למקום שלו בשרת ולא דורס את הגיבוי ששוחזר
       lsSet(BEFORE_RESTORE_KEY, JSON.stringify({ ...lastSavedState, code: cloudCode(true), saved: lsGet(CLOUD_SAVED_KEY) === "1", waKey: waKey(), at: Date.now() }));
@@ -2440,7 +2437,7 @@ const App = (() => {
     if (!before) return;
     if (!await askConfirmation(`לחזור למה שהיה במכשיר לפני השחזור: ${before.students.length} תלמידים ו-${before.lessons.length} שיעורים?`, "ביטול השחזור")) return;
     let data;
-    try { data = parseBackup(before); } catch (error) { toast("העותק פגום: " + error.message, "err"); return; }
+    try { data = parseBackup(before); } catch (error) { toast("העותק פגום ואי אפשר לחזור אליו.", "err"); return; }
     applyRestored(data, before.code, before.waKey, before.saved);
     try { localStorage.removeItem(BEFORE_RESTORE_KEY); } catch { /* לא קריטי */ }
     toast("חזרת לנתונים שהיו לפני השחזור", "ok");
@@ -2494,7 +2491,7 @@ const App = (() => {
           <div><span>התקבל</span><strong>${cur(earned)}</strong></div>
           <div class="pending"><span>ממתין</span><strong>${cur(pending)}</strong></div>
         </div>
-        <div class="collection-rate"><div><span>שיעור גבייה</span><b>${collectionRate}%</b></div><span class="rate-track" aria-hidden="true"><i style="width:${collectionRate}%"></i></span></div>
+        <div class="collection-rate"><div><span>אחוז גבייה</span><b>${collectionRate}%</b></div><span class="rate-track" aria-hidden="true"><i style="width:${collectionRate}%"></i></span></div>
       </section>
       ${breakdown}`;
 
@@ -2561,7 +2558,7 @@ const App = (() => {
         </div>
         <div class="setting-row setting-row-wide">
           <div><label class="setting-label" for="set-payinfo">פרטים לתשלום</label><div class="setting-sub">קישור ביט/פייבוקס או מספר להעברה — יתווסף לתזכורות התשלום בוואטסאפ</div></div>
-          <input type="text" id="set-payinfo" value="${escapeHtml(settings.payInfo || "")}" placeholder="לדוגמה: bit.ly/pay או העברה ל-050..." onchange="App.updateSetting('payInfo', this.value)">
+          <input type="text" id="set-payinfo" value="${escapeHtml(settings.payInfo || "")}" placeholder="לדוגמה: bit.ly/pay או העברה ל-050…" onchange="App.updateSetting('payInfo', this.value)">
         </div>
         </div>
       </section>
@@ -2598,7 +2595,7 @@ const App = (() => {
         </div>
         <div class="settings-panel">
           <div class="setting-row">
-            <div><label class="setting-label" for="set-morning">תזכורת בוקר</label><div class="setting-sub">push עם מספר השיעורים של היום — משם שולחים תזכורות לתלמידים</div></div>
+            <div><label class="setting-label" for="set-morning">תזכורת בוקר</label><div class="setting-sub">התראה עם מספר השיעורים של היום — משם שולחים תזכורות לתלמידים</div></div>
             <div class="setting-inline">
               <input type="time" id="set-morning" value="${settings.morningReminderTime}" onblur="App.updateSetting('morningReminderTime', this.value)">
               ${settings.morningReminderTime
@@ -2607,7 +2604,7 @@ const App = (() => {
             </div>
           </div>
           <div class="setting-row">
-            <div><label class="setting-label" for="set-paymode">תזכורת תשלום להורה</label><div class="setting-sub">push אחרי השיעור — לחיצה פותחת את ההודעה מוכנה לוואטסאפ</div></div>
+            <div><label class="setting-label" for="set-paymode">תזכורת תשלום להורה</label><div class="setting-sub">התראה אחרי השיעור — לחיצה פותחת את ההודעה מוכנה לוואטסאפ</div></div>
             <select id="set-paymode" onchange="App.updateSetting('payReminderMode', this.value)">
               <option value="afterLesson" ${settings.payReminderMode === "afterLesson" ? "selected" : ""}>אחרי כל שיעור</option>
               <option value="nextMorning" ${settings.payReminderMode === "nextMorning" ? "selected" : ""}>למחרת בבוקר</option>
@@ -2631,7 +2628,7 @@ const App = (() => {
         <summary class="setting-label">נוסח ההודעות</summary>
         <p class="setting-sub">מחיקת כל הטקסט מחזירה את הנוסח המקורי.</p>
         <div class="setting-row setting-row-wide">
-          <div><label class="setting-label" for="set-paymsg">תזכורת תשלום להורה</label><div class="setting-sub">אפשר לשלב: {הורה} {תלמיד} {שיעורים} {סכום}. פרטי התשלום מתווספים בסוף</div></div>
+          <div><label class="setting-label" for="set-paymsg">נוסח הודעת התשלום</label><div class="setting-sub">אפשר לשלב: {הורה} {תלמיד} {שיעורים} {סכום}. פרטי התשלום מתווספים בסוף</div></div>
           <textarea id="set-paymsg" rows="5" maxlength="1000" onchange="App.updateSetting('payMessage', this.value)">${escapeHtml(settings.payMessage || MESSAGE_DEFAULTS.payMessage)}</textarea>
         </div>
         <div class="setting-row setting-row-wide">
@@ -2642,8 +2639,8 @@ const App = (() => {
         <details class="settings-panel settings-fold">
           <summary class="setting-label">שליחה לכולם בלחיצה אחת (אייפון)</summary>
           ${settings.waAuto
-            ? `<p class="setting-sub">כפתור "שליחה לכל..." במרכז התזכורות שולח בוואטסאפ את כל התזכורות של היום ומחר דרך אותו קיצור ${AUTO_SHORTCUT} של השליחה האוטומטית — אין צורך בקיצור נוסף.</p>`
-            : `<p class="setting-sub">כפתור "שליחה לכל..." במרכז התזכורות שולח בוואטסאפ את כל התזכורות של היום ומחר דרך קיצור הדרך ${SHORTCUT_NAME}. מתקינים פעם אחת (השם חייב להישאר בדיוק ${SHORTCUT_NAME}):</p>
+            ? `<p class="setting-sub">כפתור "שליחה לכל…" במרכז התזכורות שולח בוואטסאפ את כל התזכורות של היום ומחר דרך אותו קיצור ${AUTO_SHORTCUT} של השליחה האוטומטית — אין צורך בקיצור נוסף.</p>`
+            : `<p class="setting-sub">כפתור "שליחה לכל…" במרכז התזכורות שולח בוואטסאפ את כל התזכורות של היום ומחר דרך קיצור הדרך ${SHORTCUT_NAME}. מתקינים פעם אחת (השם חייב להישאר בדיוק ${SHORTCUT_NAME}):</p>
           <a class="btn btn-wa btn-block" href="shortcuts/${SHORTCUT_NAME}.shortcut">${icon("whatsapp")} התקנת קיצור ${SHORTCUT_NAME}</a>`}
         </details>
       </section>
@@ -2669,7 +2666,7 @@ const App = (() => {
             ? `<div class="install-status">${icon("checkCircle")}<div><strong>האפליקציה מותקנת</strong><span>הגרסה מתעדכנת אוטומטית</span></div></div>`
             : canInstall()
               ? `<button class="btn btn-primary btn-block" onclick="App.promptInstall()">התקנת האפליקציה למסך הבית</button>`
-              : `<p class="settings-help">להתקנה: פתחי את תפריט הדפדפן ובחרי <b>"הוספה למסך הבית"</b>.</p>`}
+              : `<p class="settings-help">להתקנה: בתפריט הדפדפן בוחרים <b>"הוספה למסך הבית"</b>.</p>`}
         </div>
       </section>
 
@@ -2730,7 +2727,7 @@ const App = (() => {
   }
 
   async function clearAll() {
-    if (!await askConfirmation("כל התלמידים, השיעורים וההגדרות יימחקו לצמיתות. ניתן לשחזר רק מקובץ גיבוי קיים.", "מחיקת כל הנתונים")) return;
+    if (!await askConfirmation("כל התלמידים, השיעורים וההגדרות יימחקו מהמכשיר. אפשר לשחזר מהגיבוי בענן (עם קוד השחזור) או מקובץ גיבוי.", "מחיקת כל הנתונים")) return;
     students = []; lessons = [];
     settings = Object.assign({}, DEFAULT_SETTINGS);
     if (!save()) { render(); return; }
@@ -2785,7 +2782,7 @@ const App = (() => {
     // בלי הגנת notifSupported הגישה ל-Notification זורקת ומרוקנת את כל מסך ההגדרות
     if (!notifSupported) return "הדפדפן הזה לא תומך בהתראות";
     if (Notification.permission === "granted" && pushSupported()) return "מופעל — התראות מגיעות גם כשהאפליקציה סגורה";
-    return "הפעילי התראות כדי לקבל תזכורות גם כשהאפליקציה סגורה";
+    return "כדאי להפעיל התראות כדי לקבל תזכורות גם כשהאפליקציה סגורה";
   }
   function notifHelpText() {
     return "כל תזכורת שיעור מופיעה כהתראה בזמן, גם כשהטלפון נעול והאפליקציה סגורה. לשם כך צריך שהאפליקציה תותקן למסך הבית ושההתראות יאושרו. אפשר בנוסף להוסיף את השיעורים ליומן.";
@@ -2835,7 +2832,7 @@ const App = (() => {
 
   async function enableNotifications() {
     if (isIOS() && !isStandalone()) {
-      toast("באייפון: הוסיפי קודם את האפליקציה למסך הבית, פתחי אותה משם ואז הפעילי התראות", "err");
+      toast("באייפון: קודם מוסיפים את האפליקציה למסך הבית, פותחים אותה משם ואז מפעילים התראות", "err");
       return;
     }
     if (!notifSupported) { toast("הדפדפן לא תומך בהתראות", "err"); return; }
@@ -2859,7 +2856,7 @@ const App = (() => {
       }
       if (pushOk) toast("התראות הופעלו — כולל כשהאפליקציה סגורה", "ok");
       else if (pushErr) toast(`ההתראות פועלות רק כשהאפליקציה פתוחה — רישום ברקע נכשל (${pushErr})`, "err");
-      else toast("התראות הופעלו (באפליקציה פתוחה)", "ok");
+      else toast("התראות הופעלו — רק כשהאפליקציה פתוחה", "ok");
       await testNotification();
     } else {
       toast("ההרשאה לא ניתנה", "err");
@@ -2875,7 +2872,7 @@ const App = (() => {
       });
     } catch (error) {
       console.warn("Could not show test notification", error);
-      toast("לא ניתן להציג התראה. בדקי הרשאה בהגדרות הטלפון.", "err");
+      toast("לא ניתן להציג התראה. כדאי לבדוק את ההרשאה בהגדרות הטלפון.", "err");
     }
   }
 
@@ -2926,7 +2923,7 @@ const App = (() => {
       const when = new Date(s.at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
       return `<p class="push-status ok">✓ התזכורות מסונכרנות לשרת ההתראות (עודכן ${when})</p>`;
     }
-    return `<p class="push-status err">סנכרון התזכורות נכשל — בדקי חיבור לאינטרנט. ינוסה שוב אוטומטית.</p>`;
+    return `<p class="push-status err">סנכרון התזכורות נכשל. כדאי לבדוק את החיבור לאינטרנט — ננסה שוב אוטומטית.</p>`;
   }
 
   // בדיקה אמיתית של תזכורת כשהאפליקציה סגורה — עוברת דרך השרת וה-cron, כמו תזכורת אמיתית
@@ -2934,11 +2931,11 @@ const App = (() => {
     try {
       await sendClosedAppTest(lessons, lessonIndex.studentsById, settings);
       rememberPushSync("ok");
-      toast("נשלח! סגרי עכשיו את האפליקציה — ההתראה תגיע תוך 2-7 דקות", "ok");
+      toast("נשלח. עכשיו סוגרים את האפליקציה — ההתראה תגיע תוך 2–7 דקות", "ok");
     } catch (error) {
       console.warn("Closed-app reminder test failed", error);
       rememberPushSync("fail");
-      toast("השליחה לשרת נכשלה — בדקי חיבור לאינטרנט", "err");
+      toast("השליחה לשרת נכשלה. כדאי לבדוק את החיבור לאינטרנט.", "err");
       renderSettings();
     }
   }
@@ -3010,7 +3007,7 @@ const App = (() => {
     a.download = `שיעורים-${todayStr()}.ics`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast("קובץ היומן מוכן — פתחי אותו ואשרי הוספה", "ok");
+    toast("קובץ היומן מוכן — פותחים אותו ומאשרים את ההוספה", "ok");
   }
 
   // ========== התקנה (PWA) — כפתור בהגדרות, ללא באנר צף ==========
@@ -3033,7 +3030,7 @@ const App = (() => {
   }
   function canInstall() { return !!deferredPrompt && !isStandalone(); }
   async function promptInstall() {
-    if (!deferredPrompt) { toast("להתקנה: תפריט הדפדפן → הוספה למסך הבית", "info"); return; }
+    if (!deferredPrompt) { toast("להתקנה: תפריט הדפדפן ← \"הוספה למסך הבית\"", "info"); return; }
     deferredPrompt.prompt();
     await deferredPrompt.userChoice;
     deferredPrompt = null;
@@ -3389,7 +3386,7 @@ const App = (() => {
         l.date = target.date; l.time = target.time;
         if (!save()) { l.date = from.date; l.time = from.time; render(); return; }
         refreshCalendarSurface();
-        toast(`השיעור הועבר ${dayLabelPlain(l.date)} בשעה ${fmtTime(l.time)}`, "ok", {
+        toast(`השיעור הועבר — ${dayLabelPlain(l.date)} בשעה ${fmtTime(l.time)}`, "ok", {
           label: "ביטול",
           run: () => { l.date = from.date; l.time = from.time; save(); render(); }
         });

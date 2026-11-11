@@ -1,11 +1,11 @@
 // Service Worker – מאפשר עבודה גם בלי אינטרנט (offline) והתקנה כאפליקציה
-const CACHE = "morti-v4.7.2";
+const CACHE = "morti-v4.7.3";
 // נתוני ה-push של האפליקציה (רשימת תזכורות + סימוני "הוצג") — חיים מעבר לעדכוני גרסה
 const PUSH_DATA = "mt-push-data";
 const ASSETS = [
   "index.html",
-  "styles.css?v=73",
-  "app.js?v=95",
+  "styles.css?v=74",
+  "app.js?v=96",
   "src/data.js",
   "src/push.js",
   "src/reminders.js",
@@ -65,7 +65,7 @@ self.addEventListener("push", e => {
     } catch { /* מטמון חסר/פגום */ }
     // push חייב להציג התראה גלויה (אחרת Chrome מציג הודעה גנרית משלו ו-iOS מבטל את המנוי)
     if (!inWindow || !inWindow.length) {
-      return notify({ title: "המורה שלי", body: "יש תזכורת ממתינה — פתחי את האפליקציה" });
+      return notify({ title: "המורה שלי", body: "יש תזכורת ממתינה באפליקציה" });
     }
     let shown = 0;
     for (const item of inWindow) {

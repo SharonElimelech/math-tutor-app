@@ -21,7 +21,7 @@ const nextDay = date => {
   d.setDate(d.getDate() + 1);
   return ymd(d);
 };
-const morningBody = n => n === 1 ? "שיעור אחד היום — שלחי תזכורת לתלמיד" : `${n} שיעורים היום — שלחי תזכורות לתלמידים`;
+const morningBody = n => n === 1 ? "שיעור אחד היום — זמן לשלוח תזכורת" : `${n} שיעורים היום — זמן לשלוח תזכורות`;
 
 export function plannedReminders(lessons, studentsById, settings = {}, now = Date.now(), horizonDays = 60) {
   const lead = Math.max(0, Number(settings.remindMinutes ?? 30) || 0) * MINUTE;
@@ -56,7 +56,7 @@ export function plannedReminders(lessons, studentsById, settings = {}, now = Dat
       out.push({
         t,
         title: "תזכורת תשלום",
-        body: `השיעור עם ${name} הסתיים — שלחי תזכורת תשלום להורה`,
+        body: `השיעור עם ${name} הסתיים — זמן לשלוח תזכורת תשלום להורה`,
         tag: `pay-${l.id}`,
         url: `./?view=home&pay=${encodeURIComponent(l.studentId)}`,
         sig: paymentSignature(l)
