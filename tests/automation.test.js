@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { automationItems } from "../src/automation.js";
-import { cleanWa, takeDue } from "../push-server/worker.js";
+import worker, { cleanWa, takeDue } from "../push-server/worker.js";
 
 const t = (date, hhmm) => new Date(`${date}T${hhmm}:00`).getTime();
 const texts = {
@@ -70,4 +70,28 @@ test("send-all and the morning run share an id, so a lesson is reminded once", (
   assert.deepEqual(takeDue(items, first.sent, t("2026-11-11", "10:00")).due, []);
   // both windows open at once (send-all after 09:30): still one message
   assert.equal(takeDue(items, null, t("2026-11-11", "10:00")).due.length, 1);
+});
+
+test("status shows the shortcut's last run and what it delivered, without consuming anything", async () => {
+  const store = new Map();
+  const env = { SUBS: {
+    get: async (k, type) => (store.has(k) ? (type === "json" ? JSON.parse(store.get(k)) : store.get(k)) : null),
+    put: async (k, v) => { store.set(k, v); }
+  } };
+  const call = (path, init) => worker.fetch(new Request("https://w.test" + path, init), env);
+  const key = "k".repeat(30), now = Date.now();
+  const item = { id: "d:a:2026-11-12:17:00", after: now - 1000, until: now + 3600e3, phone: "+972501234567", text: "hi" };
+  await call("/sync", { method: "POST", body: JSON.stringify({ id: "device-123", items: [], wa: { key, items: [item] } }) });
+
+  let s = await (await call(`/wa/status?key=${key}`)).json();
+  assert.deepEqual([s.lastRun, s.sent], [null, []], "no run yet");
+  assert.equal((await (await call(`/wa?key=${key}`)).json()).length, 1);
+  s = await (await call(`/wa/status?key=${key}`)).json();
+  assert.equal(s.lastRun.n, 1);
+  assert.deepEqual(s.sent, [item.id]);
+  assert.deepEqual(await (await call(`/wa?key=${key}`)).json(), [], "status did not hand the message out again");
+
+  await call(`/wa?key=${"r".repeat(30)}`);
+  assert.ok(![...store.keys()].some(k => k.includes("rrrr")), "unknown key leaves no records");
+  assert.equal((await call("/wa/status?key=short")).status, 400);
 });

@@ -1568,7 +1568,7 @@ const App = (() => {
   }
   // כמה עוד ממתינים לשליחה — המונה שבכותרת
   const pendingLessons = () => hubLessons()
-    .filter(l => reminderPhone(studentById(l.studentId)) && !waSent.has(reminderSignature(l)));
+    .filter(l => reminderPhone(studentById(l.studentId)) && !waSent.has(reminderSignature(l)) && !autoSent(l));
   // לשליחה בבת אחת: הממתינות; אם הכול כבר סומן כנשלח — כולן שוב (למשל אחרי קיצור שנכשל)
   const bulkLessons = () => {
     const pending = pendingLessons();
@@ -1596,10 +1596,11 @@ const App = (() => {
   function lessonReminderRow(l) {
     const s = studentById(l.studentId);
     const signature = reminderSignature(l);
-    const sent = waSent.has(signature);
+    const byHand = waSent.has(signature);
+    const sent = byHand || autoSent(l);
     const name = escapeHtml(s.name);
     const meta = `<span class="remind-when">${dayLabelPlain(l.date)} · ${fmtTime(l.time)}</span>${l.topic ? ` · ${escapeHtml(l.topic)}` : ""}` +
-      (sent ? ` · <b class="remind-sent">${icon("check", "ic-sub")} ${sentAgoLabel(signature)}</b>` : "");
+      (sent ? ` · <b class="remind-sent">${icon("check", "ic-sub")} ${byHand ? sentAgoLabel(signature) : "נשלח אוטומטית"}</b>` : "");
     return remindRow({
       name: s.name,
       meta,
@@ -2146,6 +2147,39 @@ const App = (() => {
     return { key: waKey(true), items: [...waNowItems.filter(i => i.until > now), ...items] };
   }
 
+  // מה הקיצור עשה בפועל (מהשרת, קריאה בלבד): מתי רץ לאחרונה ואילו הודעות כבר נמסרו —
+  // כדי שמרכז התזכורות לא יציע לשלוח שוב ידנית, ושיהיה ברור כשהקיצור לא רץ או מחובר לקישור ישן
+  let waStatus = null;
+  let waStatusAt = 0;
+  async function loadWaStatus() {
+    const key = waKey();
+    if (!settings.waAuto || !key || Date.now() - waStatusAt < 20e3) return;
+    waStatusAt = Date.now();
+    try {
+      const res = await fetch(`${PUSH_SERVER}/wa/status?key=${key}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const s = await res.json();
+      waStatus = { lastRun: s.lastRun, sent: new Set(s.sent) };
+      render();
+    } catch { /* בלי רשת — בלי סטטוס */ }
+  }
+  const autoSent = l => !!waStatus?.sent.has(`d:${reminderSignature(l)}`);
+
+  function waRunStatusHtml() {
+    if (!waStatus) return "";
+    const r = waStatus.lastRun;
+    const when = at => new Date(at).toLocaleString("he-IL", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+    if (!r) {
+      const hhmm = new Date().toTimeString().slice(0, 5);
+      const next = autoRunTimes().find(t => t > hhmm) || autoRunTimes()[0];
+      return `<p class="push-status warn">עוד אין ריצה של הקיצור עם הקישור הזה. אחרי הריצה הבאה (${next}) יופיע כאן אישור. אם לא יופיע — הקישור בקיצור ישן: מעתיקים אותו מחדש (שלב 1 למטה).</p>`;
+    }
+    if (Date.now() - r.at > 26 * 3600e3) {
+      return `<p class="push-status err">הקיצור לא רץ מאז ${when(r.at)}. כדאי לבדוק באייפון שהאוטומציות פעילות ושהקישור בקיצור עדכני.</p>`;
+    }
+    return `<p class="push-status ok">✓ הקיצור רץ לאחרונה ${when(r.at)} · ${r.n > 1 ? `נשלחו ${r.n} הודעות` : r.n ? "נשלחה הודעה אחת" : "לא היה מה לשלוח"}</p>`;
+  }
+
   function setWaAuto(on) {
     settings.waAuto = !!on;
     if (!saveSettings()) { render(); return; }
@@ -2171,6 +2205,7 @@ const App = (() => {
         <label class="setting-inline"><input type="checkbox" id="set-waauto" ${settings.waAuto ? "checked" : ""} onchange="App.setWaAuto(this.checked)"> ${settings.waAuto ? "פעיל" : "כבוי"}</label>
       </div>
       ${settings.waAuto ? `
+      ${waRunStatusHtml()}
       ${row("set-auto-daily", "תזכורת לשיעורי היום", "לכל תלמיד שיש לו שיעור באותו יום", timeInput("set-auto-daily", "autoDaily"))}
       ${row("set-auto-pay", "הודעת תשלום להורה", payOff
         ? "כבוי — \"תזכורת תשלום להורה\" כבויה בהתראות"
@@ -3068,6 +3103,9 @@ const App = (() => {
     // מה שכבר במכשיר עולה לענן מיד בפתיחה, ושוב כשחוזר החיבור אחרי כישלון
     scheduleCloudBackup(1500);
     addEventListener("online", () => scheduleCloudBackup(0));
+    // מה הקיצור שלח — בפתיחה ובכל חזרה לאפליקציה (למשל אחרי "שליחה לכולם")
+    void loadWaStatus();
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) void loadWaStatus(); });
     initCalendarSwipe();
     initLessonDrag();
     handleLaunchParams();

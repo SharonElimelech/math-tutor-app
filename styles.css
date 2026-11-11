@@ -1540,9 +1540,9 @@ html[data-theme="dark"] .remind-btn-again { color: #2a0e13; }
 .free-slots { margin-bottom: 14px; }
 .free-slots:empty { margin: 0; }
 .free-slots > label { display: block; margin-bottom: 6px; }
-.backup-nudge { display: flex; align-items: center; gap: 11px; margin-top: 16px; padding: 13px 16px; border: 0; border-radius: var(--r-lg); background: var(--surface); }
+.backup-nudge { display: flex; flex-wrap: wrap; align-items: center; gap: 11px; margin-top: 16px; padding: 13px 16px; border: 0; border-radius: var(--r-lg); background: var(--surface); }
 .backup-nudge > .ic { width: 22px; height: 22px; flex: none; color: var(--red); }
-.backup-nudge div { flex: 1; min-width: 0; }
+.backup-nudge div { flex: 1 1 150px; min-width: 0; } /* צר (עמודת הצד) — הכפתור יורד לשורה משלו */
 .backup-nudge strong, .backup-nudge span { display: block; }
 .backup-nudge strong { font-size: .88rem; }
 .backup-nudge span { color: var(--muted); font-size: .74rem; }

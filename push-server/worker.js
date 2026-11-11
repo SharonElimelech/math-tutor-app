@@ -76,7 +76,18 @@ export default {
       const items = await env.SUBS.get("wa:" + key, "json");
       const { due, sent } = takeDue(items, await env.SUBS.get("wasent:" + key, "json"), Date.now());
       if (due.length) await env.SUBS.put("wasent:" + key, JSON.stringify(sent));
+      // ריצה של הקיצור — לסטטוס באפליקציה. רק לתור קיים: מפתח אקראי לא יוצר רשומות
+      if (items) await env.SUBS.put("waseen:" + key, JSON.stringify({ at: Date.now(), n: due.length }));
       return Response.json(due, { headers: { "Cache-Control": "no-store" } });
+    }
+    // סטטוס לאפליקציה: מתי הקיצור רץ לאחרונה ומה כבר נמסר. קריאה בלבד — לא "צורך" הודעות
+    if (req.method === "GET" && url.pathname === "/wa/status") {
+      const key = url.searchParams.get("key") || "";
+      if (!WA_KEY.test(key)) return reply("bad key", 400);
+      const [lastRun, sent] = await Promise.all([env.SUBS.get("waseen:" + key, "json"), env.SUBS.get("wasent:" + key, "json")]);
+      const now = Date.now();
+      return Response.json({ lastRun, sent: Object.keys(sent || {}).filter(id => sent[id] > now) },
+        { headers: { ...corsFor(req), "Cache-Control": "no-store" } });
     }
     if (url.pathname === "/backup") return backup(req, url, env, reply);
     if (req.method !== "POST" || url.pathname !== "/sync") return reply("not found", 404);
