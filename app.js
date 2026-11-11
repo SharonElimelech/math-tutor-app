@@ -2106,6 +2106,14 @@ const App = (() => {
   const waAutoUrl = () => `${PUSH_SERVER}/wa?key=${waKey(true)}`;
   const waPhone = raw => normalizePhone(raw) ? `+${normalizePhone(raw)}` : "";
   const AUTO_SHORTCUT = "TutorAuto";
+  // התקנת קיצור מתוך האפליקציה המותקנת: חלון האפליקציה לא יודע להוריד קבצים ומציג את תוכן הקובץ
+  // כ"ג'יבריש". לכן מעבירים את הקישור ישר לאפליקציית קיצורי הדרך, ואם זה לא נפתח — פותחים את הקובץ
+  // בספארי עצמו (x-safari-, iOS 17+), שמוריד אותו ומציע "פתיחה בקיצורים".
+  function shortcutInstallHtml(name, cls = "", after = "") {
+    const file = new URL(`shortcuts/${name}.shortcut`, location.href).href;
+    return `<a ${cls ? `class="${cls}" ` : ""}href="shortcuts://import-shortcut?url=${encodeURIComponent(file)}&name=${encodeURIComponent(name)}">${cls ? `${icon("whatsapp")} ` : ""}התקנת קיצור ${name}</a>${after}
+      <a class="shortcut-alt" href="x-safari-${file}">לא נפתח? פתיחה בספארי</a>`;
+  }
 
   const autoTexts = {
     daily: (l, s) => ({ phone: waPhone(reminderPhone(s)), text: lessonReminderText(l, s, msgDay(l.date, new Date(`${l.date}T12:00`))) }),
@@ -2215,7 +2223,7 @@ const App = (() => {
         <summary class="setting-label">הגדרה חד-פעמית באייפון</summary>
         <ol class="setting-sub">
           <li><button type="button" class="btn btn-light" onclick="App.copyWaAutoUrl()">העתקת הקישור האישי</button> — המפתח שלך, לא לשתף.</li>
-          <li><a href="shortcuts/${AUTO_SHORTCUT}.shortcut">התקנת קיצור ${AUTO_SHORTCUT}</a> ← "הוספת קיצור" ← כשהאייפון מבקש קישור, מדביקים את מה שהעתקת.</li>
+          <li>${shortcutInstallHtml(AUTO_SHORTCUT, "", ` ← "הוספת קיצור" ← כשהאייפון מבקש קישור, מדביקים את מה שהעתקת. כבר מותקן? אפשר למחוק את הישן ולהתקין מחדש, או לערוך אותו ולהדביק את הקישור בפעולה הראשונה.`)}</li>
           <li><button type="button" class="btn btn-light" onclick="App.testAutoShortcut()">בדיקה שהקיצור נמצא</button> — אם מופיע "לא נמצא": בקיצורים, לחיצה ארוכה על הקיצור ← "שינוי שם" ← <b dir="ltr">${AUTO_SHORTCUT}</b> בדיוק (בלי "1" בסוף). קיצור כפול מהתקנה קודמת — למחוק.</li>
           <li>בקיצורים ← "אוטומציה" ← ‏+ ← "שעה ביום" ← בוחרים שעה, "כל יום" ← "הרצה מיידית" ← "הבא" ← ${AUTO_SHORTCUT}.</li>
           <li>אוטומציה כזו לכל אחת מהשעות: <b>${autoRunTimes().join(" · ")}</b></li>
@@ -2641,7 +2649,7 @@ const App = (() => {
           ${settings.waAuto
             ? `<p class="setting-sub">כפתור "שליחה לכל…" במרכז התזכורות שולח בוואטסאפ את כל התזכורות של היום ומחר דרך אותו קיצור ${AUTO_SHORTCUT} של השליחה האוטומטית — אין צורך בקיצור נוסף.</p>`
             : `<p class="setting-sub">כפתור "שליחה לכל…" במרכז התזכורות שולח בוואטסאפ את כל התזכורות של היום ומחר דרך קיצור הדרך ${SHORTCUT_NAME}. מתקינים פעם אחת (השם חייב להישאר בדיוק ${SHORTCUT_NAME}):</p>
-          <a class="btn btn-wa btn-block" href="shortcuts/${SHORTCUT_NAME}.shortcut">${icon("whatsapp")} התקנת קיצור ${SHORTCUT_NAME}</a>`}
+          ${shortcutInstallHtml(SHORTCUT_NAME, "btn btn-wa btn-block")}`}
         </details>
       </section>
 

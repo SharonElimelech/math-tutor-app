@@ -2509,3 +2509,5 @@ input:focus, select:focus, textarea:focus { border-color: var(--text); box-shado
 /* גיבוי ענן בהגדרות */
 .cloud-backup { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .cloud-code { margin: 10px 0 4px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font: 600 1.02rem/1.3 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .06em; text-align: center; user-select: all; overflow-wrap: anywhere; }
+/* התקנת קיצור: נתיב גיבוי לספארי כשהייבוא הישיר לא נפתח */
+.shortcut-alt { display: block; margin-top: 6px; color: var(--muted); font-size: .76rem; text-decoration: underline; text-underline-offset: 2px; }
