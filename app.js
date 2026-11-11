@@ -2106,13 +2106,15 @@ const App = (() => {
   const waAutoUrl = () => `${PUSH_SERVER}/wa?key=${waKey(true)}`;
   const waPhone = raw => normalizePhone(raw) ? `+${normalizePhone(raw)}` : "";
   const AUTO_SHORTCUT = "TutorAuto";
-  // התקנת קיצור מתוך האפליקציה המותקנת: חלון האפליקציה לא יודע להוריד קבצים ומציג את תוכן הקובץ
-  // כ"ג'יבריש". לכן מעבירים את הקישור ישר לאפליקציית קיצורי הדרך, ואם זה לא נפתח — פותחים את הקובץ
-  // בספארי עצמו (x-safari-, iOS 17+), שמוריד אותו ומציע "פתיחה בקיצורים".
-  function shortcutInstallHtml(name, cls = "", after = "") {
-    const file = new URL(`shortcuts/${name}.shortcut`, location.href).href;
-    return `<a ${cls ? `class="${cls}" ` : ""}href="shortcuts://import-shortcut?url=${encodeURIComponent(file)}&name=${encodeURIComponent(name)}">${cls ? `${icon("whatsapp")} ` : ""}התקנת קיצור ${name}</a>${after}
-      <a class="shortcut-alt" href="x-safari-${file}">לא נפתח? פתיחה בספארי</a>`;
+  // התקנה כמו שעבדה: הקובץ החתום נפתח בספארי עצמו, שמציג "הוספת קיצור". מתוך האפליקציה המותקנת
+  // הקישור מציג "ג'יבריש" (החלון לא מוריד קבצים) ו-shortcuts://import-shortcut דוחה כל קישור שאינו
+  // iCloud. לכן: מעתיקים את הקישור האישי (הקיצור יבקש אותו) ופותחים את הקובץ בספארי (x-safari-, iOS 17+).
+  // דרך השרת — שם הקובץ נשלח כהורדה (GitHub Pages שולח בלי Content-Disposition וספארי מציג "ג'יבריש")
+  const shortcutFileUrl = name => `${PUSH_SERVER}/shortcut/${name}`;
+  async function installAutoShortcut() {
+    try { await navigator.clipboard.writeText(waAutoUrl()); } catch { /* בלי הרשאה — מעתיקים בשלב 1 */ }
+    toast("הקישור האישי הועתק. בספארי: \"הוספת קיצור\" ומדביקים אותו כשהוא מבקש.", "ok");
+    setTimeout(() => { location.href = `x-safari-${shortcutFileUrl(AUTO_SHORTCUT)}`; }, 600);
   }
 
   const autoTexts = {
@@ -2222,8 +2224,19 @@ const App = (() => {
       <details class="shortcut-help" open>
         <summary class="setting-label">הגדרה חד-פעמית באייפון</summary>
         <ol class="setting-sub">
-          <li><button type="button" class="btn btn-light" onclick="App.copyWaAutoUrl()">העתקת הקישור האישי</button> — המפתח שלך, לא לשתף.</li>
-          <li>${shortcutInstallHtml(AUTO_SHORTCUT, "", ` ← "הוספת קיצור" ← כשהאייפון מבקש קישור, מדביקים את מה שהעתקת. כבר מותקן? אפשר למחוק את הישן ולהתקין מחדש, או לערוך אותו ולהדביק את הקישור בפעולה הראשונה.`)}</li>
+          <li><button type="button" class="btn btn-wa" onclick="App.installAutoShortcut()">${icon("whatsapp")} התקנת קיצור ${AUTO_SHORTCUT}</button> — מעתיק את הקישור האישי שלך ופותח את הקיצור בספארי ← "הוספת קיצור" <span dir="ltr">(Add Shortcut)</span> ← כשהוא מבקש קישור, מדביקים. הקישור הוא המפתח שלך — לא לשתף.
+            <div class="setting-sub">ספארי לא נפתח? <button type="button" class="btn btn-light" onclick="App.copyWaAutoUrl()">העתקת הקישור האישי</button> ואז בספארי פותחים את <span dir="ltr">${shortcutFileUrl(AUTO_SHORTCUT).replace(/^https?:\/\//, "")}</span></div>
+          </li>
+          <li>אם ההתקנה לא הצליחה — <details class="shortcut-manual"><summary>בונים את הקיצור ידנית (כ-3 דקות)</summary> בקיצורים ← ‏+ ← שם: <b dir="ltr">${AUTO_SHORTCUT}</b>. מוסיפים פעולות דרך שורת החיפוש:
+            <ol class="shortcut-build">
+              <li>חיפוש <b>URL</b> ← "קבלת תוכן של URL" <span dir="ltr">(Get Contents of URL)</span> ← בשדה הכתובת מדביקים את הקישור שהעתקת.</li>
+              <li>חיפוש <b>מילון</b> ← "קבלת מילון מקלט" <span dir="ltr">(Get Dictionary from Input)</span>.</li>
+              <li>חיפוש <b>חזר</b> ← "חזרה עם כל אחד" <span dir="ltr">(Repeat with Each)</span>. שלוש הפעולות הבאות נכנסות בתוך החזרה:</li>
+              <li>"קבלת ערך מילון" <span dir="ltr">(Get Dictionary Value)</span> ← מפתח <b dir="ltr">phone</b>, במילון: "פריט חזרה" <span dir="ltr">(Repeat Item)</span>.</li>
+              <li>שוב "קבלת ערך מילון" ← מפתח <b dir="ltr">text</b>, במילון: "פריט חזרה".</li>
+              <li>חיפוש <b>WhatsApp</b> ← "שליחת הודעה" ← ההודעה: ערך המילון של <b dir="ltr">text</b>, הנמען: ערך המילון של <b dir="ltr">phone</b> ← בחץ של הפעולה מכבים "הצגה בעת הרצה" <span dir="ltr">(Show When Run)</span>.</li>
+            </ol></details>
+          </li>
           <li><button type="button" class="btn btn-light" onclick="App.testAutoShortcut()">בדיקה שהקיצור נמצא</button> — אם מופיע "לא נמצא": בקיצורים, לחיצה ארוכה על הקיצור ← "שינוי שם" ← <b dir="ltr">${AUTO_SHORTCUT}</b> בדיוק (בלי "1" בסוף). קיצור כפול מהתקנה קודמת — למחוק.</li>
           <li>בקיצורים ← "אוטומציה" ← ‏+ ← "שעה ביום" ← בוחרים שעה, "כל יום" ← "הרצה מיידית" ← "הבא" ← ${AUTO_SHORTCUT}.</li>
           <li>אוטומציה כזו לכל אחת מהשעות: <b>${autoRunTimes().join(" · ")}</b></li>
@@ -2648,8 +2661,7 @@ const App = (() => {
           <summary class="setting-label">שליחה לכולם בלחיצה אחת (אייפון)</summary>
           ${settings.waAuto
             ? `<p class="setting-sub">כפתור "שליחה לכל…" במרכז התזכורות שולח בוואטסאפ את כל התזכורות של היום ומחר דרך אותו קיצור ${AUTO_SHORTCUT} של השליחה האוטומטית — אין צורך בקיצור נוסף.</p>`
-            : `<p class="setting-sub">כפתור "שליחה לכל…" במרכז התזכורות שולח בוואטסאפ את כל התזכורות של היום ומחר דרך קיצור הדרך ${SHORTCUT_NAME}. מתקינים פעם אחת (השם חייב להישאר בדיוק ${SHORTCUT_NAME}):</p>
-          ${shortcutInstallHtml(SHORTCUT_NAME, "btn btn-wa btn-block")}`}
+            : `<p class="setting-sub">כפתור "שליחה לכל…" במרכז התזכורות שולח בוואטסאפ את כל התזכורות של היום ומחר דרך קיצור הדרך באייפון. הדרך הפשוטה: מפעילים "שליחה אוטומטית" למעלה ובונים את הקיצור ${AUTO_SHORTCUT} לפי ההוראות שם — הוא משמש גם לשליחה לכולם.</p>`}
         </details>
       </section>
 
@@ -3416,7 +3428,7 @@ const App = (() => {
     setLessonDate, togglePast, renderStudentPicker, pickStudent, quickAddStudent, toggleAdvanced,
     toggleRepeat, setRecurMode, setRecurInterval, renderFreeSlots, pickFreeSlot, scheduleForStudent, togglePaid,
     calShift, selectCalDay, calToday, setHomeCalMode, quickAddLesson, showMoreLessons, miniShift, openHub,
-    setMoneyTab, togglePaymentBox, sendWhatsApp, openWhatsAppChat, sendReceipt, sendLessonReminder, sendAllViaShortcut, setWaAuto, copyWaAutoUrl, testAutoShortcut, repeatLastLesson, markAllPaid, postponeLesson,
+    setMoneyTab, togglePaymentBox, sendWhatsApp, openWhatsAppChat, sendReceipt, sendLessonReminder, sendAllViaShortcut, setWaAuto, copyWaAutoUrl, installAutoShortcut, testAutoShortcut, repeatLastLesson, markAllPaid, postponeLesson,
     exportData, importData, exportCalendar,
     shareCloudCode, openCloudRestore, restoreFromCloud, undoCloudRestore,
     changeMonth,

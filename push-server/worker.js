@@ -94,6 +94,19 @@ export default {
         { headers: { ...corsFor(req), "Cache-Control": "no-store" } });
     }
     if (url.pathname === "/backup") return backup(req, url, env, reply);
+    // קובץ הקיצור כהורדה: GitHub Pages שולח אותו בלי Content-Disposition, וספארי מציג את התוכן
+    // כטקסט ("ג'יבריש") במקום להוריד. מכאן הוא יורד, ונפתח בקיצורים ← "הוספת קיצור".
+    const sc = req.method === "GET" && url.pathname.match(/^\/shortcut\/(TutorAuto|TutorSend)$/);
+    if (sc) {
+      const file = await fetch(`https://sharonelimelech.github.io/math-tutor-app/shortcuts/${sc[1]}.shortcut`);
+      if (!file.ok) return reply("not found", 404);
+      return new Response(file.body, { headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${sc[1]}.shortcut"`,
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store"
+      } });
+    }
     if (req.method !== "POST" || url.pathname !== "/sync") return reply("not found", 404);
 
     let body;
