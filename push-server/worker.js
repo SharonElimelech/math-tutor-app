@@ -71,8 +71,12 @@ export default {
     if (req.method === "OPTIONS") return reply(null, 204);
     const url = new URL(req.url);
     if (req.method === "GET" && url.pathname === "/wa") {
-      const key = url.searchParams.get("key") || "";
+      let key = url.searchParams.get("key") || "";
       if (!WA_KEY.test(key)) return reply("bad key", 400);
+      // קישור ישן (אפליקציה שנמחקה ושוחזרה עם מפתח חדש) → התור החדש: הקיצור שבאייפון ממשיך לעבוד
+      // בלי לגעת בו, ולא שולח הודעות מהרשימה הישנה. ponytail: הפניה נכתבת ידנית ב-KV ("waalias:<ישן>"),
+      // כי שחזור מהענן כבר מחזיר את המפתח המקורי — צריך את זה רק למי ששוחזר לפני כן.
+      key = (await env.SUBS.get("waalias:" + key)) || key;
       const items = await env.SUBS.get("wa:" + key, "json");
       const { due, sent } = takeDue(items, await env.SUBS.get("wasent:" + key, "json"), Date.now());
       if (due.length) await env.SUBS.put("wasent:" + key, JSON.stringify(sent));

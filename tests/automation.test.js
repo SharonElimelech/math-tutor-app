@@ -95,3 +95,22 @@ test("status shows the shortcut's last run and what it delivered, without consum
   assert.ok(![...store.keys()].some(k => k.includes("rrrr")), "unknown key leaves no records");
   assert.equal((await call("/wa/status?key=short")).status, 400);
 });
+
+test("an old shortcut link pulls the new queue once an alias exists", async () => {
+  const store = new Map();
+  const env = { SUBS: {
+    get: async (k, type) => (store.has(k) ? (type === "json" ? JSON.parse(store.get(k)) : store.get(k)) : null),
+    put: async (k, v) => { store.set(k, v); }
+  } };
+  const call = path => worker.fetch(new Request("https://w.test" + path), env);
+  const oldKey = "o".repeat(30), newKey = "n".repeat(30), now = Date.now();
+  const item = (id, text) => ({ id, after: now - 1000, until: now + 3600e3, phone: "+972501234567", text });
+  store.set("wa:" + oldKey, JSON.stringify([item("p:stale", "stale")]));
+  store.set("wa:" + newKey, JSON.stringify([item("d:fresh", "fresh")]));
+  store.set("waalias:" + oldKey, newKey);
+
+  assert.deepEqual((await (await call(`/wa?key=${oldKey}`)).json()).map(m => m.text), ["fresh"], "old link gets the new list, not the stale one");
+  const s = await (await call(`/wa/status?key=${newKey}`)).json();
+  assert.equal(s.lastRun.n, 1, "the run shows up in the app's status");
+  assert.deepEqual(await (await call(`/wa?key=${newKey}`)).json(), [], "no second send through the new link");
+});
