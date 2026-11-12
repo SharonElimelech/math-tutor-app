@@ -26,6 +26,11 @@ import {
 import { enablePush, pushSupported, pushSubscribed, syncPush, sendClosedAppTest, plannedReminders, pageDueItems, shownSigs, markShown, pruneShown, PUSH_SERVER } from "./src/push.js";
 import { automationItems } from "./src/automation.js";
 import { newCode, validCode, formatCode, fingerprint, cloudSave, cloudLoad } from "./src/cloud.js";
+import { mergeSnapshots, sameSnapshot } from "./src/sync.js";
+import {
+  onAuth, signInEmail, signUpEmail, resetPassword, signInGoogle, signOutUser, deleteFirebaseUser,
+  getAccountData, putAccountData, getAccountWaKey, putAccountWaKey, deleteAccountData, authErrorText
+} from "./src/account.js";
 import { whatsappLinks, normalizePhone, fillTemplate, shortcutRunUrl } from "./src/whatsapp.js";
 
 /* =========================================================
@@ -101,6 +106,7 @@ const App = (() => {
       lastSavedState = clone(snapshot);
       refreshIndex();
       scheduleCloudBackup();
+      scheduleAccountSync();
       return true;
     } catch (error) {
       restoreLastSavedState();
@@ -2479,6 +2485,210 @@ const App = (() => {
     toast("חזרת לנתונים שהיו לפני השחזור", "ok");
   }
 
+  // ========== חשבון וסנכרון בין מכשירים ==========
+  // מחובר: כל שמירה עולה לחשבון כמה שניות אחריה, ובכל פתיחה/חזרה לאפליקציה נמשכים שינויים ממכשירים
+  // אחרים. מיזוג שלושה כיוונים מול מה שסונכרן לאחרונה (src/sync.js): מחיקה לא חוזרת, הוספה לא נעלמת.
+  // הנתונים נשמרים גם במכשיר — האפליקציה עובדת בלי רשת ומסתנכרנת כשיש.
+  const SYNC_KEY = "mt_sync";           // { uid, version, base } — הגרסה והתוכן של הסנכרון האחרון
+  const AUTH_SKIP_KEY = "mt_auth_skip"; // בחרו "המשך בלי חשבון"
+  let user = null, syncTimer = null, syncBusy = false, applyingRemote = false, syncState = null, lastPull = 0;
+  const snap = () => ({ students: lastSavedState.students, lessons: lastSavedState.lessons, settings: lastSavedState.settings });
+  const syncMeta = () => { const m = lsJson(SYNC_KEY); return m?.uid === user?.uid ? m : { version: 0, base: null }; };
+  const setSyncMeta = (version, base) => lsSet(SYNC_KEY, JSON.stringify({ uid: user.uid, version, base }));
+
+  function scheduleAccountSync(delay = 2000) {
+    if (!user || applyingRemote) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => void syncAccount(), delay);
+  }
+
+  // נתונים שהגיעו מהחשבון (אחרי מיזוג) — נשמרים במכשיר בלי להפעיל סנכרון נוסף
+  function applyRemote(data) {
+    const d = parseBackup(data);
+    applyingRemote = true;
+    try {
+      students = d.students; lessons = d.lessons; settings = d.settings;
+      if (save()) { applyTheme(); render(); }
+    } finally { applyingRemote = false; }
+  }
+
+  async function syncAccount() {
+    if (!user || syncBusy) return;
+    syncBusy = true;
+    try {
+      for (let round = 0; round < 3; round++) {
+        const meta = syncMeta();
+        const got = await getAccountData();
+        if (got.status !== 200) throw new Error(`get ${got.status}`);
+        const { data, version } = got.json;
+        if (data && version !== meta.version) {
+          const merged = mergeSnapshots(meta.base, snap(), data);
+          if (!sameSnapshot(merged, snap())) applyRemote(merged);
+        }
+        const local = snap();
+        if (data ? sameSnapshot(local, data) : !local.students.length && !local.lessons.length) {
+          setSyncMeta(version, data);
+          break;
+        }
+        const put = await putAccountData(local, version);
+        if (put.status === 200) { setSyncMeta(put.json.version, local); break; }
+        if (put.status !== 409) throw new Error(`put ${put.status}`);
+        // 409: מכשיר אחר שמר בדיוק עכשיו — סיבוב נוסף ממזג מול הגרסה שלו
+      }
+      syncState = { ok: true, at: Date.now() };
+    } catch (error) {
+      console.warn("Account sync failed", error);
+      syncState = { ok: false, at: Date.now() };
+    } finally {
+      syncBusy = false;
+      if (activeViewName() === "settings") renderSettings();
+    }
+  }
+
+  // הקיצור באייפון שייך לחשבון: המכשיר הראשון מוסר את הקישור שלו, מכשיר נוסף מקבל אותו
+  async function linkWaKey() {
+    try {
+      const r = await getAccountWaKey();
+      if (r.status !== 200) return;
+      const local = waKey();
+      if (!r.json.key) { if (local) await putAccountWaKey(local); return; }
+      if (r.json.key !== local) { lsSet(WA_KEY_STORE, r.json.key); trySyncPush(); }
+    } catch (error) { console.warn("WhatsApp key link failed", error); }
+  }
+
+  const GOOGLE_ICON = `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.5-.2-2.3H12v4.3h5.9a5 5 0 0 1-2.2 3.3v2.7h3.6c2.1-1.9 3.3-4.8 3.3-8z"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.6-2.7c-1 .7-2.2 1-3.7 1-2.9 0-5.3-1.9-6.2-4.5H2.1v2.8A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.8 14.1a6.6 6.6 0 0 1 0-4.2V7.1H2.1a11 11 0 0 0 0 9.8l3.7-2.8z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3 .6 4.2 1.6l3.1-3.1A11 11 0 0 0 2.1 7.1l3.7 2.8C6.7 7.3 9.1 5.4 12 5.4z"/></svg>`;
+
+  function showAuthScreen() {
+    let el = document.getElementById("authScreen");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "authScreen";
+      el.className = "auth-screen";
+      document.body.appendChild(el);
+    }
+    const hasData = students.length || lessons.length;
+    el.innerHTML = `
+      <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <img src="icon-192.png" alt="" class="auth-logo" width="64" height="64">
+        <h1 id="authTitle">המורה שלי</h1>
+        <p class="auth-sub">${hasData
+          ? "בהתחברות, התלמידים והשיעורים שכבר במכשיר נשמרים בחשבון — ונפתחים מכל מכשיר."
+          : "תלמידים, שיעורים ותשלומים במקום אחד — מכל מכשיר."}</p>
+        <button type="button" class="btn btn-block auth-google" onclick="App.authGoogle()">${GOOGLE_ICON} המשך עם Google</button>
+        <div class="auth-or"><span>או עם מייל</span></div>
+        <form class="auth-form" onsubmit="event.preventDefault(); App.authEmail('signin')">
+          <label for="auth-email">מייל</label>
+          <input id="auth-email" type="email" autocomplete="email" inputmode="email" dir="ltr" required>
+          <label for="auth-pass">סיסמה</label>
+          <input id="auth-pass" type="password" autocomplete="current-password" dir="ltr" required>
+          <p id="auth-error" class="field-error" role="alert" hidden></p>
+          <button type="submit" class="btn btn-primary btn-block">כניסה</button>
+          <button type="button" class="btn btn-light btn-block" onclick="App.authEmail('signup')">יצירת חשבון חדש</button>
+          <button type="button" class="auth-link" onclick="App.authReset()">שכחתי סיסמה</button>
+        </form>
+        <button type="button" class="auth-link auth-skip" onclick="App.authSkip()">המשך בלי חשבון (הנתונים יישארו רק במכשיר הזה)</button>
+      </div>`;
+    el.hidden = false;
+    document.body.classList.add("auth-open");
+  }
+  function hideAuthScreen() {
+    const el = document.getElementById("authScreen");
+    if (el) el.hidden = true;
+    document.body.classList.remove("auth-open");
+  }
+  function authFail(error) {
+    const text = authErrorText(error);
+    const el = document.getElementById("auth-error");
+    if (el) { el.textContent = text; el.hidden = !text; }
+  }
+  async function authGoogle() {
+    try { await signInGoogle(); } catch (error) { authFail(error); }
+  }
+  async function authEmail(mode) {
+    const email = document.getElementById("auth-email")?.value.trim() || "";
+    const password = document.getElementById("auth-pass")?.value || "";
+    try { await (mode === "signup" ? signUpEmail(email, password) : signInEmail(email, password)); }
+    catch (error) { authFail(error); }
+  }
+  async function authReset() {
+    const email = document.getElementById("auth-email")?.value.trim() || "";
+    if (!email) { authFail({ code: "auth/invalid-email" }); return; }
+    try { await resetPassword(email); toast("נשלח מייל לאיפוס הסיסמה", "ok"); }
+    catch (error) { authFail(error); }
+  }
+  function authSkip() { lsSet(AUTH_SKIP_KEY, "1"); hideAuthScreen(); }
+
+  // ההתנתקות מנקה את המכשיר (מכשיר משותף/שאול) — הכול שמור בחשבון וחוזר בהתחברות הבאה
+  function clearDeviceData() {
+    students = []; lessons = []; settings = { ...DEFAULT_SETTINGS };
+    persistSnapshot();
+    for (const k of [SYNC_KEY, WA_KEY_STORE, WA_SENT_KEY, CLOUD_CODE_KEY, CLOUD_STATE_KEY, CLOUD_SAVED_KEY, BEFORE_RESTORE_KEY]) {
+      try { localStorage.removeItem(k); } catch { /* לא קריטי */ }
+    }
+    applyTheme(); render();
+  }
+  async function authSignOut() {
+    if (!await askConfirmation("הנתונים שמורים בחשבון. בהתנתקות הם יימחקו מהמכשיר הזה ויחזרו בהתחברות הבאה.", "התנתקות")) return;
+    await syncAccount();
+    if (!syncState?.ok && !await askConfirmation("השינויים האחרונים עוד לא נשמרו בחשבון (אין חיבור?). להתנתק בכל זאת?", "התנתקות בכל זאת")) return;
+    await signOutUser();
+    clearDeviceData();
+  }
+  async function authDelete() {
+    if (!await askConfirmation("החשבון וכל הנתונים שבו יימחקו לצמיתות — מהשרת ומהמכשיר הזה. אי אפשר לבטל את זה.", "מחיקת החשבון")) return;
+    try {
+      const r = await deleteAccountData();
+      if (r.status !== 200) throw new Error(`delete ${r.status}`);
+      await deleteFirebaseUser();
+    } catch (error) {
+      toast(authErrorText(error), "err");
+      return;
+    }
+    clearDeviceData();
+    toast("החשבון נמחק", "ok");
+  }
+
+  function accountSettingsHtml() {
+    const head = `<div class="settings-group-head"><span>${icon("user")}</span><div><h3>חשבון</h3><p>הנתונים נשמרים בחשבון ונפתחים מכל מכשיר</p></div></div>`;
+    if (!user) {
+      return `<section class="settings-group">${head}
+        <div class="settings-action-stack"><button class="btn btn-primary btn-block" onclick="App.openAuth()">התחברות או הרשמה</button></div>
+      </section>`;
+    }
+    const when = syncState && new Date(syncState.at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+    const status = !syncState ? `<p class="push-status warn">מסנכרן…</p>`
+      : syncState.ok ? `<p class="push-status ok">✓ מסונכרן עם החשבון · ${when}</p>`
+      : `<p class="push-status err">הסנכרון נכשל — אין חיבור? ננסה שוב בשמירה הבאה.</p>`;
+    return `<section class="settings-group">${head}
+      <div class="settings-panel">
+        <div class="setting-row"><div><div class="setting-label">מחובר בתור</div><div class="setting-sub" dir="ltr">${escapeHtml(user.email || "")}</div></div></div>
+        ${status}
+      </div>
+      <div class="settings-action-stack settings-data-actions">
+        <button class="btn btn-light btn-block" onclick="App.authSignOut()">התנתקות</button>
+        <button class="btn btn-danger btn-block" onclick="App.authDelete()">מחיקת החשבון</button>
+      </div>
+    </section>`;
+  }
+
+  function initAccount() {
+    onAuth(u => {
+      user = u;
+      if (u) {
+        hideAuthScreen();
+        void syncAccount().then(linkWaKey);
+      } else if (lsGet(AUTH_SKIP_KEY) !== "1") {
+        showAuthScreen();
+      }
+      if (activeViewName() === "settings") renderSettings();
+    }).catch(error => console.warn("Accounts unavailable", error)); // בלי רשת בפתיחה הראשונה — האפליקציה עובדת מקומית
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden || !user || Date.now() - lastPull < 15e3) return;
+      lastPull = Date.now();
+      void syncAccount();
+    });
+  }
+
   // ========== סיכום הכנסות ==========
   function changeMonth(delta) {
     viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + delta, 1);
@@ -2581,6 +2791,7 @@ const App = (() => {
   function renderSettings() {
     const body = document.getElementById("settingsBody");
     renderKeepFocus(body, `
+      ${accountSettingsHtml()}
       <section class="settings-group">
         <div class="settings-group-head"><span>${icon("edit")}</span><div><h3>פרופיל</h3><p>הפרטים שמופיעים באפליקציה</p></div></div>
         <div class="settings-panel">
@@ -3135,6 +3346,7 @@ const App = (() => {
     // מה שכבר במכשיר עולה לענן מיד בפתיחה, ושוב כשחוזר החיבור אחרי כישלון
     scheduleCloudBackup(1500);
     addEventListener("online", () => scheduleCloudBackup(0));
+    initAccount();
     // מה הקיצור שלח — בפתיחה ובכל חזרה לאפליקציה (למשל אחרי "שליחה לכולם")
     void loadWaStatus();
     document.addEventListener("visibilitychange", () => { if (!document.hidden) void loadWaStatus(); });
@@ -3446,6 +3658,7 @@ const App = (() => {
     setMoneyTab, togglePaymentBox, sendWhatsApp, openWhatsAppChat, sendReceipt, sendLessonReminder, sendAllViaShortcut, setWaAuto, copyWaAutoUrl, installAutoShortcut, testAutoShortcut, repeatLastLesson, markAllPaid, postponeLesson,
     exportData, importData, exportCalendar,
     shareCloudCode, openCloudRestore, restoreFromCloud, undoCloudRestore,
+    authGoogle, authEmail, authReset, authSkip, authSignOut, authDelete, openAuth: showAuthScreen,
     changeMonth,
     updateSetting, setTheme, clearAll,
     enableNotifications, testNotification, testClosedPush,

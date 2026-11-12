@@ -2512,3 +2512,20 @@ input:focus, select:focus, textarea:focus { border-color: var(--text); box-shado
 .shortcut-build { margin: 6px 0 4px; padding-inline-start: 18px; list-style: decimal; }
 .shortcut-build li { margin: 3px 0; }
 .shortcut-manual summary { display: inline; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+/* מסך התחברות */
+body.auth-open { overflow: hidden; }
+.auth-screen { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px 16px; overflow-y: auto; background: var(--bg); }
+.auth-screen[hidden] { display: none; }
+.auth-card { width: 100%; max-width: 380px; text-align: center; }
+.auth-logo { border-radius: 16px; margin-bottom: 10px; }
+.auth-card h1 { margin: 0 0 6px; font-size: 1.6rem; }
+.auth-sub { margin: 0 0 22px; color: var(--muted); font-size: .92rem; line-height: 1.55; text-wrap: balance; }
+.auth-google { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font-weight: 600; }
+.auth-or { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; color: var(--muted); font-size: .8rem; }
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.auth-form { display: grid; gap: 8px; text-align: start; }
+.auth-form label { font-size: .82rem; font-weight: 600; }
+.auth-form .btn { margin-top: 4px; }
+.auth-link { background: none; border: 0; padding: 8px; color: var(--muted); font: inherit; font-size: .82rem; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.auth-skip { margin-top: 14px; }

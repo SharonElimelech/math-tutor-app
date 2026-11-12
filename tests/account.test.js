@@ -70,8 +70,9 @@ test("each user sees only their own data, and a stale device cannot overwrite a 
 
 test("the WhatsApp key belongs to one account and follows it to new devices", async () => {
   const env = memoryEnv({ FIREBASE_PROJECT_ID: PROJECT }), call = client(env);
-  const k1 = (await call("alice", "GET", "/me/wa-key")).json.key;
-  assert.match(k1, /^[\w-]{20,80}$/);
+  assert.equal((await call("alice", "GET", "/me/wa-key")).json.key, null, "no key until a device sends one");
+  const k1 = "first-device-key-0000000000";
+  await call("alice", "PUT", "/me/wa-key", { key: k1 });
   assert.equal((await call("alice", "GET", "/me/wa-key")).json.key, k1, "same key on every device");
 
   const existing = "85355c31-3a31-4551-96d9-60eaf8cdb161";
@@ -83,7 +84,8 @@ test("the WhatsApp key belongs to one account and follows it to new devices", as
 test("deleting the account removes everything the server holds for it", async () => {
   const env = memoryEnv({ FIREBASE_PROJECT_ID: PROJECT }), call = client(env), kv = kvStore(env);
   await call("alice", "PUT", "/me/data", { baseVersion: 0, data: snapshot("דנה") });
-  const key = (await call("alice", "GET", "/me/wa-key")).json.key;
+  const key = "alice-wa-key-000000000000";
+  await call("alice", "PUT", "/me/wa-key", { key });
   await kv.put("wa:" + key, "[]");
   await call("bob", "PUT", "/me/data", { baseVersion: 0, data: snapshot("של בוב") });
 

@@ -234,10 +234,10 @@ async function account(req, url, env, reply, kv) {
     }
     return json({ version: base + 1, updatedAt: now });
   }
-  // מפתח הוואטסאפ של החשבון: נוצר פעם אחת; PUT מאמץ מפתח קיים (הקישור שכבר בקיצור באייפון)
+  // מפתח הוואטסאפ של החשבון. GET: null אם עוד אין — המכשיר הראשון שולח את שלו (הקישור שכבר בקיצור
+  // באייפון) ב-PUT; מכשיר נוסף מקבל את של החשבון וממשיך לאותו קיצור.
   if (url.pathname === "/me/wa-key" && req.method === "GET") {
-    await env.DB.prepare("INSERT INTO account_keys (uid, wa_key) VALUES (?1, ?2) ON CONFLICT(uid) DO NOTHING").bind(uid, crypto.randomUUID()).run();
-    return json({ key: (await env.DB.prepare("SELECT wa_key FROM account_keys WHERE uid = ?1").bind(uid).first()).wa_key });
+    return json({ key: (await env.DB.prepare("SELECT wa_key FROM account_keys WHERE uid = ?1").bind(uid).first())?.wa_key || null });
   }
   if (url.pathname === "/me/wa-key" && req.method === "PUT") {
     const key = String((await readBody())?.key || "");
