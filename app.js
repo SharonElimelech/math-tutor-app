@@ -2304,6 +2304,13 @@ const App = (() => {
   function renderBackupNudge() {
     const el = document.getElementById("backupNudge");
     if (!el) return;
+    if (isDemo()) {
+      el.innerHTML = `<div class="backup-nudge demo-nudge">${icon("info")}
+          <div><strong>מצב ניסיון עם נתוני דוגמה</strong><span>אפשר ללחוץ על הכול. שום דבר לא נשמר ולא נשלח.</span></div>
+          <button class="btn btn-primary" onclick="App.endDemo()">מתחילים באמת</button>
+        </div>`;
+      return;
+    }
     const hasData = students.length || lessons.length;
     // גיבוי ענן פעיל — התזכורת היחידה היא לשמור את קוד השחזור (בלעדיו הגיבוי לא שווה כלום)
     if (hasData && cloudCode() && lsGet(CLOUD_SAVED_KEY) !== "1") {
@@ -2369,6 +2376,7 @@ const App = (() => {
     cloudTimer = setTimeout(() => void backupToCloud(), delay);
   }
   async function backupToCloud() {
+    if (isDemo()) return;
     const snap = lastSavedState;
     if (!snap.students.length && !snap.lessons.length) return;
     const code = cloudCode(true);
@@ -2592,6 +2600,7 @@ const App = (() => {
           <button type="button" class="btn btn-light btn-block" onclick="App.authEmail('signup')">יצירת חשבון חדש</button>
           <button type="button" class="auth-link" onclick="App.authReset()">שכחתי סיסמה</button>
         </form>
+        <button type="button" class="btn btn-light btn-block auth-demo" onclick="App.startDemo()">לנסות עם נתוני דוגמה, בלי הרשמה</button>
         <button type="button" class="auth-link auth-skip" onclick="App.authSkip()">המשך בלי חשבון (הנתונים יישארו רק במכשיר הזה)</button>
         <p class="auth-legal">בהתחברות מסכימים ל<a href="terms.html">תנאי השימוש</a> ול<a href="privacy.html">מדיניות הפרטיות</a>.</p>
       </div>`;
@@ -2628,6 +2637,41 @@ const App = (() => {
   }
   function authSkip() { lsSet(AUTH_SKIP_KEY, "1"); hideAuthScreen(); }
 
+  // ניסיון עם נתוני דוגמה, בלי הרשמה. הנתונים נשארים במכשיר — לא מסונכרנים, לא מגובים ולא נשלחים לשרת;
+  // "מתחילים באמת" מוחק אותם ופותח את ההתחברות. הטלפונים: 050-000000X — מספרים שלא קיימים בוואטסאפ,
+  // כך שכפתורי השליחה נראים ועובדים בניסיון, אבל שום הודעה לא מגיעה לאדם אמיתי.
+  const DEMO_KEY = "mt_demo";
+  const isDemo = () => lsGet(DEMO_KEY) === "1";
+  function startDemo() {
+    const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return ymd(d); };
+    const kid = (id, name, parentName, price) => ({ id, name, parentName, phone: `050000000${id.slice(-1)}`, studentPhone: "", price, notes: "" });
+    const lesson = (id, studentId, n, time, duration, topic, done, paid) =>
+      ({ id, studentId, date: day(n), time, duration, topic, done, paid, ...(paid ? { paidAt: day(n) } : {}) });
+    students = [kid("demo1", "נועה", "מיכל", 130), kid("demo2", "איתי", "רונן", 120), kid("demo3", "מאיה", "דנה", 140)];
+    lessons = [
+      lesson("demol1", "demo2", -7, "17:00", 45, "שברים", true, true),
+      lesson("demol2", "demo1", -2, "16:00", 60, "משוואות", true, false),
+      lesson("demol3", "demo2", 0, "17:00", 45, "אחוזים", false, false),
+      lesson("demol4", "demo3", 1, "18:30", 60, "גאומטריה", false, false),
+      lesson("demol5", "demo1", 5, "16:00", 60, "", false, false)
+    ];
+    lsSet(DEMO_KEY, "1");
+    lsSet(AUTH_SKIP_KEY, "1");
+    hideAuthScreen();
+    if (save()) render();
+  }
+  function clearDemo() {
+    lsSet(DEMO_KEY, "");
+    students = []; lessons = []; settings = { ...DEFAULT_SETTINGS };
+    persistSnapshot();
+  }
+  function endDemo() {
+    clearDemo();
+    try { localStorage.removeItem(AUTH_SKIP_KEY); } catch { /* לא קריטי */ }
+    render();
+    showAuthScreen();
+  }
+
   // ההתנתקות מנקה את המכשיר (מכשיר משותף/שאול) — הכול שמור בחשבון וחוזר בהתחברות הבאה
   function clearDeviceData() {
     students = []; lessons = []; settings = { ...DEFAULT_SETTINGS };
@@ -2658,11 +2702,16 @@ const App = (() => {
     toast("החשבון נמחק", "ok");
   }
 
+  // משוב ישירות למייל (אותה כתובת שבדף הפרטיות), עם גרסה ומכשיר — עוזר לשחזר תקלה
+  const FEEDBACK_HREF = () => `mailto:aruitkh11@gmail.com?subject=${encodeURIComponent("משוב — המורה שלי")}&body=${encodeURIComponent(`\n\n—\nגרסה ${APP_VERSION} · ${navigator.userAgent}`)}`;
+  const LEGAL_LINKS_HTML = () => `<p class="settings-help"><a href="${FEEDBACK_HREF()}">שליחת משוב</a> · <a href="privacy.html">מדיניות פרטיות</a> · <a href="terms.html">תנאי שימוש</a></p>`;
   function accountSettingsHtml() {
+    const LEGAL_LINKS = LEGAL_LINKS_HTML();
     const head = `<div class="settings-group-head"><span>${icon("user")}</span><div><h3>חשבון</h3><p>הנתונים נשמרים בחשבון ונפתחים מכל מכשיר</p></div></div>`;
     if (!user) {
       return `<section class="settings-group">${head}
         <div class="settings-action-stack"><button class="btn btn-primary btn-block" onclick="App.openAuth()">התחברות או הרשמה</button></div>
+        ${LEGAL_LINKS}
       </section>`;
     }
     const when = syncState && new Date(syncState.at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
@@ -2678,7 +2727,7 @@ const App = (() => {
         <button class="btn btn-light btn-block" onclick="App.authSignOut()">התנתקות</button>
         <button class="btn btn-danger btn-block" onclick="App.authDelete()">מחיקת החשבון</button>
       </div>
-      <p class="settings-help"><a href="privacy.html">מדיניות פרטיות</a> · <a href="terms.html">תנאי שימוש</a></p>
+      ${LEGAL_LINKS}
     </section>`;
   }
 
@@ -2686,6 +2735,7 @@ const App = (() => {
     onAuth(u => {
       user = u;
       if (u) {
+        if (isDemo()) clearDemo(); // נתוני הדוגמה לא עולים לחשבון
         hideAuthScreen();
         void syncAccount().then(linkWaKey);
       } else if (lsGet(AUTH_SKIP_KEY) !== "1") {
@@ -3160,6 +3210,7 @@ const App = (() => {
     try { return JSON.parse(localStorage.getItem(PUSH_SYNC_KEY)); } catch { return null; }
   }
   function trySyncPush() {
+    if (isDemo()) return Promise.resolve(true); // נתוני דוגמה לא נשלחים לשרת
     // רץ תמיד — הסנכרון לא תלוי בתמיכת push בדפדפן (חשוב באייפון שאינו מותקן למסך הבית).
     // החותמת היא הזמן שהסנכרון סינן איתו (כך ש-pageDueItems רואה בדיוק מה השרת השמיט), והבדיקה
     // המיידית מציגה פריט שהסנכרון הזה בדיוק השמיט במקום לחכות לטיימר של 30 שניות.
@@ -3309,6 +3360,9 @@ const App = (() => {
   // ----- אתחול -----
   function handleLaunchParams() {
     const p = new URLSearchParams(location.search);
+    // קישור "?demo" (למשל בהזמנה למורים) — נכנסים ישר לנתוני הדוגמה, רק במכשיר ריק
+    if (p.has("demo") && !students.length && !lessons.length) startDemo();
+    if (HOME_MODES.some(([m]) => m === p.get("cal"))) setHomeCalMode(p.get("cal")); // למשל ?cal=week
     const hub = p.get("hub");
     const pay = p.get("pay");
     if (p.get("view")) go(p.get("view"), (hub || pay) ? () => highlightHub(pay) : undefined);
@@ -3670,6 +3724,7 @@ const App = (() => {
     exportData, importData, exportCalendar,
     shareCloudCode, openCloudRestore, restoreFromCloud, undoCloudRestore,
     authGoogle, authFacebook, authEmail, authReset, authSkip, authSignOut, authDelete, openAuth: showAuthScreen,
+    startDemo, endDemo,
     changeMonth,
     updateSetting, setTheme, clearAll,
     enableNotifications, testNotification, testClosedPush,
