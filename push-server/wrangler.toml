@@ -10,6 +10,7 @@ binding = "SUBS"
 id = "aac4e0266d82477d9b8ad899176f359b"
 
 [vars]
+FIREBASE_PROJECT_ID = "mytutor-app-f9fc4"
 VAPID_PUBLIC_KEY = "BHhFFPc6qcDFpasSyWrqfsMUdq4-InJTvr-ehC_1EVSSBlfNmG6rprnc0ONBPsqsMxnKuFY6ROfqMqCF9LW-wew"
 
 # גיבוי ענן מוצפן (סכמה: schema.sql)

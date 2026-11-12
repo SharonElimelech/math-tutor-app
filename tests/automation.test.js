@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { automationItems } from "../src/automation.js";
-import worker, { cleanWa, takeDue } from "../push-server/worker.js";
+import worker, { cleanWa, takeDue, kvStore } from "../push-server/worker.js";
+import { memoryEnv } from "./d1-memory.js";
 
 const t = (date, hhmm) => new Date(`${date}T${hhmm}:00`).getTime();
 const texts = {
@@ -73,11 +74,7 @@ test("send-all and the morning run share an id, so a lesson is reminded once", (
 });
 
 test("status shows the shortcut's last run and what it delivered, without consuming anything", async () => {
-  const store = new Map();
-  const env = { SUBS: {
-    get: async (k, type) => (store.has(k) ? (type === "json" ? JSON.parse(store.get(k)) : store.get(k)) : null),
-    put: async (k, v) => { store.set(k, v); }
-  } };
+  const env = memoryEnv();
   const call = (path, init) => worker.fetch(new Request("https://w.test" + path, init), env);
   const key = "k".repeat(30), now = Date.now();
   const item = { id: "d:a:2026-11-12:17:00", after: now - 1000, until: now + 3600e3, phone: "+972501234567", text: "hi" };
@@ -92,25 +89,32 @@ test("status shows the shortcut's last run and what it delivered, without consum
   assert.deepEqual(await (await call(`/wa?key=${key}`)).json(), [], "status did not hand the message out again");
 
   await call(`/wa?key=${"r".repeat(30)}`);
-  assert.ok(![...store.keys()].some(k => k.includes("rrrr")), "unknown key leaves no records");
+  assert.ok(!(await env.DB.prepare("SELECT k FROM kv").all()).results.some(r => r.k.includes("rrrr")), "unknown key leaves no records");
   assert.equal((await call("/wa/status?key=short")).status, 400);
 });
 
 test("an old shortcut link pulls the new queue once an alias exists", async () => {
-  const store = new Map();
-  const env = { SUBS: {
-    get: async (k, type) => (store.has(k) ? (type === "json" ? JSON.parse(store.get(k)) : store.get(k)) : null),
-    put: async (k, v) => { store.set(k, v); }
-  } };
+  const env = memoryEnv(), kv = kvStore(env);
   const call = path => worker.fetch(new Request("https://w.test" + path), env);
   const oldKey = "o".repeat(30), newKey = "n".repeat(30), now = Date.now();
   const item = (id, text) => ({ id, after: now - 1000, until: now + 3600e3, phone: "+972501234567", text });
-  store.set("wa:" + oldKey, JSON.stringify([item("p:stale", "stale")]));
-  store.set("wa:" + newKey, JSON.stringify([item("d:fresh", "fresh")]));
-  store.set("waalias:" + oldKey, newKey);
+  await kv.put("wa:" + oldKey, JSON.stringify([item("p:stale", "stale")]));
+  await kv.put("wa:" + newKey, JSON.stringify([item("d:fresh", "fresh")]));
+  await kv.put("waalias:" + oldKey, newKey);
 
   assert.deepEqual((await (await call(`/wa?key=${oldKey}`)).json()).map(m => m.text), ["fresh"], "old link gets the new list, not the stale one");
   const s = await (await call(`/wa/status?key=${newKey}`)).json();
   assert.equal(s.lastRun.n, 1, "the run shows up in the app's status");
   assert.deepEqual(await (await call(`/wa?key=${newKey}`)).json(), [], "no second send through the new link");
+});
+
+test("the 5-minute cron reads devices from D1 and prunes delivered reminders", async () => {
+  const env = memoryEnv(), kv = kvStore(env), now = Date.now();
+  await kv.put("sub:device-a", JSON.stringify({ sub: null, items: [{ t: now - 1000, title: "due", body: "" }, { t: now + 3600e3, title: "later", body: "" }] }));
+  await kv.put("wa:other", "[]");
+  const jobs = [];
+  await worker.scheduled({}, env, { waitUntil: p => jobs.push(p) });
+  await Promise.all(jobs);
+  assert.deepEqual((await kv.get("sub:device-a", "json")).items.map(i => i.title), ["later"]);
+  assert.equal(await kv.get("wa:other"), "[]", "only sub: records are touched");
 });
