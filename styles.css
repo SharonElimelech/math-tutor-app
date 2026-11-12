@@ -2531,3 +2531,4 @@ body.auth-open { overflow: hidden; }
 .auth-skip { margin-top: 14px; }
 .auth-legal { margin: 10px 0 0; color: var(--muted); font-size: .76rem; }
 .auth-legal a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.auth-facebook { margin-top: 8px; }

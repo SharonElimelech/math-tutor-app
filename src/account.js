@@ -20,6 +20,12 @@ export async function signInEmail(email, password) { const f = await firebase();
 export async function signUpEmail(email, password) { const f = await firebase(); return f.createUserWithEmailAndPassword(f.a, email, password); }
 export async function resetPassword(email) { const f = await firebase(); return f.sendPasswordResetEmail(f.a, email); }
 export async function signInGoogle() { const f = await firebase(); return f.signInWithPopup(f.a, new f.GoogleAuthProvider()); }
+export async function signInFacebook() {
+  const f = await firebase();
+  const provider = new f.FacebookAuthProvider();
+  provider.addScope("email");
+  return f.signInWithPopup(f.a, provider);
+}
 export async function signOutUser() { const f = await firebase(); return f.signOut(f.a); }
 export async function deleteFirebaseUser() { const f = await firebase(); return f.a.currentUser?.delete(); }
 
@@ -55,6 +61,8 @@ const ERRORS = {
   "auth/cancelled-popup-request": "",
   "auth/network-request-failed": "אין חיבור לאינטרנט.",
   "auth/too-many-requests": "יותר מדי ניסיונות. אפשר לנסות שוב בעוד כמה דקות.",
-  "auth/requires-recent-login": "מטעמי אבטחה צריך להתחבר שוב ואז לחזור על הפעולה."
+  "auth/requires-recent-login": "מטעמי אבטחה צריך להתחבר שוב ואז לחזור על הפעולה.",
+  // אותו מייל כבר רשום בדרך אחרת (למשל Google) — Firebase מחזיק חשבון אחד לכל מייל
+  "auth/account-exists-with-different-credential": "כבר יש חשבון עם המייל הזה בדרך אחרת — אפשר להתחבר עם Google או עם מייל וסיסמה."
 };
 export const authErrorText = error => ERRORS[error?.code] ?? "משהו השתבש. אפשר לנסות שוב.";
