@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>מדיניות פרטיות — המורה שלי</title>
+  <meta name="description" content="איזה מידע נשמר באפליקציה המורה שלי, למה, ואיך מוחקים אותו.">
+  <link rel="icon" href="icon-192.png">
+  <style>
+    :root { --bg: #f3f5f9; --surface: #fff; --text: #121826; --muted: #475266; --line: #e2e6ee; --link: #2c4a8a; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #0d1118; --surface: #151b26; --text: #e8ecf3; --muted: #a3adbf; --line: #283142; --link: #9db8f0; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.7 system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+    header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    header img { border-radius: 12px; }
+    h1 { margin: 0; font-size: 1.6rem; }
+    .updated { color: var(--muted); font-size: .9rem; margin: 0 0 24px; }
+    section { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin: 14px 0; }
+    h2 { margin: 0 0 8px; font-size: 1.15rem; }
+    ul { padding-inline-start: 20px; margin: 8px 0; }
+    li { margin: 6px 0; }
+    a { color: var(--link); }
+    .back { display: inline-block; margin-top: 20px; }
+  </style>
+</head>
+<body>
+<main>
+  <header><img src="icon-192.png" alt="" width="48" height="48"><h1>מדיניות פרטיות</h1></header>
+  <p class="updated">המורה שלי · עודכן לאחרונה: 12 בנובמבר 2026</p>
+
+  <section>
+    <h2>בקצרה</h2>
+    <p>"המורה שלי" היא אפליקציה לניהול שיעורים פרטיים: תלמידים, יומן, תזכורות ותשלומים. שומרים רק את מה שצריך כדי שהאפליקציה תעבוד ותיפתח מכל מכשיר. לא מוכרים מידע, לא מציגים פרסומות ולא משתמשים בכלי מעקב או אנליטיקה. אפשר למחוק את החשבון וכל המידע בכל רגע.</p>
+  </section>
+
+  <section>
+    <h2>איזה מידע נשמר</h2>
+    <ul>
+      <li><b>פרטי החשבון:</b> כתובת המייל, ובהתחברות עם Google או Facebook — גם השם שהם מעבירים. ההתחברות מנוהלת על ידי Firebase Authentication של Google; הסיסמה לא נשמרת אצלנו.</li>
+      <li><b>מה שמכניסים לאפליקציה:</b> תלמידים, שמות ההורים, מספרי טלפון, שיעורים, מחירים, תשלומים, הערות והגדרות. נשמר במכשיר ובשרת שלנו, כדי שיהיה זמין מכל מכשיר שמתחברים ממנו.</li>
+      <li><b>שליחה אוטומטית בוואטסאפ (אם מפעילים):</b> ההודעות המתוכננות — מספר טלפון ונוסח — נשמרות בשרת עד שנשלחות או שזמנן עובר. ההודעות נשלחות מהוואטסאפ של המשתמש עצמו, מהטלפון שלו, דרך קיצורי הדרך של אפל.</li>
+      <li><b>התראות:</b> כתובת ההתראות של הדפדפן וזמני התזכורות הקרובות, כדי לשלוח תזכורת גם כשהאפליקציה סגורה.</li>
+      <li><b>גיבוי עם קוד שחזור (אם משתמשים):</b> מוצפן במכשיר לפני שהוא נשלח. השרת לא יכול לקרוא אותו.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>למה ואיפה</h2>
+    <p>המידע משמש רק להפעלת האפליקציה: הצגת הנתונים, סנכרון בין מכשירים, תזכורות ושליחת הודעות שהמשתמש ביקש. הוא נשמר אצל ספקי התשתית: Google Firebase (התחברות), Cloudflare (שרת ומסד נתונים) ו-GitHub Pages (האתר עצמו). השרתים שלהם עשויים להיות מחוץ לישראל. המידע לא מועבר לאף גורם אחר.</p>
+  </section>
+
+  <section>
+    <h2>מידע על תלמידים והורים</h2>
+    <p>המשתמש — המורה — מכניס לאפליקציה פרטים של תלמידים והורים, ואחראי לכך שמותר לו לשמור אותם ולשלוח להם הודעות. אנחנו לא פונים לתלמידים או להורים ולא משתמשים בפרטים שלהם לשום מטרה אחרת.</p>
+  </section>
+
+  <section>
+    <h2>אבטחה</h2>
+    <p>כל התקשורת מוצפנת (HTTPS). כל בקשה לשרת נבדקת מול תעודת ההתחברות של המשתמש, וכל משתמש רואה רק את המידע שלו. יש הגבלה על כמות הבקשות כדי למנוע ניצול לרעה.</p>
+  </section>
+
+  <section id="delete">
+    <h2>מחיקת המידע</h2>
+    <ul>
+      <li><b>מתוך האפליקציה:</b> הגדרות ← חשבון ← "מחיקת החשבון". כל המידע של החשבון נמחק מהשרת, החשבון עצמו נמחק, והמידע נמחק גם מהמכשיר. זה סופי.</li>
+      <li><b>במייל:</b> אפשר לבקש מחיקה ב-<a href="mailto:aruitkh11@gmail.com?subject=%D7%9E%D7%97%D7%99%D7%A7%D7%AA%20%D7%97%D7%A9%D7%91%D7%95%D7%9F%20-%20%D7%94%D7%9E%D7%95%D7%A8%D7%94%20%D7%A9%D7%9C%D7%99">aruitkh11@gmail.com</a> מכתובת המייל של החשבון. המחיקה מתבצעת תוך 30 יום.</li>
+      <li><b>התחברות עם Facebook:</b> אותו הדבר — מחיקת החשבון באפליקציה מוחקת את כל המידע. אפשר גם להסיר את האפליקציה מהגדרות Facebook (אפליקציות ואתרים).</li>
+    </ul>
+    <p>אפשר גם לבקש לעיין במידע או לתקן אותו, באותה כתובת.</p>
+  </section>
+
+  <section>
+    <h2>שינויים</h2>
+    <p>אם המדיניות תשתנה, התאריך למעלה יתעדכן. שינוי מהותי יוצג גם באפליקציה.</p>
+    <p>שאלות: <a href="mailto:aruitkh11@gmail.com">aruitkh11@gmail.com</a> · <a href="terms.html">תנאי השימוש</a></p>
+  </section>
+
+  <a class="back" href="./">← חזרה לאפליקציה</a>
+</main>
+</body>
+</html>

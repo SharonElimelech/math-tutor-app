@@ -2529,3 +2529,5 @@ body.auth-open { overflow: hidden; }
 .auth-form .btn { margin-top: 4px; }
 .auth-link { background: none; border: 0; padding: 8px; color: var(--muted); font: inherit; font-size: .82rem; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .auth-skip { margin-top: 14px; }
+.auth-legal { margin: 10px 0 0; color: var(--muted); font-size: .76rem; }
+.auth-legal a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }

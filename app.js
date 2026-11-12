@@ -2587,6 +2587,7 @@ const App = (() => {
           <button type="button" class="auth-link" onclick="App.authReset()">שכחתי סיסמה</button>
         </form>
         <button type="button" class="auth-link auth-skip" onclick="App.authSkip()">המשך בלי חשבון (הנתונים יישארו רק במכשיר הזה)</button>
+        <p class="auth-legal">בהתחברות מסכימים ל<a href="terms.html">תנאי השימוש</a> ול<a href="privacy.html">מדיניות הפרטיות</a>.</p>
       </div>`;
     el.hidden = false;
     document.body.classList.add("auth-open");
@@ -2668,6 +2669,7 @@ const App = (() => {
         <button class="btn btn-light btn-block" onclick="App.authSignOut()">התנתקות</button>
         <button class="btn btn-danger btn-block" onclick="App.authDelete()">מחיקת החשבון</button>
       </div>
+      <p class="settings-help"><a href="privacy.html">מדיניות פרטיות</a> · <a href="terms.html">תנאי שימוש</a></p>
     </section>`;
   }
 

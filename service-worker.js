@@ -1,11 +1,11 @@
 // Service Worker – מאפשר עבודה גם בלי אינטרנט (offline) והתקנה כאפליקציה
-const CACHE = "morti-v4.9.0";
+const CACHE = "morti-v4.9.1";
 // נתוני ה-push של האפליקציה (רשימת תזכורות + סימוני "הוצג") — חיים מעבר לעדכוני גרסה
 const PUSH_DATA = "mt-push-data";
 const ASSETS = [
   "index.html",
-  "styles.css?v=79",
-  "app.js?v=104",
+  "styles.css?v=80",
+  "app.js?v=105",
   "src/data.js",
   "src/push.js",
   "src/reminders.js",
@@ -108,9 +108,10 @@ self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
 
   if (e.request.mode === "navigate") {
-    // רק דף ה-HTML של האפליקציה נשמר כ-index.html — לא קובץ קיצור או כל ניווט אחר בתחום
+    // רק דף הבית של האפליקציה נשמר כ-index.html — לא קובץ קיצור, דף פרטיות או כל ניווט אחר בתחום
     // (קובץ שנפתח מתוך האפליקציה נשמר פעם כדף הבית, ובלי רשת היא נפתחה כ"ג'יבריש")
-    if (/\.[a-z0-9]+$/i.test(url.pathname) && !url.pathname.endsWith(".html")) return;
+    const scope = new URL(self.registration.scope).pathname;
+    if (url.pathname !== scope && url.pathname !== scope + "index.html") return;
     e.respondWith(
       fetch(e.request)
         .then(res => {
